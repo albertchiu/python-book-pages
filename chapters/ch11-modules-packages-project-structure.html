@@ -1,0 +1,664 @@
+<h1 id="第-11-章模組套件與專案結構">第 11 章：模組、套件與專案結構</h1><p>在 Java，編譯期就把「我有哪些類別、它們屬於哪個 package」釘死了：<code>package com.acme.billing;</code> 寫在檔頭，class 名稱要跟檔名一致，classpath 在啟動時固定，JVM 載入類別是惰性、嚴格、無副作用的。Python 把這一整套搬到了<strong>執行期</strong>：<code>import</code> 是一條會跑的敘述，模組第一次被載入時會「從上到下執行整個檔案」，而且只執行一次、之後快取在記憶體裡。這個差異會顛覆你對「載入」的直覺——它解釋了循環匯入為何會炸、為何頂層別放重活、為何相對匯入在腳本裡會失效。本章用一個會貫穿全章的最小套件範例，把 Python 的模組系統與現代專案佈局講透。</p>
+<hr>
+<h2 id="module-與-package執行期的命名空間">module 與 package：執行期的命名空間</h2><p>先把詞彙對齊。在 Python：</p>
+<ul>
+<li><strong>module（模組）</strong>：一個 <code>.py</code> 檔。檔名（去掉 <code>.py</code>）就是模組名。</li>
+<li><strong>package（套件）</strong>：一個「裝著模組的目錄」。傳統上目錄裡要有 <code>__init__.py</code> 才算 package（沒有的話是「namespace package」，後面會談）。</li>
+<li><strong>import</strong>：把另一個模組載入、執行、並在當前命名空間綁定一個名字。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>思維差異</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>package com.acme.billing;</code>（檔頭宣告）</td>
+<td>目錄結構<strong>就是</strong>套件名，不在檔案裡宣告</td>
+<td>Python 的套件名來自它在檔案系統的相對位置</td>
+</tr>
+<tr>
+<td><code>import com.acme.billing.Invoice;</code></td>
+<td><code>from acme.billing import invoice</code></td>
+<td>Java import 是編譯期符號解析；Python import 是執行期、會跑程式碼</td>
+</tr>
+<tr>
+<td>classpath（JAR/目錄清單）</td>
+<td><code>sys.path</code>（目錄/zip 清單）</td>
+<td>兩者都是「去哪裡找」，但 <code>sys.path</code> 可在執行期被改</td>
+</tr>
+<tr>
+<td>JVM 惰性載入、無副作用</td>
+<td>模組第一次 import 時整檔執行</td>
+<td><strong>這是最大的心智轉換</strong></td>
+</tr>
+</tbody></table>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 的 <code>import</code> 只是「打字省略」，不會載入任何東西，真正載入在第一次用到該類別時由 ClassLoader 完成。Python 的 <code>import x</code> 是一條敘述：找到 <code>x</code>、執行 <code>x</code> 的全部頂層程式碼、把模組物件綁到名字 <code>x</code>。</p>
+</div><h3 id="本章的範例套件">本章的範例套件</h3><p>整章用這個最小但可運作的套件。先把目錄樹放在這裡，後面所有範例都對應它：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-330" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('billing-demo%2F%0A%E2%94%9C%E2%94%80%E2%94%80%20pyproject.toml%0A%E2%94%9C%E2%94%80%E2%94%80%20src%2F%0A%E2%94%82%20%20%20%E2%94%94%E2%94%80%E2%94%80%20billing%2F%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20__init__.py%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20money.py%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20invoice.py%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20tax.py%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%94%E2%94%80%E2%94%80%20__main__.py%0A%E2%94%94%E2%94%80%E2%94%80%20tests%2F%0A%20%20%20%20%E2%94%94%E2%94%80%E2%94%80%20test_invoice.py'), 'copy-btn-330')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">billing-demo/
+├── pyproject.toml
+├── src/
+│   └── billing/
+│       ├── __init__.py
+│       ├── money.py
+│       ├── invoice.py
+│       ├── tax.py
+│       └── __main__.py
+└── tests/
+    └── test_invoice.py</code></pre>
+      </div>
+    <p><code>money.py</code> 是最底層、不依賴套件內其他模組的工具：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-331" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Fbilling%2Fmoney.py%0Afrom%20decimal%20import%20Decimal%0A%0Adef%20to_cents(amount%3A%20Decimal)%20-%3E%20int%3A%0A%20%20%20%20%22%22%22%E6%8A%8A%E9%87%91%E9%A1%8D%EF%BC%88%E5%85%83%EF%BC%89%E8%BD%89%E6%88%90%E5%88%86%EF%BC%8C%E9%81%BF%E5%85%8D%E6%B5%AE%E9%BB%9E%E8%AA%A4%E5%B7%AE%E3%80%82%22%22%22%0A%20%20%20%20%23%20to_integral_value()%20%E9%A0%90%E8%A8%AD%E6%8E%A1%E7%9B%AE%E5%89%8D%20Decimal%20context%20%E7%9A%84%20ROUND_HALF_EVEN%EF%BC%88%E9%8A%80%E8%A1%8C%E5%AE%B6%E6%8D%A8%E5%85%A5%EF%BC%89%EF%BC%9B%0A%20%20%20%20%23%20%E8%8B%A5%E8%A8%88%E8%B2%BB%E9%9C%80%E7%89%B9%E5%AE%9A%E8%A6%8F%E5%89%87%EF%BC%8C%E6%87%89%E9%A1%AF%E5%BC%8F%E6%8C%87%E5%AE%9A%EF%BC%8C%E4%BE%8B%E5%A6%82%20.to_integral_value(rounding%3DROUND_HALF_UP)%E3%80%82%0A%20%20%20%20return%20int((amount%20*%20100).to_integral_value())%0A%0Adef%20format_money(cents%3A%20int)%20-%3E%20str%3A%0A%20%20%20%20return%20f%22%24%7Bcents%20%2F%20100%3A.2f%7D%22'), 'copy-btn-331')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/billing/money.py
+from decimal import Decimal
+
+def to_cents(amount: Decimal) -&gt; int:
+    """把金額（元）轉成分，避免浮點誤差。"""
+    # to_integral_value() 預設採目前 Decimal context 的 ROUND_HALF_EVEN（銀行家捨入）；
+    # 若計費需特定規則，應顯式指定，例如 .to_integral_value(rounding=ROUND_HALF_UP)。
+    return int((amount * 100).to_integral_value())
+
+def format_money(cents: int) -&gt; str:
+    return f"${cents / 100:.2f}"</code></pre>
+      </div>
+    <hr>
+<h2 id="import-機制syspathsysmodules-與只載入一次">import 機制：sys.path、sys.modules 與只載入一次</h2><p><code>import billing.money</code> 背後發生三件事：</p>
+<ol>
+<li><strong>尋找（find）</strong>：直譯器依序問每個「finder」：我能定位 <code>billing</code> 嗎？最常見的 finder 走訪 <code>sys.path</code> 裡的每個目錄找 <code>billing/</code>。</li>
+<li><strong>載入（load）</strong>：找到後，建立一個 module 物件，<strong>從上到下執行該檔的所有頂層程式碼</strong>，把產生的名字放進 module 的命名空間。</li>
+<li><strong>綁定（bind）</strong>：在你目前的命名空間綁定名字。<code>import billing.money</code> 綁的是 <code>billing</code>；<code>from billing import money</code> 綁的是 <code>money</code>。</li>
+</ol>
+<p><code>sys.path</code> 就是 Python 的 classpath。它從哪裡來？</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-332" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20sys%0A%3E%3E%3E%20sys.path%5B%3A3%5D%0A%5B%27%27%2C%20%27%2Fusr%2Flib%2Fpython3.14%27%2C%20%27%2Fusr%2Flib%2Fpython3.14%2Flib-dynload%27%5D'), 'copy-btn-332')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import sys
+&gt;&gt;&gt; sys.path[:3]
+['', '/usr/lib/python3.14', '/usr/lib/python3.14/lib-dynload']</code></pre>
+      </div>
+    <p>開頭那個 <code>sys.path[0]</code> 很關鍵，但它的<strong>字面值會因啟動方式而不同</strong>：在 REPL、<code>python -c</code>、<code>python -m</code> 時它是空字串 <code>&#39;&#39;</code>（代表「目前工作目錄」，就是上面 REPL 範例看到的）；而你直接 <code>python foo.py</code> 時，它是 <code>foo.py</code> 所在目錄的<strong>絕對路徑</strong>（例如 <code>/private/tmp</code>），不是 <code>&#39;&#39;</code>。兩者語意相近——都讓你能 import 同目錄下的檔案——但字面不同，別誤以為 <code>&#39;&#39;</code> 跟「腳本目錄」是同一回事。重點是：<strong>你直接 <code>python foo.py</code> 時，<code>foo.py</code> 所在的目錄會被加進 <code>sys.path</code> 最前面</strong>。這是很多「在我電腦上跑得起來、裝起來卻 import 不到」問題的根源，後面 src layout 會回頭解決它。</p>
+<h3 id="模組只載入一次sysmodules-快取">模組只載入一次：sys.modules 快取</h3><p>第一次 import 一個模組，Python 執行它的頂層程式碼，然後把 module 物件存進 <code>sys.modules</code> 這個 dict。<strong>之後所有 import 同一模組，都直接從 <code>sys.modules</code> 拿快取，不再重跑檔案。</strong></p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-333" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Fbilling%2Ftax.py%EF%BC%88%E4%BB%A5%E4%B8%8B%E9%A0%82%E5%B1%A4%20print%20%E7%B4%94%E7%82%BA%E7%A4%BA%E7%AF%84%20sys.modules%20%E5%BF%AB%E5%8F%96%EF%BC%8C%E6%AD%A3%E5%BC%8F%E7%AF%84%E4%BE%8B%E8%AB%8B%E7%A7%BB%E9%99%A4%EF%BC%89%0Aprint(%22tax.py%20%E6%AD%A3%E5%9C%A8%E8%A2%AB%E8%BC%89%E5%85%A5%22)%20%20%20%20%20%20%20%20%20%20%23%20%E2%86%90%20%E6%95%85%E6%84%8F%E7%9A%84%E5%89%AF%E4%BD%9C%E7%94%A8%EF%BC%8C%E7%9C%8B%E5%AE%8C%E6%9C%AC%E7%AF%80%E5%B0%B1%E5%88%AA%E6%8E%89%0A%0ATAX_RATE%20%3D%200.05%0A%0Adef%20with_tax(cents%3A%20int)%20-%3E%20int%3A%0A%20%20%20%20return%20round(cents%20*%20(1%20%2B%20TAX_RATE))'), 'copy-btn-333')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/billing/tax.py（以下頂層 print 純為示範 sys.modules 快取，正式範例請移除）
+print("tax.py 正在被載入")          # ← 故意的副作用，看完本節就刪掉
+
+TAX_RATE = 0.05
+
+def with_tax(cents: int) -&gt; int:
+    return round(cents * (1 + TAX_RATE))</code></pre>
+      </div>
+    <p>注意這行頂層 <code>print</code> 正是 18 行前批評的「頂層放動作」陷阱——它只是用來觀察快取行為。<strong>看完這一節就把它刪掉</strong>，否則之後凡是 <code>import billing</code>（會經 <code>__init__.py</code>→<code>invoice</code>→<code>tax</code>）都會先印出這行。本章後續所有執行框（<code>python -m billing</code>、<code>uv run billing</code> 等）都假設這行 debug print 已移除。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-334" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20billing.tax%0Atax.py%20%E6%AD%A3%E5%9C%A8%E8%A2%AB%E8%BC%89%E5%85%A5%0A%3E%3E%3E%20import%20billing.tax%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%AC%AC%E4%BA%8C%E6%AC%A1%EF%BC%9A%E4%BB%80%E9%BA%BC%E9%83%BD%E4%B8%8D%E5%8D%B0%EF%BC%8C%E5%9B%A0%E7%82%BA%E8%B5%B0%E5%BF%AB%E5%8F%96%0A%3E%3E%3E%20import%20sys%0A%3E%3E%3E%20%27billing.tax%27%20in%20sys.modules%0ATrue%0A%3E%3E%3E%20sys.modules%5B%27billing.tax%27%5D.TAX_RATE%0A0.05'), 'copy-btn-334')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import billing.tax
+tax.py 正在被載入
+&gt;&gt;&gt; import billing.tax            # 第二次：什麼都不印，因為走快取
+&gt;&gt;&gt; import sys
+&gt;&gt;&gt; 'billing.tax' in sys.modules
+True
+&gt;&gt;&gt; sys.modules['billing.tax'].TAX_RATE
+0.05</code></pre>
+      </div>
+    <p>這帶來兩個資深工程師必須內化的後果：</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<strong>import 有副作用，而且副作用只發生一次。</strong> 如果你在模組頂層放了「開資料庫連線」「讀環境變數」「註冊全域 handler」這類重活，它會在第一次 import 時就跑（可能是在你意想不到的時機，例如測試蒐集階段），而且你無法靠「再 import 一次」重來。頂層只放「定義」（函式、類別、常數），把「動作」收進函式或 <code>if __name__ == &quot;__main__&quot;</code>。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>sys.modules</code> 是單例（singleton）模式的天然實作。你想要「整個程序共用一份設定物件」，最簡單的做法就是把它放在一個模組頂層——模組本身就是進程級單例，import 它就拿到同一份。比 Java 那套 <code>private static INSTANCE</code> + double-checked locking 乾淨太多，而且執行緒安全由 import 鎖保證。</p>
+</div><h3 id="import-x-vs-from-x-import-y綁定的是不同名字">`import x` vs `from x import y`：綁定的是不同名字</h3><p>這兩種寫法載入的是<strong>同一個</strong>模組物件（<code>sys.modules</code> 只有一份），差別只在「你的命名空間裡多了什麼名字」：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-335" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20billing.money%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%91%BD%E5%90%8D%E7%A9%BA%E9%96%93%E5%A4%9A%E4%BA%86%20billing%EF%BC%9B%E7%94%A8%20billing.money.to_cents(...)%0Afrom%20billing%20import%20money%20%20%20%20%20%20%20%20%20%20%23%20%E5%91%BD%E5%90%8D%E7%A9%BA%E9%96%93%E5%A4%9A%E4%BA%86%20money%EF%BC%9B%E7%94%A8%20money.to_cents(...)%0Afrom%20billing.money%20import%20to_cents%20%23%20%E5%91%BD%E5%90%8D%E7%A9%BA%E9%96%93%E5%A4%9A%E4%BA%86%20to_cents%EF%BC%9B%E7%9B%B4%E6%8E%A5%E7%94%A8%20to_cents(...)%0Aimport%20billing.money%20as%20m%20%20%20%20%20%20%20%20%20%20%23%20%E5%88%A5%E5%90%8D%EF%BC%9B%E7%94%A8%20m.to_cents(...)'), 'copy-btn-335')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import billing.money               # 命名空間多了 billing；用 billing.money.to_cents(...)
+from billing import money          # 命名空間多了 money；用 money.to_cents(...)
+from billing.money import to_cents # 命名空間多了 to_cents；直接用 to_cents(...)
+import billing.money as m          # 別名；用 m.to_cents(...)</code></pre>
+      </div>
+    <p>關鍵理解：<code>from billing.money import to_cents</code> 之後，<code>to_cents</code> 是一個<strong>指向函式物件的新名字</strong>，跟 <code>billing.money.to_cents</code> 是兩個獨立綁定，只是現在指向同一個物件。這在 monkeypatch（測試替身）時是個經典陷阱：</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>from os import getpid</code> 之後，你在測試裡 patch <code>os.getpid</code> <strong>不會</strong>影響已經 <code>from</code>-import 進來的那個 <code>getpid</code> 名字——它早在 import 當下就綁死了原本的函式物件。要 patch 得對，請 patch「使用端模組裡的那個名字」（例如 <code>mymodule.getpid</code>），或一開始就用 <code>import os</code> + <code>os.getpid()</code>。這跟第 3 章「名字只是綁定」一脈相承。</p>
+</div><p>避免用 <code>from module import *</code>：它把模組所有公開名字倒進當前命名空間，污染嚴重又讓人看不出名字從哪來。唯一能稍微控制它的是 <code>__all__</code>（下一節）。</p>
+<hr>
+<h2 id="initpyall-與相對-vs-絕對匯入">`__init__.py`、`__all__` 與相對 vs 絕對匯入</h2><h3 id="initpy-的角色">`__init__.py` 的角色</h3><p><code>__init__.py</code> 是「這個目錄被 import 為 package 時會執行的檔案」。它做三件事：</p>
+<ol>
+<li><strong>標記</strong>這個目錄是個傳統 package。</li>
+<li>它的頂層程式碼在「package 第一次被 import」時執行——<code>import billing</code> 跑的就是 <code>billing/__init__.py</code>。</li>
+<li>它定義 package 的<strong>門面（facade）</strong>：把深層模組的東西「拉上來」變成 package 級公開 API。</li>
+</ol>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-336" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Fbilling%2F__init__.py%0A%22%22%22billing%EF%BC%9A%E4%B8%80%E5%80%8B%E7%A4%BA%E7%AF%84%E7%94%A8%E7%9A%84%E8%A8%88%E8%B2%BB%E5%A5%97%E4%BB%B6%E3%80%82%22%22%22%0Afrom%20billing.money%20import%20format_money%2C%20to_cents%0Afrom%20billing.invoice%20import%20Invoice%0A%0A__all__%20%3D%20%5B%22Invoice%22%2C%20%22format_money%22%2C%20%22to_cents%22%5D%0A__version__%20%3D%20%220.1.0%22'), 'copy-btn-336')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/billing/__init__.py
+"""billing：一個示範用的計費套件。"""
+from billing.money import format_money, to_cents
+from billing.invoice import Invoice
+
+__all__ = ["Invoice", "format_money", "to_cents"]
+__version__ = "0.1.0"</code></pre>
+      </div>
+    <p>這樣使用者能寫 <code>from billing import Invoice</code>，不必知道它其實住在 <code>billing/invoice.py</code>。你可以隨意重構內部模組結構，只要 <code>__init__.py</code> 的門面不變，下游就不受影響——這跟 Java 用 package-info、或刻意只 <code>public</code> 暴露門面類別、其餘設 package-private 是同一個封裝思維。</p>
+<p><code>__all__</code> 是一個字串清單，控制兩件事：</p>
+<ul>
+<li><code>from billing import *</code> 只會匯入 <code>__all__</code> 列出的名字。</li>
+<li>它是給讀者與工具看的「公開 API 宣告」（很多 linter、文件工具拿它當公開介面的依據）。</li>
+</ul>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：Python 沒有 <code>public</code>/<code>private</code> 關鍵字，<strong>封裝靠慣例</strong>：底線開頭（<code>_helper</code>、<code>_InternalThing</code>）表示「內部用，別碰」，工具與同事都會尊重。<code>__all__</code> 則是 package 層級的「這些是我保證的公開 API」。把這兩者當成你的 access modifier。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：別把 <code>__init__.py</code> 寫成重活。因為 <code>import billing.anything</code> 都會先觸發 <code>billing/__init__.py</code> 執行，如果你在門面裡 import 了一堆昂貴的子模組，使用者「只想用一個小工具」也得付全部 import 成本。大型套件常刻意讓 <code>__init__.py</code> 保持輕薄，或用延遲匯入（<code>__getattr__</code> on module，PEP 562）按需載入。</p>
+</div><h3 id="絕對匯入-vs-相對匯入">絕對匯入 vs 相對匯入</h3><p>套件內部模組互相引用，有兩種寫法：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-337" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Fbilling%2Finvoice.py%0A%0A%23%20%E7%B5%95%E5%B0%8D%E5%8C%AF%E5%85%A5%EF%BC%88absolute%20import%EF%BC%89%EF%BC%9A%E5%BE%9E%E5%A5%97%E4%BB%B6%E6%A0%B9%E7%AE%97%E8%B5%B7%E7%9A%84%E5%AE%8C%E6%95%B4%E8%B7%AF%E5%BE%91%0Afrom%20billing.money%20import%20to_cents%2C%20format_money%0Afrom%20billing.tax%20import%20with_tax%0A%0A%23%20%E7%9B%B8%E5%B0%8D%E5%8C%AF%E5%85%A5%EF%BC%88relative%20import%EF%BC%89%EF%BC%9A%E7%94%A8%E9%BB%9E%E8%99%9F%E8%A1%A8%E7%A4%BA%E3%80%8C%E7%9B%B8%E5%B0%8D%E6%96%BC%E6%88%91%E6%89%80%E5%9C%A8%E7%9A%84%E5%A5%97%E4%BB%B6%E3%80%8D%0Afrom%20.money%20import%20to_cents%2C%20format_money%20%20%20%20%20%23%20.%20%3D%20%E6%88%91%E6%89%80%E5%9C%A8%E7%9A%84%20package%EF%BC%88billing%EF%BC%89%0Afrom%20.tax%20import%20with_tax%0A%23%20from%20..otherpkg%20import%20thing%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20..%20%3D%20%E4%B8%8A%E4%B8%80%E5%B1%A4%20package'), 'copy-btn-337')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/billing/invoice.py
+
+# 絕對匯入（absolute import）：從套件根算起的完整路徑
+from billing.money import to_cents, format_money
+from billing.tax import with_tax
+
+# 相對匯入（relative import）：用點號表示「相對於我所在的套件」
+from .money import to_cents, format_money     # . = 我所在的 package（billing）
+from .tax import with_tax
+# from ..otherpkg import thing                # .. = 上一層 package</code></pre>
+      </div>
+    <p><code>.</code> 代表「目前模組所在的 package」，<code>..</code> 代表上一層，以此類推。兩者載入的是同一個模組，差別在可讀性與可移植性的取捨：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>絕對匯入</th>
+<th>相對匯入</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>寫法</td>
+<td><code>from billing.money import to_cents</code></td>
+<td><code>from .money import to_cents</code></td>
+</tr>
+<tr>
+<td>改套件名時</td>
+<td>要全部改</td>
+<td>不用改（相對的，跟著走）</td>
+</tr>
+<tr>
+<td>可讀性</td>
+<td>一眼看出來源</td>
+<td>簡潔，但要知道「我在哪」</td>
+</tr>
+<tr>
+<td>官方建議</td>
+<td>PEP 8 偏好（清楚）</td>
+<td>套件內、深層巢狀時方便</td>
+</tr>
+</tbody></table>
+<p>把 <code>invoice.py</code> 補完（這裡用絕對匯入，與門面一致）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-338" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Fbilling%2Finvoice.py%0Afrom%20dataclasses%20import%20dataclass%2C%20field%0Afrom%20decimal%20import%20Decimal%0A%0Afrom%20billing.money%20import%20to_cents%2C%20format_money%0Afrom%20billing.tax%20import%20with_tax%0A%0A%40dataclass%0Aclass%20Invoice%3A%0A%20%20%20%20customer%3A%20str%0A%20%20%20%20_lines%3A%20list%5Bint%5D%20%3D%20field(default_factory%3Dlist)%20%20%20%23%20%E5%90%84%E8%A1%8C%E9%87%91%E9%A1%8D%EF%BC%88%E5%88%86%EF%BC%89%0A%0A%20%20%20%20def%20add_line(self%2C%20amount%3A%20Decimal)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self._lines.append(to_cents(amount))%0A%0A%20%20%20%20def%20total_cents(self%2C%20*%2C%20taxed%3A%20bool%20%3D%20True)%20-%3E%20int%3A%0A%20%20%20%20%20%20%20%20subtotal%20%3D%20sum(self._lines)%0A%20%20%20%20%20%20%20%20return%20with_tax(subtotal)%20if%20taxed%20else%20subtotal%0A%0A%20%20%20%20def%20__str__(self)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20return%20f%22Invoice(%7Bself.customer%7D%2C%20%7Bformat_money(self.total_cents())%7D)%22'), 'copy-btn-338')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/billing/invoice.py
+from dataclasses import dataclass, field
+from decimal import Decimal
+
+from billing.money import to_cents, format_money
+from billing.tax import with_tax
+
+@dataclass
+class Invoice:
+    customer: str
+    _lines: list[int] = field(default_factory=list)   # 各行金額（分）
+
+    def add_line(self, amount: Decimal) -&gt; None:
+        self._lines.append(to_cents(amount))
+
+    def total_cents(self, *, taxed: bool = True) -&gt; int:
+        subtotal = sum(self._lines)
+        return with_tax(subtotal) if taxed else subtotal
+
+    def __str__(self) -&gt; str:
+        return f"Invoice({self.customer}, {format_money(self.total_cents())})"</code></pre>
+      </div>
+    <h3 id="為什麼相對匯入不能用在被當腳本直接執行的檔案">為什麼相對匯入不能用在「被當腳本直接執行」的檔案</h3><p>這是 Java 工程師一定會踩、而且訊息很難懂的坑。相對匯入靠的是模組的 <code>__package__</code>／<code>__name__</code> 來判斷「我相對於誰」。當你 <code>python src/billing/invoice.py</code> 直接執行它：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-339" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20python%20src%2Fbilling%2Finvoice.py%0AImportError%3A%20attempted%20relative%20import%20with%20no%20known%20parent%20package'), 'copy-btn-339')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ python src/billing/invoice.py
+ImportError: attempted relative import with no known parent package</code></pre>
+      </div>
+    <p>原因：被直接執行的檔案，它的 <code>__name__</code> 會變成 <code>&quot;__main__&quot;</code>，<code>__package__</code> 是空的——直譯器根本不知道它屬於哪個 package，於是 <code>.money</code> 的「<code>.</code>」無從解析。<strong>相對匯入只在「這個檔案是被當作某個 package 的一員 import 進來」時才成立。</strong></p>
+<p>正確的執行方式是用 <code>-m</code>，讓 Python 把它當套件成員載入（下一節詳述）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-340" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20python%20-m%20billing%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%8A%8A%20billing%20%E7%95%B6%E5%A5%97%E4%BB%B6%E5%9F%B7%E8%A1%8C%EF%BC%8C%E7%9B%B8%E5%B0%8D%E5%8C%AF%E5%85%A5%E6%AD%A3%E5%B8%B8%E9%81%8B%E4%BD%9C'), 'copy-btn-340')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ python -m billing            # 把 billing 當套件執行，相對匯入正常運作</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：看到 <code>attempted relative import with no known parent package</code>，幾乎都是「你直接 <code>python 某個套件內檔案.py</code> 了」。解法不是把相對改絕對硬上，而是改用 <code>python -m pkg.module</code> 執行，或在開發階段把套件 <code>pip install -e .</code>（editable install）讓它真的在 <code>sys.path</code> 上。</p>
+</div><hr>
+<h2 id="if-name-main可執行又可被-import">`if __name__ == "__main__"`：可執行又可被 import</h2><p>Java 的進入點是 <code>public static void main(String[] args)</code>，由 JVM 在啟動指定的類別上呼叫。Python 沒有「特殊的 main 方法」，它用一個慣用判斷式：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-341" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20main()%20-%3E%20None%3A%0A%20%20%20%20inv%20%3D%20Invoice(%22ACME%22)%0A%20%20%20%20inv.add_line(Decimal(%2219.99%22))%0A%20%20%20%20inv.add_line(Decimal(%225.00%22))%0A%20%20%20%20print(inv)%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20main()'), 'copy-btn-341')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def main() -&gt; None:
+    inv = Invoice("ACME")
+    inv.add_line(Decimal("19.99"))
+    inv.add_line(Decimal("5.00"))
+    print(inv)
+
+if __name__ == "__main__":
+    main()</code></pre>
+      </div>
+    <p>機制很單純：每個模組都有一個 <code>__name__</code> 變數。</p>
+<ul>
+<li>當這個檔案是<strong>被直接執行</strong>的（<code>python foo.py</code> 或 <code>python -m foo</code>），<code>__name__</code> 是 <code>&quot;__main__&quot;</code>。</li>
+<li>當它是<strong>被 import</strong> 的，<code>__name__</code> 是它的模組名（例如 <code>&quot;billing.invoice&quot;</code>）。</li>
+</ul>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-342" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20billing.invoice%0A%3E%3E%3E%20billing.invoice.__name__%0A%27billing.invoice%27'), 'copy-btn-342')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import billing.invoice
+&gt;&gt;&gt; billing.invoice.__name__
+'billing.invoice'</code></pre>
+      </div>
+    <p>所以 <code>if __name__ == &quot;__main__&quot;:</code> 的意思是「只有當我是被當主程式跑時，才執行這段」。這讓<strong>同一個檔案既能被 import（當函式庫）、又能被直接執行（當腳本）</strong>，而 import 它的人不會意外觸發那段示範/啟動程式碼。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>if __name__ == &quot;__main__&quot;</code> ≈ <code>public static void main</code>，但更靈活——任何模組都能有自己的「main」，方便邊寫邊測。對照 Java 你得另開一個 class 或寫 JUnit 才能跑一小段。</p>
+</div><h3 id="python-m-與-mainpy">`python -m` 與 `__main__.py`</h3><p><code>python -m billing.invoice</code> 跟 <code>python src/billing/invoice.py</code> 看似一樣，其實天差地別：</p>
+<ul>
+<li><code>python src/billing/invoice.py</code>：把那個<strong>檔案</strong>當腳本跑，所在目錄塞進 <code>sys.path</code>，<code>__package__</code> 為空，相對匯入會炸。</li>
+<li><code>python -m billing.invoice</code>：把 <code>billing.invoice</code> 當<strong>套件成員</strong>載入並執行，<code>__package__</code> 正確設好，相對匯入正常，且當前目錄（含 <code>src</code> 在路徑上時）的套件解析一致。</li>
+</ul>
+<p><code>-m</code> 是「以模組方式執行」的正規做法，等同 Java 的 <code>java -cp ... com.acme.Main</code>——你給的是邏輯名稱，不是檔案路徑。</p>
+<p>若想讓<strong>整個套件</strong>可被執行（<code>python -m billing</code>），就放一個 <code>__main__.py</code> 在套件目錄：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-343" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Fbilling%2F__main__.py%0Afrom%20decimal%20import%20Decimal%0Afrom%20billing.invoice%20import%20Invoice%0A%0Adef%20main()%20-%3E%20None%3A%0A%20%20%20%20inv%20%3D%20Invoice(%22ACME%22)%0A%20%20%20%20inv.add_line(Decimal(%2219.99%22))%0A%20%20%20%20inv.add_line(Decimal(%225.00%22))%0A%20%20%20%20print(inv)%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20main()'), 'copy-btn-343')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/billing/__main__.py
+from decimal import Decimal
+from billing.invoice import Invoice
+
+def main() -&gt; None:
+    inv = Invoice("ACME")
+    inv.add_line(Decimal("19.99"))
+    inv.add_line(Decimal("5.00"))
+    print(inv)
+
+if __name__ == "__main__":
+    main()</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-344" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20python%20-m%20billing%0AInvoice(ACME%2C%20%2426.24)'), 'copy-btn-344')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ python -m billing
+Invoice(ACME, $26.24)</code></pre>
+      </div>
+    <p><code>pip</code>、<code>venv</code>、<code>json.tool</code>、<code>http.server</code> 都是這樣設計的（你應該打過 <code>python -m http.server</code>）。這是讓套件「可像 CLI 一樣被叫起來」的標準入口。稍後 <code>pyproject.toml</code> 的 <code>[project.scripts]</code> 會給它一個更漂亮的指令名。</p>
+<hr>
+<h2 id="標準專案結構src-layout">標準專案結構：src layout</h2><p>你已經用過 Maven/Gradle 的 <code>src/main/java</code>、<code>src/test/java</code>。Python 社群現在的共識佈局是 <strong>src layout</strong>，動機與 Maven 把原始碼跟測試分目錄一樣，但解決的是 Python 特有的一個陰險問題。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-345" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('billing-demo%2F%0A%E2%94%9C%E2%94%80%E2%94%80%20pyproject.toml%0A%E2%94%9C%E2%94%80%E2%94%80%20src%2F%0A%E2%94%82%20%20%20%E2%94%94%E2%94%80%E2%94%80%20billing%2F%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20__init__.py%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20money.py%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20invoice.py%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20tax.py%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%94%E2%94%80%E2%94%80%20__main__.py%0A%E2%94%94%E2%94%80%E2%94%80%20tests%2F%0A%20%20%20%20%E2%94%94%E2%94%80%E2%94%80%20test_invoice.py'), 'copy-btn-345')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">billing-demo/
+├── pyproject.toml
+├── src/
+│   └── billing/
+│       ├── __init__.py
+│       ├── money.py
+│       ├── invoice.py
+│       ├── tax.py
+│       └── __main__.py
+└── tests/
+    └── test_invoice.py</code></pre>
+      </div>
+    <h3 id="為什麼-src-layout-優於-flat-layout">為什麼 src layout 優於 flat layout</h3><p>「flat layout」是把 <code>billing/</code> 直接放在專案根目錄（跟 <code>pyproject.toml</code>、<code>tests/</code> 同層）。問題出在前面講過的：<strong>當前工作目錄會被加進 <code>sys.path</code></strong>。於是你在專案根跑測試時，<code>import billing</code> 抓到的是「目錄裡的原始碼」，而不是「你已經 <code>pip install</code> 進 venv 的那一份套件」。</p>
+<p>這聽起來不痛不癢，但它會讓你<strong>測到一份根本沒被正確打包的程式碼</strong>：假設某個檔案沒被列進打包設定，flat layout 下測試照樣 import 得到（因為它直接讀原始碼目錄），於是測試全綠——使用者裝起來卻 <code>ModuleNotFoundError</code>。</p>
+<p>src layout 把 <code>billing/</code> 藏進 <code>src/</code>。<code>src/</code> 本身不在 <code>sys.path</code> 上，所以<strong>唯一能 import 到 <code>billing</code> 的方式，就是先把它（用 editable install）裝進環境</strong>。這強迫你的測試跑在「跟使用者一樣的安裝路徑」上，打包遺漏會立刻在測試階段爆出來。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：src layout 的精神是「測你會發佈的東西，而不是測你硬碟上的原始碼目錄」。它把「能 import = 已正確安裝」變成不變量，等同 Maven 強制 <code>mvn package</code> 後測 artifact 的精神。新專案一律用 src layout，不要用 flat。</p>
+</div><h3 id="editable-install邊改邊跑">editable install：邊改邊跑</h3><p>開發時你不想每改一行就重裝。**editable install（可編輯安裝）**把套件以「指向原始碼」的方式裝進 venv：import 時走的是你的 <code>src/billing/</code>，改檔即時生效，但 <code>sys.path</code> 解析又是「已安裝套件」的正規路徑。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-346" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20venv%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%BB%BA%E7%AB%8B%E8%99%9B%E6%93%AC%E7%92%B0%E5%A2%83%EF%BC%88%E8%A9%B3%E8%A6%8B%E7%AC%AC%201%20%E7%AB%A0%EF%BC%89%0A%24%20uv%20pip%20install%20-e%20.%20%20%20%20%20%20%20%20%20%20%20%23%20editable%20install%EF%BC%9A%E6%8A%8A%E7%95%B6%E5%89%8D%E5%B0%88%E6%A1%88%E4%BB%A5%E5%8F%AF%E7%B7%A8%E8%BC%AF%E6%96%B9%E5%BC%8F%E8%A3%9D%E5%85%A5'), 'copy-btn-346')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ uv venv                       # 建立虛擬環境（詳見第 1 章）
+$ uv pip install -e .           # editable install：把當前專案以可編輯方式裝入</code></pre>
+      </div>
+    <p>或用 <code>uv</code> 的專案工作流，一個指令把環境、相依、editable install 一次搞定：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-347" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20sync%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%BE%9D%20pyproject.toml%20%E5%BB%BA%E7%92%B0%E5%A2%83%E3%80%81%E8%A3%9D%E7%9B%B8%E4%BE%9D%E3%80%81editable%20%E8%A3%9D%E6%9C%AC%E5%B0%88%E6%A1%88'), 'copy-btn-347')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ uv sync                       # 依 pyproject.toml 建環境、裝相依、editable 裝本專案</code></pre>
+      </div>
+    <p>裝好後，無論在哪個目錄、用 <code>python -m billing</code> 或在 <code>tests/</code> 裡 <code>import billing</code>，抓到的都是同一份、且是「已安裝」語意的套件。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：editable install ≈ 把模組以 source 形式掛進 reactor build，而不是每次都 <code>mvn install</code> 到本機 repo。你改 <code>src/</code> 立刻反映，不必重打包。</p>
+</div><hr>
+<h2 id="pyprojecttoml完整解析與發佈到-pypi">`pyproject.toml`：完整解析與發佈到 PyPI</h2><p><code>pyproject.toml</code> 是現代 Python 專案的單一設定檔，地位等同 <code>pom.xml</code>／<code>build.gradle</code>，但用 TOML、且涵蓋「打包 + 工具設定」兩件事。完整看一遍：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">toml</span>
+          <button id="copy-btn-348" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20pyproject.toml%0A%0A%5Bbuild-system%5D%0A%23%20%E5%B0%8D%E7%85%A7%20Maven%20%E7%9A%84%20build%20plugin%EF%BC%9A%E7%94%A8%E4%BB%80%E9%BA%BC%E5%BE%8C%E7%AB%AF%E6%8A%8A%E5%B0%88%E6%A1%88%E6%89%93%E5%8C%85%E6%88%90%20wheel%2Fsdist%0Arequires%20%3D%20%5B%22hatchling%22%5D%0Abuild-backend%20%3D%20%22hatchling.build%22%0A%0A%5Bproject%5D%0A%23%20%E5%B0%8D%E7%85%A7%20Maven%20%E5%BA%A7%E6%A8%99%EF%BC%9Aname%E2%89%88artifactId%E3%80%81version%E2%89%88version%EF%BC%88groupId%20%E5%9C%A8%20PyPI%20%E6%B2%92%E6%9C%89%EF%BC%8Cname%20%E5%85%A8%E5%9F%9F%E5%94%AF%E4%B8%80%EF%BC%89%0Aname%20%3D%20%22billing-demo%22%0Aversion%20%3D%20%220.1.0%22%0Adescription%20%3D%20%22%E7%A4%BA%E7%AF%84%E7%94%A8%E7%9A%84%E8%A8%88%E8%B2%BB%E5%A5%97%E4%BB%B6%22%0Areadme%20%3D%20%22README.md%22%0Arequires-python%20%3D%20%22%3E%3D3.12%22%0Aauthors%20%3D%20%5B%7B%20name%20%3D%20%22Albert%20Chiu%22%2C%20email%20%3D%20%22chiu.albert%40gmail.com%22%20%7D%5D%0Alicense%20%3D%20%22MIT%22%0A%0A%23%20%E5%9F%B7%E8%A1%8C%E6%9C%9F%E7%9B%B8%E4%BE%9D%EF%BC%88%E5%B0%8D%E7%85%A7%20Maven%20%3Cdependencies%3E%20%E7%9A%84%20compile%20scope%EF%BC%89%0Adependencies%20%3D%20%5B%0A%20%20%20%20%22httpx%3E%3D0.27%22%2C%0A%5D%0A%0A%5Bproject.optional-dependencies%5D%0A%23%20%E5%B0%8D%E7%85%A7%20Maven%20optional%2Fextra%EF%BC%9A%E4%BD%BF%E7%94%A8%E8%80%85%E7%94%A8%20pip%20install%20%22billing-demo%5Bdev%5D%22%20%E6%89%8D%E6%9C%83%E8%A3%9D%0Adev%20%3D%20%5B%22pytest%3E%3D8%22%2C%20%22mypy%3E%3D1.10%22%5D%0A%0A%5Bproject.scripts%5D%0A%23%20%E9%80%B2%E5%85%A5%E9%BB%9E%EF%BC%9A%E8%A3%9D%E5%A5%97%E4%BB%B6%E5%BE%8C%E6%9C%83%E5%9C%A8%20PATH%20%E7%94%A2%E7%94%9F%E4%B8%80%E5%80%8B%20%60billing%60%20%E6%8C%87%E4%BB%A4%0A%23%20%E7%AD%89%E8%99%9F%E5%8F%B3%E9%82%8A%E6%98%AF%20%22%E6%A8%A1%E7%B5%84%3A%E5%8F%AF%E5%91%BC%E5%8F%AB%E7%89%A9%E4%BB%B6%22%EF%BC%8C%E5%AE%89%E8%A3%9D%E5%99%A8%E6%9C%83%E5%B9%AB%E4%BD%A0%E7%94%9F%E4%B8%80%E5%80%8B%E5%B0%8F%E5%9F%B7%E8%A1%8C%E6%AA%94%E5%8E%BB%E5%91%BC%E5%8F%AB%E5%AE%83%0Abilling%20%3D%20%22billing.__main__%3Amain%22%0A%0A%5Bproject.urls%5D%0AHomepage%20%3D%20%22https%3A%2F%2Fgithub.com%2Falbert%2Fbilling-demo%22%0A%0A%23%20%E5%B7%A5%E5%85%B7%E8%A8%AD%E5%AE%9A%E4%B9%9F%E4%BD%8F%E9%80%99%E8%A3%A1%EF%BC%8C%E4%B8%8D%E5%BF%85%E6%95%A3%E8%90%BD%E5%90%84%E6%AA%94%EF%BC%88%E5%B0%8D%E7%85%A7%E6%8A%8A%20plugin%20%E8%A8%AD%E5%AE%9A%E5%A1%9E%E9%80%B2%20pom%EF%BC%89%0A%5Btool.pytest.ini_options%5D%0Atestpaths%20%3D%20%5B%22tests%22%5D%0A%0A%5Btool.mypy%5D%0Astrict%20%3D%20true%0A%0A%23%20%E5%91%8A%E8%A8%B4%20build%20backend%EF%BC%9A%E5%A5%97%E4%BB%B6%E5%9C%A8%20src%2F%20%E5%BA%95%E4%B8%8B%EF%BC%88src%20layout%20%E9%9C%80%E8%A6%81%E9%80%99%E8%A1%8C%EF%BC%8C%E8%A6%96%20backend%20%E8%80%8C%E5%AE%9A%EF%BC%89%0A%5Btool.hatch.build.targets.wheel%5D%0Apackages%20%3D%20%5B%22src%2Fbilling%22%5D'), 'copy-btn-348')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-toml"><code class="language-toml"># pyproject.toml
+
+[build-system]
+# 對照 Maven 的 build plugin：用什麼後端把專案打包成 wheel/sdist
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+# 對照 Maven 座標：name≈artifactId、version≈version（groupId 在 PyPI 沒有，name 全域唯一）
+name = "billing-demo"
+version = "0.1.0"
+description = "示範用的計費套件"
+readme = "README.md"
+requires-python = "&gt;=3.12"
+authors = [{ name = "Albert Chiu", email = "chiu.albert@gmail.com" }]
+license = "MIT"
+
+# 執行期相依（對照 Maven &lt;dependencies&gt; 的 compile scope）
+dependencies = [
+    "httpx&gt;=0.27",
+]
+
+[project.optional-dependencies]
+# 對照 Maven optional/extra：使用者用 pip install "billing-demo[dev]" 才會裝
+dev = ["pytest&gt;=8", "mypy&gt;=1.10"]
+
+[project.scripts]
+# 進入點：裝套件後會在 PATH 產生一個 `billing` 指令
+# 等號右邊是 "模組:可呼叫物件"，安裝器會幫你生一個小執行檔去呼叫它
+billing = "billing.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/albert/billing-demo"
+
+# 工具設定也住這裡，不必散落各檔（對照把 plugin 設定塞進 pom）
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+
+# 告訴 build backend：套件在 src/ 底下（src layout 需要這行，視 backend 而定）
+[tool.hatch.build.targets.wheel]
+packages = ["src/billing"]</code></pre>
+      </div>
+    <p>幾個 Java 工程師要對齊的觀念：</p>
+<ul>
+<li><strong><code>[build-system]</code></strong> 宣告「用什麼後端打包」（hatchling、setuptools、flit、pdm…），對照你選 maven-compiler-plugin 還是別的。<code>requires</code> 是「打包時」要裝的工具，跟你專案的執行期相依無關。</li>
+<li><strong><code>[project]</code></strong> 是 PEP 621 標準化的 metadata。<code>name</code> 在 PyPI 是<strong>全域唯一</strong>（沒有 Java 那種 groupId 命名空間），所以好名字要先搶。<code>version</code> 沒有 SNAPSHOT 概念，但有 PEP 440 的 <code>1.0.0a1</code>、<code>1.0.0.dev3</code> 等預發佈標記。</li>
+<li><strong><code>dependencies</code></strong> 用版本約束字串（<code>httpx&gt;=0.27</code>）。Python 沒有 Maven 那種 compile/test/provided scope，靠 <code>optional-dependencies</code>（extras）區分「核心相依」與「開發/額外相依」。</li>
+<li><strong><code>[project.scripts]</code></strong> 是 entry point：裝套件後 <code>billing</code> 變成可在終端機直接打的指令，等同 Maven 的 appassembler 或 Spring Boot 的可執行 jar，但更輕。注意 entry point 只做「import 那個模組、呼叫指定的 callable」兩件事——<code>billing = &quot;billing.__main__:main&quot;</code> 會 import <code>billing.__main__</code> 並呼叫它的 <code>main()</code>，但<strong>不會</strong>執行 <code>__main__.py</code> 裡的 <code>if __name__ == &quot;__main__&quot;:</code> 區塊（因為被 import 時該模組的 <code>__name__</code> 是 <code>&#39;billing.__main__&#39;</code>，不是 <code>&#39;__main__&#39;</code>），這正與前面 <code>if __name__</code> 主題呼應。若覺得拿 <code>__main__.py</code> 當 import 目標不夠乾淨，更慣用的做法是另設 <code>cli.py</code> 放 <code>main</code>，再把 entry point 指成 <code>billing = &quot;billing.cli:main&quot;</code>。</li>
+</ul>
+<h3 id="從建置到發佈">從建置到發佈</h3><p><code>uv build</code> 產出兩種發佈格式（對照 Maven 產 <code>.jar</code> 與 source jar）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-349" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20build%0A%23%20%E7%94%A2%E7%94%9F%EF%BC%9A%0A%23%20%20%20dist%2Fbilling_demo-0.1.0-py3-none-any.whl%20%20%20%E2%86%90%20wheel%EF%BC%9A%E9%A0%90%E5%85%88%E6%89%93%E5%8C%85%E5%A5%BD%E3%80%81%E5%AE%89%E8%A3%9D%E5%BF%AB%EF%BC%88%E5%B0%8D%E7%85%A7%20.jar%EF%BC%89%0A%23%20%20%20dist%2Fbilling_demo-0.1.0.tar.gz%20%20%20%20%20%20%20%20%20%20%20%20%20%E2%86%90%20sdist%EF%BC%9A%E5%8E%9F%E5%A7%8B%E7%A2%BC%E5%A3%93%E7%B8%AE%E5%8C%85%EF%BC%88%E5%B0%8D%E7%85%A7%20source%20jar%EF%BC%89'), 'copy-btn-349')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ uv build
+# 產生：
+#   dist/billing_demo-0.1.0-py3-none-any.whl   ← wheel：預先打包好、安裝快（對照 .jar）
+#   dist/billing_demo-0.1.0.tar.gz             ← sdist：原始碼壓縮包（對照 source jar）</code></pre>
+      </div>
+    <ul>
+<li><strong>wheel</strong> 是「即裝即用」的二進位發佈格式，使用者 <code>pip install</code> 直接解壓到 site-packages，不必重新建置。</li>
+<li><strong>sdist</strong> 是原始碼包，缺對應 wheel 時 pip 會下載它在本機 build。</li>
+</ul>
+<p>發佈到 PyPI（對照 <code>mvn deploy</code> 推到 Maven Central）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-350" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20publish%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%A0%90%E8%A8%AD%E6%8E%A8%E5%88%B0%20PyPI%EF%BC%9B%E9%9C%80%E8%A6%81%20PyPI%20token%EF%BC%88%E5%BB%BA%E8%AD%B0%E7%94%A8%20trusted%20publishing%EF%BC%89%0A%23%20%E6%88%96%E7%94%A8%E5%82%B3%E7%B5%B1%E5%B7%A5%E5%85%B7%EF%BC%9A%0A%24%20python%20-m%20twine%20upload%20dist%2F*'), 'copy-btn-350')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ uv publish                    # 預設推到 PyPI；需要 PyPI token（建議用 trusted publishing）
+# 或用傳統工具：
+$ python -m twine upload dist/*</code></pre>
+      </div>
+    <table>
+<thead>
+<tr>
+<th>Maven Central</th>
+<th>PyPI</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>groupId:artifactId:version</code></td>
+<td><code>name</code>（全域唯一）+ <code>version</code></td>
+<td>PyPI 沒有 group 命名空間</td>
+</tr>
+<tr>
+<td><code>mvn package</code></td>
+<td><code>uv build</code></td>
+<td>產出可發佈成品</td>
+</tr>
+<tr>
+<td><code>.jar</code> / source jar</td>
+<td><code>.whl</code> / <code>.tar.gz</code>（sdist）</td>
+<td>wheel 即裝即用</td>
+</tr>
+<tr>
+<td><code>mvn deploy</code> + GPG 簽章</td>
+<td><code>uv publish</code> + API token</td>
+<td>都要憑證，PyPI 現推 trusted publishing（OIDC）</td>
+</tr>
+<tr>
+<td>SNAPSHOT</td>
+<td><code>.devN</code> / <code>aN</code> / <code>bN</code>（PEP 440）</td>
+<td>Python 沒有 SNAPSHOT 機制</td>
+</tr>
+</tbody></table>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：先發到 <strong>TestPyPI</strong>（<code>uv publish --publish-url https://test.pypi.org/legacy/</code>）演練整條流程，再推正式站。正式 PyPI 的「同一版本號不可覆蓋、不可重傳」是鐵律——傳錯了只能 yank（標記不可裝）後出新版本號，跟 Maven Central 一樣不可變。</p>
+</div><hr>
+<h2 id="循環匯入成因與三種解法">循環匯入：成因與三種解法</h2><p>兩個模組互相 import，是 Java 工程師最容易低估的雷。在 Java，A 與 B 互相 import 完全沒問題——編譯器一次看到所有符號，循環依賴頂多是「設計味道」。在 Python，<strong>import 是執行期、由上而下逐行跑的</strong>，循環會讓某個模組「只初始化到一半」就被對方拿去用，於是炸出 <code>ImportError</code> 或 <code>AttributeError</code>。</p>
+<h3 id="成因部分初始化的模組">成因：部分初始化的模組</h3><p>製造一個循環。<code>invoice.py</code> 想用 <code>report.py</code> 的格式化函式，而 <code>report.py</code> 又想用 <code>invoice.py</code> 的 <code>Invoice</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-351" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Fbilling%2Freport.py%20%20%E2%80%94%E2%80%94%20%E9%80%99%E6%9C%83%E5%87%BA%E9%8C%AF%0Afrom%20billing.invoice%20import%20Invoice%20%20%20%20%20%20%20%20%20%20%23%20%E2%86%90%20%E9%A0%82%E5%B1%A4%20import%20invoice%0A%0Adef%20render(inv%3A%20Invoice)%20-%3E%20str%3A%0A%20%20%20%20return%20f%22REPORT%3A%20%7Binv%7D%22'), 'copy-btn-351')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/billing/report.py  —— 這會出錯
+from billing.invoice import Invoice          # ← 頂層 import invoice
+
+def render(inv: Invoice) -&gt; str:
+    return f"REPORT: {inv}"</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-352" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Fbilling%2Finvoice.py%EF%BC%88%E5%8A%A0%E4%B8%8A%E5%B0%8D%20report%20%E7%9A%84%E9%A0%82%E5%B1%A4%20import%EF%BC%89%E2%80%94%E2%80%94%20%E9%80%99%E6%9C%83%E5%87%BA%E9%8C%AF%0Afrom%20billing.report%20import%20render%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E2%86%90%20%E9%A0%82%E5%B1%A4%20import%20report%0A%0A%23%20...Invoice%20%E5%AE%9A%E7%BE%A9...'), 'copy-btn-352')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/billing/invoice.py（加上對 report 的頂層 import）—— 這會出錯
+from billing.report import render            # ← 頂層 import report
+
+# ...Invoice 定義...</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-353" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20python%20-m%20billing%0AImportError%3A%20cannot%20import%20name%20%27Invoice%27%20from%20partially%20initialized%20module%0A%27billing.invoice%27%20(most%20likely%20due%20to%20a%20circular%20import)'), 'copy-btn-353')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ python -m billing
+ImportError: cannot import name 'Invoice' from partially initialized module
+'billing.invoice' (most likely due to a circular import)</code></pre>
+      </div>
+    <p>逐步追因：載入 <code>invoice</code> →執行到 <code>from billing.report import render</code> →跳去載入 <code>report</code> →<code>report</code> 頂層執行 <code>from billing.invoice import Invoice</code> →此時 <code>invoice</code> 已在 <code>sys.modules</code>（避免無限遞迴），但它<strong>還沒跑到定義 <code>Invoice</code> 那行</strong>，命名空間裡還沒有 <code>Invoice</code> →取不到 →<code>ImportError</code>。關鍵字是錯誤訊息裡的 <strong>partially initialized module</strong>。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：循環匯入是否報錯，取決於「誰先被 import、卡在哪一行、要的名字此刻定義了沒」。同樣的循環，把頂層 import 換成 <code>import billing.report</code>（綁模組而非綁名字）有時就不炸——因為它不要求對方「此刻已有某個名字」，只要模組物件存在即可，等真的用到 <code>report.render()</code> 時對方早就初始化完了。但別靠這種運氣，循環本身就是該消除的設計問題。</p>
+</div><h3 id="解法一延後-import-進函式">解法一：延後 import 進函式</h3><p>把 import 從模組頂層移進「真正用到的函式內部」。函式體在「被呼叫時」才執行，那時兩個模組通常都初始化完了：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-354" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Fbilling%2Freport.py%0Adef%20render(inv)%20-%3E%20str%3A%0A%20%20%20%20from%20billing.invoice%20import%20Invoice%20%20%20%20%20%20%23%20%E5%BB%B6%E5%BE%8C%E5%88%B0%E5%91%BC%E5%8F%AB%E6%99%82%E6%89%8D%20import%EF%BC%8C%E5%BE%AA%E7%92%B0%E8%A7%A3%E9%99%A4%0A%20%20%20%20assert%20isinstance(inv%2C%20Invoice)%0A%20%20%20%20return%20f%22REPORT%3A%20%7Binv%7D%22'), 'copy-btn-354')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/billing/report.py
+def render(inv) -&gt; str:
+    from billing.invoice import Invoice      # 延後到呼叫時才 import，循環解除
+    assert isinstance(inv, Invoice)
+    return f"REPORT: {inv}"</code></pre>
+      </div>
+    <p>這是最快的止血法，代價是把依賴關係藏進函式、import 成本攤到第一次呼叫。</p>
+<h3 id="解法二抽共用到第三模組最根本">解法二：抽共用到第三模組（最根本）</h3><p>循環常代表「兩個模組有一塊共用概念被放錯地方」。把它抽到雙方都依賴、但不反向依賴的底層模組（單向 DAG）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-355" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%20%20%20money.py%20%20%20%E2%86%90%20%E6%9C%80%E5%BA%95%E5%B1%A4%EF%BC%8C%E4%B8%8D%E4%BE%9D%E8%B3%B4%E5%A5%97%E4%BB%B6%E5%85%A7%E4%BB%BB%E4%BD%95%E6%A8%A1%E7%B5%84%0A%20%20%20%20%20%20%E2%86%91%0A%20%20%20invoice.py%20%E2%86%90%20%E4%BE%9D%E8%B3%B4%20money%E3%80%81tax%0A%20%20%20%20%20%20%E2%86%91%0A%20%20%20report.py%20%20%E2%86%90%20%E4%BE%9D%E8%B3%B4%20invoice%EF%BC%88%E5%96%AE%E5%90%91%EF%BC%89'), 'copy-btn-355')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">   money.py   ← 最底層，不依賴套件內任何模組
+      ↑
+   invoice.py ← 依賴 money、tax
+      ↑
+   report.py  ← 依賴 invoice（單向）</code></pre>
+      </div>
+    <p>讓依賴變成單向有向無環圖：<code>report → invoice → money</code>。<code>report</code> 用 <code>Invoice</code>，但 <code>invoice</code> 絕不反過來 import <code>report</code>。這跟你在 Java 重構循環依賴的做法完全一樣——抽介面、調整方向、打破環。</p>
+<h3 id="解法三type-only-import-用-if-typechecking">解法三：type-only import 用 `if TYPE_CHECKING`</h3><p>很多循環其實只是為了「型別提示」而 import，執行期根本不需要那個名字。<code>typing.TYPE_CHECKING</code> 是一個常數：<strong>靜態檢查器（mypy/pyright）眼中為 <code>True</code>，執行期永遠為 <code>False</code></strong>。把純型別用的 import 包進去，執行期就不會真的 import，循環消失，型別檢查照常：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-356" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Fbilling%2Freport.py%0Afrom%20__future__%20import%20annotations%20%20%20%20%20%20%20%20%20%20%23%20%E8%AE%93%E8%A8%BB%E8%A7%A3%E5%BB%B6%E5%BE%8C%E6%B1%82%E5%80%BC%EF%BC%8C%E5%9E%8B%E5%88%A5%E5%AF%AB%E6%88%90%E5%AD%97%E4%B8%B2%E4%B8%8D%E6%9C%83%E5%9C%A8%E5%9F%B7%E8%A1%8C%E6%9C%9F%E8%A7%A3%E6%9E%90%0A%0Afrom%20typing%20import%20TYPE_CHECKING%0A%0Aif%20TYPE_CHECKING%3A%0A%20%20%20%20from%20billing.invoice%20import%20Invoice%20%20%20%20%20%23%20%E5%8F%AA%E6%9C%89%20mypy%20%E7%9C%8B%E5%BE%97%E5%88%B0%EF%BC%9B%E5%9F%B7%E8%A1%8C%E6%9C%9F%E4%B8%8D%20import%0A%0Adef%20render(inv%3A%20Invoice)%20-%3E%20str%3A%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%A8%BB%E8%A7%A3%E6%AD%A4%E5%88%BB%E6%98%AF%E5%AD%97%E4%B8%B2%EF%BC%8C%E4%B8%8D%E8%A7%B8%E7%99%BC%E7%9C%9F%E6%AD%A3%20import%0A%20%20%20%20return%20f%22REPORT%3A%20%7Binv%7D%22'), 'copy-btn-356')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/billing/report.py
+from __future__ import annotations          # 讓註解延後求值，型別寫成字串不會在執行期解析
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from billing.invoice import Invoice     # 只有 mypy 看得到；執行期不 import
+
+def render(inv: Invoice) -&gt; str:            # 註解此刻是字串，不觸發真正 import
+    return f"REPORT: {inv}"</code></pre>
+      </div>
+    <p><code>from __future__ import annotations</code>（或本就用 Python 3.12 的字串註解習慣）讓 <code>Invoice</code> 在函式簽章裡只是字串，不會在執行期被求值，因此即使執行期沒 import 它也不報錯，而 mypy 仍能在 <code>TYPE_CHECKING</code> 分支看到真正的 <code>Invoice</code> 做檢查。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>if TYPE_CHECKING:</code> 是處理「只為型別而生的循環」的標準解法，也是讓重型相依（只在型別簽章出現的大套件）不被執行期 import 的手段——靜態檢查拿到全部資訊，執行期保持輕巧。這正是第 9 章「型別提示不在執行期強制」的延伸應用。</p>
+</div><hr>
+<h2 id="跑起來測試與執行整個範例">跑起來：測試與執行整個範例</h2><p>把測試補上，用 <code>uv run</code> 在隔離環境執行（套件已 editable 裝入）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-357" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20tests%2Ftest_invoice.py%0Afrom%20decimal%20import%20Decimal%0Afrom%20billing.invoice%20import%20Invoice%20%20%20%20%20%20%20%20%20%20%23%20%E5%9B%A0%E7%82%BA%20editable%20install%EF%BC%8Cimport%20%E6%8A%93%E5%88%B0%E7%9A%84%E6%98%AF%E5%B7%B2%E5%AE%89%E8%A3%9D%E5%A5%97%E4%BB%B6%0A%0Adef%20test_total_with_tax()%20-%3E%20None%3A%0A%20%20%20%20inv%20%3D%20Invoice(%22ACME%22)%0A%20%20%20%20inv.add_line(Decimal(%2219.99%22))%0A%20%20%20%20inv.add_line(Decimal(%225.00%22))%0A%20%20%20%20%23%20%E5%B0%8F%E8%A8%88%202499%20%E5%88%86%EF%BC%9B%E5%90%AB%205%25%20%E7%A8%85%20%E2%86%92%20round(2499%20*%201.05)%20%3D%202624%0A%20%20%20%20assert%20inv.total_cents()%20%3D%3D%202624%0A%0Adef%20test_total_without_tax()%20-%3E%20None%3A%0A%20%20%20%20inv%20%3D%20Invoice(%22ACME%22)%0A%20%20%20%20inv.add_line(Decimal(%2210.00%22))%0A%20%20%20%20assert%20inv.total_cents(taxed%3DFalse)%20%3D%3D%201000'), 'copy-btn-357')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># tests/test_invoice.py
+from decimal import Decimal
+from billing.invoice import Invoice          # 因為 editable install，import 抓到的是已安裝套件
+
+def test_total_with_tax() -&gt; None:
+    inv = Invoice("ACME")
+    inv.add_line(Decimal("19.99"))
+    inv.add_line(Decimal("5.00"))
+    # 小計 2499 分；含 5% 稅 → round(2499 * 1.05) = 2624
+    assert inv.total_cents() == 2624
+
+def test_total_without_tax() -&gt; None:
+    inv = Invoice("ACME")
+    inv.add_line(Decimal("10.00"))
+    assert inv.total_cents(taxed=False) == 1000</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-358" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20sync%20--extra%20dev%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%BB%BA%E7%92%B0%E5%A2%83%E3%80%81%E8%A3%9D%E7%9B%B8%E4%BE%9D%E3%80%81%E8%A3%9D%20dev%20extra%EF%BC%88pytest%2Fmypy%EF%BC%89%E3%80%81editable%20%E8%A3%9D%20billing-demo%0A%24%20uv%20run%20pytest%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%9C%A8%E9%9A%94%E9%9B%A2%E7%92%B0%E5%A2%83%E8%B7%91%E6%B8%AC%E8%A9%A6%0A%24%20uv%20run%20python%20-m%20billing%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%94%A8%E6%A8%A1%E7%B5%84%E6%96%B9%E5%BC%8F%E5%9F%B7%E8%A1%8C%E5%A5%97%E4%BB%B6%0AInvoice(ACME%2C%20%2426.24)%0A%24%20uv%20run%20billing%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%94%A8%20%5Bproject.scripts%5D%20%E7%9A%84%20entry%20point%20%E6%8C%87%E4%BB%A4%0AInvoice(ACME%2C%20%2426.24)'), 'copy-btn-358')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ uv sync --extra dev                      # 建環境、裝相依、裝 dev extra（pytest/mypy）、editable 裝 billing-demo
+$ uv run pytest                            # 在隔離環境跑測試
+$ uv run python -m billing                 # 用模組方式執行套件
+Invoice(ACME, $26.24)
+$ uv run billing                           # 用 [project.scripts] 的 entry point 指令
+Invoice(ACME, $26.24)</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：純 <code>uv sync</code> <strong>不會</strong>安裝任何 optional-dependencies（extras）。<code>pytest</code> 住在 <code>[project.optional-dependencies]</code> 的 <code>dev</code> extra 裡，所以要跑測試得加 <code>--extra dev</code>（或 <code>--all-extras</code>），否則 <code>uv run pytest</code> 會直接報 <code>Failed to spawn: pytest</code>。這對 Java 工程師是個重要對照差異：Maven 的 test scope 相依在跑 <code>mvn test</code> 時自動可用，但 Python 的 extra 預設不裝，得明確指定。（若想要「開發相依預設就裝」的語意，可改用 PEP 735 的 <code>[dependency-groups]</code> 定義 <code>dev</code> group——<code>uv sync</code> 預設會裝 dev group。）</p>
+</div><p>不想建立完整專案、只想快速試一個第三方套件，<code>uv run --with</code> 可以一次性帶入相依執行（不污染環境）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-359" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20run%20--with%20rich%20python%20-c%20%22from%20rich%20import%20print%3B%20print(%27%5Bbold%20green%5Dhello%5B%2F%5D%27)%22'), 'copy-btn-359')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ uv run --with rich python -c "from rich import print; print('[bold green]hello[/]')"</code></pre>
+      </div>
+    <p>整條鏈路串起來了：模組是檔案、套件是目錄＋<code>__init__.py</code>、import 在執行期跑且只跑一次、src layout 保證「能 import = 已安裝」、<code>pyproject.toml</code> 描述座標與相依與入口、循環靠單向依賴打破。</p>
+<hr>
+<h2 id="本章小結">本章小結</h2><ul>
+<li><strong>module 是 <code>.py</code>、package 是含 <code>__init__.py</code> 的目錄</strong>；import 依 <code>sys.path</code>（≈ classpath）尋找，但 <code>sys.path</code> 可在執行期改，且當前/腳本目錄會被自動加入最前面。</li>
+<li><strong>import 是會跑的敘述</strong>：第一次載入時整檔由上而下執行、結果快取在 <code>sys.modules</code>，之後 import 都走快取、不重跑。頂層只放定義，別放重活——副作用只發生一次且時機難料。</li>
+<li><strong><code>import x</code> 與 <code>from x import y</code> 載入同一模組，差別在你命名空間綁了哪個名字</strong>；<code>from</code> 綁進來的名字在 import 當下就定死，是 monkeypatch 的經典陷阱。</li>
+<li><strong><code>__init__.py</code> 是 package 的門面</strong>：用它＋<code>__all__</code> 暴露穩定的公開 API，底線開頭與 <code>__all__</code> 是 Python 沒有 <code>public/private</code> 時的封裝慣例。</li>
+<li><strong>相對匯入（<code>.module</code>、<code>..pkg</code>）不能用在被直接執行的腳本</strong>，因為 <code>__name__</code> 變 <code>&quot;__main__&quot;</code>、<code>__package__</code> 為空；改用 <code>python -m pkg.module</code> 執行。</li>
+<li><strong><code>if __name__ == &quot;__main__&quot;</code> ≈ Java 的 main</strong>，讓同一檔案可 import 可執行；<code>python -m</code> 以模組語意執行、<code>__main__.py</code> 讓整個套件可被 <code>python -m pkg</code> 叫起。</li>
+<li><strong>src layout 優於 flat layout</strong>：把套件藏進 <code>src/</code> 強迫「唯有 editable install 後才 import 得到」，避免測到未正確打包的原始碼；新專案一律用它。</li>
+<li><strong><code>pyproject.toml</code> 是 Python 的 pom</strong>：<code>[build-system]</code> 選打包後端、<code>[project]</code> 放座標/相依/scripts、<code>[tool.*]</code> 收工具設定；<code>uv build</code> 產 wheel/sdist、<code>uv publish</code> 推 PyPI。</li>
+<li><strong>循環匯入因「import 即時執行頂層」而炸出 partially initialized module</strong>；三種解法：延後 import 進函式、抽共用到單向依賴的第三模組（最根本）、純型別 import 用 <code>if TYPE_CHECKING</code>。</li>
+</ul>
+<h2 id="練習">練習</h2><p><strong>練習 1（觀察 sys.modules 快取）</strong>
+在 <code>tax.py</code> 頂層放一行 <code>print(&quot;loading tax&quot;)</code>，然後在 REPL 連續 <code>import billing.tax</code> 三次。觀察那行只印一次，並用 <code>sys.modules[&#39;billing.tax&#39;]</code> 取出同一個模組物件、確認三次 <code>import ... as t</code> 拿到的 <code>t is sys.modules[&#39;billing.tax&#39;]</code> 為 <code>True</code>。提示：模組是進程級單例。</p>
+<p><strong>練習 2（修好相對匯入的腳本）</strong>
+把 <code>invoice.py</code> 的絕對匯入改成相對匯入（<code>from .money import ...</code>），然後分別用 <code>python src/billing/invoice.py</code> 和 <code>python -m billing.invoice</code> 執行，記錄各自的結果與錯誤訊息。解釋為什麼前者報 <code>attempted relative import with no known parent package</code>。</p>
+<p><strong>練習 3（製造並修好循環匯入）</strong>
+依本章 <code>report.py ↔ invoice.py</code> 的例子刻意造一個循環，重現 <code>partially initialized module</code> 錯誤。接著分別用「延後 import 進函式」與「<code>if TYPE_CHECKING</code>」兩種方式修好，並說明各自的取捨（執行期成本 vs 只能用於純型別場景）。提示：用 <code>from __future__ import annotations</code>。</p>
+<p><strong>練習 4（src layout 與 entry point）</strong>
+依本章目錄樹建立 <code>billing-demo</code>，寫好 <code>pyproject.toml</code>（含 <code>[project.scripts]</code> 的 <code>billing</code> 入口），跑 <code>uv sync --extra dev</code>（記得 <code>pytest</code> 在 <code>dev</code> extra，純 <code>uv sync</code> 不會裝它）後依序執行 <code>uv run python -m billing</code>、<code>uv run billing</code>、<code>uv run pytest</code>，確認三者都成功。再故意把 <code>src/billing/__init__.py</code> 刪掉一行門面 import，觀察哪個指令先壞、錯誤訊息是什麼。</p>
+<p><strong>練習 5（打包並 dry-run 發佈）</strong>
+對 <code>billing-demo</code> 跑 <code>uv build</code>，檢視 <code>dist/</code> 下產出的 <code>.whl</code> 與 <code>.tar.gz</code>，用 <code>unzip -l dist/*.whl</code> 看 wheel 裡實際包了哪些檔案，確認 <code>billing/*.py</code> 都在內——注意 wheel 內的路徑是 <code>billing/__init__.py</code>、<code>billing/money.py</code>…，已被 build backend 去掉 <code>src/</code> 前綴，因為 <code>src/</code> 只是開發佈局、不是套件命名空間的一部分，不會進到發佈成品。思考：若 flat layout 下漏掉打包設定，為什麼測試仍會通過、但使用者裝起來會 <code>ModuleNotFoundError</code>？（對照 Maven 測 artifact 而非原始碼目錄的精神。）</p>

@@ -1,0 +1,799 @@
+<h1 id="第-16-章web-開發">第 16 章：Web 開發</h1><p>你寫 Web 後端的肌肉記憶大概是這樣的：開一個 <code>@RestController</code>、灑一堆 <code>@GetMapping</code>／<code>@PostMapping</code>、用 <code>@Valid</code> 加 <code>@NotNull</code>／<code>@Size</code> 拼出驗證、靠 springdoc 生 Swagger、再用 JPA repository 接資料庫——整套 Spring Boot 的儀式你閉著眼睛都會。Python 這邊的主流是 <strong>FastAPI</strong>，它做的事情幾乎一樣，但底層哲學顛覆了兩個你習以為常的直覺：第一，「型別提示」不再只是給 IDE 看的裝飾，而是<strong>驅動執行期驗證、序列化、自動文件</strong>的單一真實來源（single source of truth）；第二，依賴注入不靠容器掃描的魔法，而是<strong>明確寫在函式參數裡的函式呼叫</strong>。這章我們用一個貫穿全章的 items CRUD API，把 FastAPI、pydantic、SQLAlchemy、<code>Depends</code> 串成一個能實際跑、能被測試的服務。</p>
+<p>本章所有範例都可用 <code>uv run --with &#39;fastapi[standard]&#39; --with httpx --with sqlalchemy --with pydantic-settings python xxx.py</code> 實際執行；FastAPI 範例一律用 <code>TestClient</code> 在記憶體內發請求，不必真的啟動伺服器；資料庫用 in-memory SQLite，可實跑。</p>
+<hr>
+<h2 id="fastapi-入門型別提示驅動的殺手鏈">FastAPI 入門：型別提示驅動的殺手鏈</h2><h3 id="java-怎麼做-python-怎麼做">Java 怎麼做 → Python 怎麼做</h3><p>在 Spring Boot，一個帶驗證的 endpoint 大概長這樣：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-485" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9ASpring%20Boot%20%2B%20Bean%20Validation%0A%40RestController%0A%40RequestMapping(%22%2Fitems%22)%0Apublic%20class%20ItemController%20%7B%0A%0A%20%20%20%20%40PostMapping%0A%20%20%20%20%40ResponseStatus(HttpStatus.CREATED)%0A%20%20%20%20public%20ItemOut%20create(%40Valid%20%40RequestBody%20ItemIn%20item)%20%7B%0A%20%20%20%20%20%20%20%20return%20service.create(item)%3B%0A%20%20%20%20%7D%0A%0A%20%20%20%20%40GetMapping(%22%2F%7Bid%7D%22)%0A%20%20%20%20public%20ItemOut%20get(%40PathVariable%20int%20id)%20%7B%20...%20%7D%0A%0A%20%20%20%20%40GetMapping%0A%20%20%20%20public%20List%3CItemOut%3E%20list(%40RequestParam(defaultValue%20%3D%20%2210%22)%20int%20limit)%20%7B%20...%20%7D%0A%7D%0A%0A%2F%2F%20DTO%20%E4%B8%8A%E6%8E%9B%20annotation%20%E6%89%8D%E6%9C%89%E9%A9%97%E8%AD%89%0Apublic%20record%20ItemIn(%40NotBlank%20%40Size(max%20%3D%2050)%20String%20name%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%40Positive%20double%20price%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20List%3CString%3E%20tags)%20%7B%7D'), 'copy-btn-485')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：Spring Boot + Bean Validation
+@RestController
+@RequestMapping("/items")
+public class ItemController {
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ItemOut create(@Valid @RequestBody ItemIn item) {
+        return service.create(item);
+    }
+
+    @GetMapping("/{id}")
+    public ItemOut get(@PathVariable int id) { ... }
+
+    @GetMapping
+    public List&lt;ItemOut&gt; list(@RequestParam(defaultValue = "10") int limit) { ... }
+}
+
+// DTO 上掛 annotation 才有驗證
+public record ItemIn(@NotBlank @Size(max = 50) String name,
+                     @Positive double price,
+                     List&lt;String&gt; tags) {}</code></pre>
+      </div>
+    <p>FastAPI 的對應寫法：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-486" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20fastapi%20import%20FastAPI%2C%20HTTPException%0Afrom%20pydantic%20import%20BaseModel%2C%20Field%0A%0Aapp%20%3D%20FastAPI(title%3D%22Items%20API%22)%20%20%23%20ASGI%20app%20%E7%89%A9%E4%BB%B6%EF%BC%8C%E7%AD%89%E5%90%8C%20Spring%20Boot%20%E7%9A%84%E6%87%89%E7%94%A8%E5%85%A5%E5%8F%A3%0A%0Aclass%20ItemIn(BaseModel)%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20request%20body%20%E7%9A%84%20schema%EF%BC%88%E6%89%BF%E6%8E%A5%E7%AC%AC%209%20%E7%AB%A0%EF%BC%89%0A%20%20%20%20name%3A%20str%20%3D%20Field(min_length%3D1%2C%20max_length%3D50)%0A%20%20%20%20price%3A%20float%20%3D%20Field(gt%3D0)%0A%20%20%20%20tags%3A%20list%5Bstr%5D%20%3D%20%5B%5D%0A%0Aclass%20ItemOut(ItemIn)%3A%0A%20%20%20%20id%3A%20int%0A%0A_db%3A%20dict%5Bint%2C%20ItemOut%5D%20%3D%20%7B%7D%0A_next_id%20%3D%201%0A%0A%40app.post(%22%2Fitems%22%2C%20response_model%3DItemOut%2C%20status_code%3D201)%0Adef%20create_item(item%3A%20ItemIn)%20-%3E%20ItemOut%3A%20%20%20%20%20%23%20%E5%8F%83%E6%95%B8%E5%9E%8B%E5%88%A5%E6%98%AF%20ItemIn%20%E2%86%92%20%E8%87%AA%E5%8B%95%E7%95%B6%20request%20body%0A%20%20%20%20global%20_next_id%0A%20%20%20%20out%20%3D%20ItemOut(id%3D_next_id%2C%20**item.model_dump())%0A%20%20%20%20_db%5B_next_id%5D%20%3D%20out%0A%20%20%20%20_next_id%20%2B%3D%201%0A%20%20%20%20return%20out%0A%0A%40app.get(%22%2Fitems%2F%7Bitem_id%7D%22%2C%20response_model%3DItemOut)%0Adef%20get_item(item_id%3A%20int)%20-%3E%20ItemOut%3A%20%20%20%20%20%20%20%20%23%20item_id%3A%20int%20%E2%86%92%20path%20%E5%8F%83%E6%95%B8%E8%87%AA%E5%8B%95%E8%BD%89%E5%9E%8B%0A%20%20%20%20if%20item_id%20not%20in%20_db%3A%0A%20%20%20%20%20%20%20%20raise%20HTTPException(status_code%3D404%2C%20detail%3D%22Item%20not%20found%22)%0A%20%20%20%20return%20_db%5Bitem_id%5D%0A%0A%40app.get(%22%2Fitems%22)%0Adef%20list_items(limit%3A%20int%20%3D%2010)%20-%3E%20list%5BItemOut%5D%3A%20%20%23%20%E6%9C%89%E9%A0%90%E8%A8%AD%E5%80%BC%20%E2%86%92%20query%20%E5%8F%83%E6%95%B8%20%3Flimit%3D%0A%20%20%20%20return%20list(_db.values())%5B%3Alimit%5D'), 'copy-btn-486')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="Items API")  # ASGI app 物件，等同 Spring Boot 的應用入口
+
+class ItemIn(BaseModel):                      # request body 的 schema（承接第 9 章）
+    name: str = Field(min_length=1, max_length=50)
+    price: float = Field(gt=0)
+    tags: list[str] = []
+
+class ItemOut(ItemIn):
+    id: int
+
+_db: dict[int, ItemOut] = {}
+_next_id = 1
+
+@app.post("/items", response_model=ItemOut, status_code=201)
+def create_item(item: ItemIn) -&gt; ItemOut:     # 參數型別是 ItemIn → 自動當 request body
+    global _next_id
+    out = ItemOut(id=_next_id, **item.model_dump())
+    _db[_next_id] = out
+    _next_id += 1
+    return out
+
+@app.get("/items/{item_id}", response_model=ItemOut)
+def get_item(item_id: int) -&gt; ItemOut:        # item_id: int → path 參數自動轉型
+    if item_id not in _db:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return _db[item_id]
+
+@app.get("/items")
+def list_items(limit: int = 10) -&gt; list[ItemOut]:  # 有預設值 → query 參數 ?limit=
+    return list(_db.values())[:limit]</code></pre>
+      </div>
+    <p>對照表把映射關係講清楚：</p>
+<table>
+<thead>
+<tr>
+<th>Spring Boot</th>
+<th>FastAPI</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@RestController</code> 類別</td>
+<td><code>app = FastAPI()</code> + 函式</td>
+<td>FastAPI 路由掛在函式上，不需要類別</td>
+</tr>
+<tr>
+<td><code>@PostMapping(&quot;/items&quot;)</code></td>
+<td><code>@app.post(&quot;/items&quot;)</code></td>
+<td>decorator 即路由註冊（詳見第 10 章）</td>
+</tr>
+<tr>
+<td><code>@PathVariable int id</code></td>
+<td>路徑 <code>{item_id}</code> + 參數 <code>item_id: int</code></td>
+<td>名字對上即綁定，型別即轉型規則</td>
+</tr>
+<tr>
+<td><code>@RequestParam int limit</code></td>
+<td>函式參數有預設值 <code>limit: int = 10</code></td>
+<td>有預設值 → query；無 → 必填 query</td>
+</tr>
+<tr>
+<td><code>@RequestBody ItemIn</code></td>
+<td>參數型別是 <code>BaseModel</code> 子類</td>
+<td>pydantic model 自動當 body</td>
+</tr>
+<tr>
+<td><code>@Valid</code> + <code>@NotBlank</code>/<code>@Positive</code></td>
+<td><code>Field(min_length=..., gt=...)</code></td>
+<td>驗證內建在 model，不需另一層 annotation</td>
+</tr>
+<tr>
+<td><code>@ResponseStatus(CREATED)</code></td>
+<td><code>status_code=201</code></td>
+<td></td>
+</tr>
+<tr>
+<td>springdoc-openapi</td>
+<td>內建，零設定</td>
+<td><code>/docs</code>（Swagger UI）、<code>/openapi.json</code></td>
+</tr>
+</tbody></table>
+<h3 id="怎麼判斷一個參數是-pathquery-還是-body">怎麼判斷一個參數是 path、query 還是 body？</h3><p>FastAPI 的規則是<strong>看型別與位置</strong>，比 Spring 的 annotation 少很多儀式：</p>
+<ul>
+<li>名字出現在路徑樣板裡（<code>{item_id}</code>）→ <strong>path 參數</strong>。</li>
+<li>型別是 pydantic <code>BaseModel</code> 子類 → <strong>request body</strong>。</li>
+<li>其餘的簡單型別（<code>int</code>/<code>str</code>/<code>bool</code>...）→ <strong>query 參數</strong>；有預設值就是選填，沒有就是必填。</li>
+</ul>
+<p>這套「慣例優於設定」的推斷，讓你不必像 Java 那樣每個參數都掛一個 <code>@PathVariable</code>／<code>@RequestParam</code>／<code>@RequestBody</code>。</p>
+<h3 id="那條殺手鏈型別提示-自動驗證-自動文件">那條殺手鏈：型別提示 → 自動驗證 → 自動文件</h3><p>這是 FastAPI 真正顛覆 Java 直覺的地方。在 Spring，「DTO 定義」「驗證規則」「OpenAPI schema」是三件分開維護、靠 annotation 黏在一起的事；在 FastAPI，它們是<strong>同一個 pydantic model 的三種投影</strong>。你寫一次 <code>ItemIn</code>，就同時得到：</p>
+<ol>
+<li><strong>執行期解析與驗證</strong>：JSON → <code>ItemIn</code> 物件，型別不符、缺欄位、違反 <code>Field</code> 約束時自動回 <strong>422 Unprocessable Entity</strong>，附結構化錯誤。</li>
+<li><strong>回應序列化</strong>：<code>response_model</code> 控制輸出 schema，多餘欄位自動濾掉（資安上很重要，避免不小心把密碼欄位回給前端）。</li>
+<li><strong>OpenAPI 文件</strong>：<code>/openapi.json</code> 與 <code>/docs</code> 自動生成，欄位型別、約束、範例全都有。</li>
+</ol>
+<p>用 <code>TestClient</code> 實際跑一遍（這是 starlette 包的記憶體內 client，不啟動真正的 server，等同 Spring 的 <code>MockMvc</code>／<code>WebTestClient</code>）。以下輸出皆為實測：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-487" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20fastapi.testclient%20import%20TestClient%0A%0Aclient%20%3D%20TestClient(app)%0A%0Ar%20%3D%20client.post(%22%2Fitems%22%2C%20json%3D%7B%22name%22%3A%20%22keyboard%22%2C%20%22price%22%3A%2089.9%2C%20%22tags%22%3A%20%5B%22gear%22%5D%7D)%0A%23%20r.status_code%20%3D%3D%20201%0A%23%20r.json()%20%3D%3D%20%7B%27name%27%3A%20%27keyboard%27%2C%20%27price%27%3A%2089.9%2C%20%27tags%27%3A%20%5B%27gear%27%5D%2C%20%27id%27%3A%201%7D%0A%0Ar%20%3D%20client.get(%22%2Fitems%2F1%22)%0A%23%20200%2C%20%7B%27name%27%3A%20%27keyboard%27%2C%20%27price%27%3A%2089.9%2C%20%27tags%27%3A%20%5B%27gear%27%5D%2C%20%27id%27%3A%201%7D%0A%0Ar%20%3D%20client.get(%22%2Fitems%2F999%22)%0A%23%20404%2C%20%7B%27detail%27%3A%20%27Item%20not%20found%27%7D'), 'copy-btn-487')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from fastapi.testclient import TestClient
+
+client = TestClient(app)
+
+r = client.post("/items", json={"name": "keyboard", "price": 89.9, "tags": ["gear"]})
+# r.status_code == 201
+# r.json() == {'name': 'keyboard', 'price': 89.9, 'tags': ['gear'], 'id': 1}
+
+r = client.get("/items/1")
+# 200, {'name': 'keyboard', 'price': 89.9, 'tags': ['gear'], 'id': 1}
+
+r = client.get("/items/999")
+# 404, {'detail': 'Item not found'}</code></pre>
+      </div>
+    <p>驗證失敗的 422 回應長這樣（<code>name</code> 空字串違反 <code>min_length</code>、<code>price</code> 負數違反 <code>gt</code>）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-488" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('r%20%3D%20client.post(%22%2Fitems%22%2C%20json%3D%7B%22name%22%3A%20%22%22%2C%20%22price%22%3A%20-5%7D)%0A%23%20r.status_code%20%3D%3D%20422%0A%23%20r.json()%5B%22detail%22%5D%20%3D%3D%0A%23%20%5B%0A%23%20%20%20%7B%22type%22%3A%20%22string_too_short%22%2C%20%22loc%22%3A%20%5B%22body%22%2C%20%22name%22%5D%2C%0A%23%20%20%20%20%22msg%22%3A%20%22String%20should%20have%20at%20least%201%20character%22%2C%0A%23%20%20%20%20%22input%22%3A%20%22%22%2C%20%22ctx%22%3A%20%7B%22min_length%22%3A%201%7D%7D%2C%0A%23%20%20%20%7B%22type%22%3A%20%22greater_than%22%2C%20%22loc%22%3A%20%5B%22body%22%2C%20%22price%22%5D%2C%0A%23%20%20%20%20%22msg%22%3A%20%22Input%20should%20be%20greater%20than%200%22%2C%0A%23%20%20%20%20%22input%22%3A%20-5%2C%20%22ctx%22%3A%20%7B%22gt%22%3A%200.0%7D%7D%0A%23%20%5D'), 'copy-btn-488')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">r = client.post("/items", json={"name": "", "price": -5})
+# r.status_code == 422
+# r.json()["detail"] ==
+# [
+#   {"type": "string_too_short", "loc": ["body", "name"],
+#    "msg": "String should have at least 1 character",
+#    "input": "", "ctx": {"min_length": 1}},
+#   {"type": "greater_than", "loc": ["body", "price"],
+#    "msg": "Input should be greater than 0",
+#    "input": -5, "ctx": {"gt": 0.0}}
+# ]</code></pre>
+      </div>
+    <p><code>loc</code> 精確指出錯在哪個欄位（<code>[&quot;body&quot;, &quot;name&quot;]</code>），這比 Spring 預設那團 <code>MethodArgumentNotValidException</code> 訊息結構化得多，前端可以直接拿來標紅哪一格。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Spring 要 <code>@Valid</code> + Bean Validation annotation + springdoc 三套東西協作，才湊出「驗證 + 文件」；FastAPI 一個 pydantic model 全包。型別提示在 Java 是編譯期檢查，在 FastAPI 是<strong>執行期行為的定義來源</strong>。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：把 request schema（<code>ItemIn</code>）和回應 schema（<code>ItemOut</code>）、以及資料庫 model（後面的 <code>ItemRow</code>）<strong>分成三個類別</strong>，不要共用一個。輸入不該含 <code>id</code>、回應不該含內部欄位、DB model 綁著 ORM——這三件事的形狀本來就不同。Spring 用 DTO/Entity 分離也是同一個道理，只是 FastAPI 讓你更自然地各寫一個。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：別把 ORM model 直接當 <code>response_model</code> 還順手回傳——若該物件帶有 lazy-load 的關聯欄位，序列化時可能觸發額外查詢甚至在 session 關閉後爆 <code>DetachedInstanceError</code>。永遠用一個乾淨的 pydantic 回應 model（搭配後面會講的 <code>from_attributes=True</code>）把要回的欄位明確列出來。</p>
+</div><hr>
+<h2 id="依賴注入depends-對照-spring-di">依賴注入：`Depends` 對照 Spring DI</h2><h3 id="函式式-di沒有容器掃描的魔法">函式式 DI，沒有容器掃描的魔法</h3><p>Spring 的 DI 是「容器在啟動時掃 classpath、找 <code>@Component</code>/<code>@Service</code>/<code>@Repository</code>、建好 bean、用 <code>@Autowired</code> 或建構子注入」。整個過程是隱式的、靠反射與 classpath 掃描。FastAPI 的 <code>Depends</code> 走另一條路：<strong>依賴就是一個普通函式，你在 endpoint 的參數裡明確宣告「我需要這個函式的回傳值」</strong>，FastAPI 在每次請求時呼叫它、把結果塞進來。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-489" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9ASpring%20%E5%BB%BA%E6%A7%8B%E5%AD%90%E6%B3%A8%E5%85%A5%0A%40Service%0Apublic%20class%20ItemService%20%7B%0A%20%20%20%20private%20final%20ItemRepository%20repo%3B%0A%20%20%20%20public%20ItemService(ItemRepository%20repo)%20%7B%20this.repo%20%3D%20repo%3B%20%7D%20%20%2F%2F%20%E5%AE%B9%E5%99%A8%E8%87%AA%E5%8B%95%E6%B3%A8%E5%85%A5%0A%7D'), 'copy-btn-489')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：Spring 建構子注入
+@Service
+public class ItemService {
+    private final ItemRepository repo;
+    public ItemService(ItemRepository repo) { this.repo = repo; }  // 容器自動注入
+}</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-490" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20Annotated%0Afrom%20fastapi%20import%20Depends%0Afrom%20pydantic_settings%20import%20BaseSettings%0A%0A%23%20%E6%9C%80%E5%B0%8F%E8%A8%AD%E5%AE%9A%E7%89%A9%E4%BB%B6%EF%BC%88%E5%AE%8C%E6%95%B4%E7%89%88%E8%A6%8B%E6%9C%AC%E7%AB%A0%E6%9C%AB%E3%80%8C%E8%A8%AD%E5%AE%9A%E7%AE%A1%E7%90%86%E3%80%8D%E4%B8%80%E7%AF%80%EF%BC%8C%E9%80%99%E8%A3%A1%E5%85%88%E7%B5%A6%E6%9C%AC%E7%AF%80%E7%94%A8%E5%BE%97%E5%88%B0%E7%9A%84%E5%85%A9%E5%80%8B%E6%AC%84%E4%BD%8D%EF%BC%89%0Aclass%20Settings(BaseSettings)%3A%0A%20%20%20%20app_name%3A%20str%20%3D%20%22Items%20API%22%0A%20%20%20%20admin_token%3A%20str%20%3D%20%22secret%22%0A%0Adef%20get_settings()%20-%3E%20Settings%3A%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%BE%9D%E8%B3%B4%20%3D%20%E4%B8%80%E5%80%8B%E6%99%AE%E9%80%9A%E5%87%BD%E5%BC%8F%0A%20%20%20%20return%20Settings()%0A%0A%40app.get(%22%2Fadmin%2Finfo%22)%0Adef%20admin_info(settings%3A%20Annotated%5BSettings%2C%20Depends(get_settings)%5D)%20-%3E%20dict%3A%0A%20%20%20%20return%20%7B%22app%22%3A%20settings.app_name%7D%20%20%20%20%20%23%20settings%20%E7%94%B1%20FastAPI%20%E5%91%BC%E5%8F%AB%20get_settings()%20%E6%B3%A8%E5%85%A5'), 'copy-btn-490')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import Annotated
+from fastapi import Depends
+from pydantic_settings import BaseSettings
+
+# 最小設定物件（完整版見本章末「設定管理」一節，這裡先給本節用得到的兩個欄位）
+class Settings(BaseSettings):
+    app_name: str = "Items API"
+    admin_token: str = "secret"
+
+def get_settings() -&gt; Settings:           # 依賴 = 一個普通函式
+    return Settings()
+
+@app.get("/admin/info")
+def admin_info(settings: Annotated[Settings, Depends(get_settings)]) -&gt; dict:
+    return {"app": settings.app_name}     # settings 由 FastAPI 呼叫 get_settings() 注入</code></pre>
+      </div>
+    <p><code>Annotated[Settings, Depends(get_settings)]</code> 是現代寫法（也可以寫成舊式的 <code>settings: Settings = Depends(get_settings)</code>）。差別在於 <code>Annotated</code> 版可以被重複使用、且型別檢查器看得懂。</p>
+<p>依賴可以<strong>巢狀</strong>：一個依賴函式本身也能宣告 <code>Depends</code>。下面 <code>require_admin</code> 同時依賴 HTTP header 與 <code>get_settings</code>，FastAPI 會自動建出整棵依賴樹：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-491" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20fastapi%20import%20Header%2C%20HTTPException%0A%0Adef%20require_admin(%0A%20%20%20%20x_token%3A%20Annotated%5Bstr%2C%20Header()%5D%2C%0A%20%20%20%20settings%3A%20Annotated%5BSettings%2C%20Depends(get_settings)%5D%2C%0A)%20-%3E%20str%3A%0A%20%20%20%20if%20x_token%20!%3D%20settings.admin_token%3A%0A%20%20%20%20%20%20%20%20raise%20HTTPException(401%2C%20%22invalid%20token%22)%0A%20%20%20%20return%20%22admin%22%0A%0A%40app.get(%22%2Fadmin%2Finfo%22)%0Adef%20admin_info(%0A%20%20%20%20user%3A%20Annotated%5Bstr%2C%20Depends(require_admin)%5D%2C%0A%20%20%20%20settings%3A%20Annotated%5BSettings%2C%20Depends(get_settings)%5D%2C%0A)%20-%3E%20dict%3A%0A%20%20%20%20return%20%7B%22user%22%3A%20user%2C%20%22app%22%3A%20settings.app_name%7D'), 'copy-btn-491')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from fastapi import Header, HTTPException
+
+def require_admin(
+    x_token: Annotated[str, Header()],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -&gt; str:
+    if x_token != settings.admin_token:
+        raise HTTPException(401, "invalid token")
+    return "admin"
+
+@app.get("/admin/info")
+def admin_info(
+    user: Annotated[str, Depends(require_admin)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -&gt; dict:
+    return {"user": user, "app": settings.app_name}</code></pre>
+      </div>
+    <p>實測（<code>admin_token</code> 預設 <code>&quot;secret&quot;</code>）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-492" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('client.get(%22%2Fadmin%2Finfo%22).status_code%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20422%EF%BC%88%E7%BC%BA%20x-token%20header%EF%BC%89%0Aclient.get(%22%2Fadmin%2Finfo%22%2C%20headers%3D%7B%22x-token%22%3A%20%22nope%22%7D).status_code%20%23%20401%0Aclient.get(%22%2Fadmin%2Finfo%22%2C%20headers%3D%7B%22x-token%22%3A%20%22secret%22%7D).json()%0A%23%20%7B%27user%27%3A%20%27admin%27%2C%20%27app%27%3A%20%27Items%20API%27%7D'), 'copy-btn-492')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">client.get("/admin/info").status_code                              # 422（缺 x-token header）
+client.get("/admin/info", headers={"x-token": "nope"}).status_code # 401
+client.get("/admin/info", headers={"x-token": "secret"}).json()
+# {'user': 'admin', 'app': 'Items API'}</code></pre>
+      </div>
+    <table>
+<thead>
+<tr>
+<th>Spring DI</th>
+<th>FastAPI <code>Depends</code></th>
+<th>思維差異</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@Autowired</code> / 建構子注入</td>
+<td><code>Depends(fn)</code> 寫在參數</td>
+<td>FastAPI 是<strong>顯式</strong>的，看函式簽章就知道依賴什麼</td>
+</tr>
+<tr>
+<td>容器掃描 classpath</td>
+<td>無容器，依賴就是被呼叫的函式</td>
+<td>沒有「bean 找不到」的啟動期魔法錯誤</td>
+</tr>
+<tr>
+<td>單例 scope（預設）</td>
+<td>每請求呼叫一次（可加 cache）</td>
+<td>FastAPI 依賴預設 per-request，相同依賴在一次請求內會快取</td>
+</tr>
+<tr>
+<td><code>@Transactional</code> 切面</td>
+<td><code>yield</code> 依賴做 setup/teardown</td>
+<td>見下</td>
+</tr>
+</tbody></table>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：同一個依賴在<strong>一次請求內</strong>只會被呼叫一次，結果會被快取重複使用。所以上例 <code>get_settings</code> 即使被 <code>require_admin</code> 和 <code>admin_info</code> 都依賴，一次請求也只執行一次。要關掉這個快取行為（少見）可用 <code>Depends(fn, use_cache=False)</code>。</p>
+</div><h3 id="yield-依賴setup-teardown-與-try-with-resources">`yield` 依賴：setup / teardown 與 try-with-resources</h3><p>需要「用前準備、用後清理」的資源（DB session、檔案、鎖），用 <strong><code>yield</code> 依賴</strong>。<code>yield</code> 之前是 setup，<code>yield</code> 出去的值就是注入的東西，請求處理完（含發生例外）回來執行 <code>yield</code> 之後的 teardown。這正是 Python 版的 try-with-resources，也對應 Spring 的 <code>@Transactional</code> 切面或 bean 的 lifecycle callback。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-493" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20collections.abc%20import%20Iterator%0Afrom%20sqlalchemy.orm%20import%20Session%0A%0Adef%20get_session()%20-%3E%20Iterator%5BSession%5D%3A%0A%20%20%20%20session%20%3D%20SessionLocal()%20%20%20%20%20%20%20%23%20setup%EF%BC%9A%E9%96%8B%20session%0A%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20yield%20session%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%B3%A8%E5%85%A5%E7%B5%A6%20endpoint%0A%20%20%20%20%20%20%20%20session.commit()%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%B2%92%E5%87%BA%E9%8C%AF%20%E2%86%92%20%E6%8F%90%E4%BA%A4%EF%BC%88%E5%83%8F%20%40Transactional%20%E6%AD%A3%E5%B8%B8%E7%B5%90%E6%9D%9F%EF%BC%89%0A%20%20%20%20except%20Exception%3A%0A%20%20%20%20%20%20%20%20session.rollback()%20%20%20%20%20%20%20%20%20%23%20%E5%87%BA%E9%8C%AF%20%E2%86%92%20%E5%9B%9E%E6%BB%BE%0A%20%20%20%20%20%20%20%20raise%0A%20%20%20%20finally%3A%0A%20%20%20%20%20%20%20%20session.close()%20%20%20%20%20%20%20%20%20%20%20%20%23%20teardown%EF%BC%9A%E4%B8%80%E5%AE%9A%E9%97%9C%E9%96%89'), 'copy-btn-493')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from collections.abc import Iterator
+from sqlalchemy.orm import Session
+
+def get_session() -&gt; Iterator[Session]:
+    session = SessionLocal()       # setup：開 session
+    try:
+        yield session              # 注入給 endpoint
+        session.commit()           # 沒出錯 → 提交（像 @Transactional 正常結束）
+    except Exception:
+        session.rollback()         # 出錯 → 回滾
+        raise
+    finally:
+        session.close()            # teardown：一定關閉</code></pre>
+      </div>
+    <p>這段邏輯——「正常就 commit、例外就 rollback、無論如何都 close」——就是你在 Java 裡靠 <code>@Transactional</code> + 連線池替你做的事，只是這裡完全顯式、看得見每一步。</p>
+<h3 id="dependencyoverrides測試時的依賴替換">`dependency_overrides`：測試時的依賴替換</h3><p>這是 <code>Depends</code> 設計上最甜的一點。FastAPI app 有一個 <code>dependency_overrides</code> 字典，可以把任何依賴<strong>換掉</strong>——測試時把 <code>get_session</code> 換成指向測試資料庫的版本，正式碼一行都不用改（承接第 13 章的測試替身概念）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-494" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20override_session()%20-%3E%20Iterator%5BSession%5D%3A%0A%20%20%20%20s%20%3D%20TestSession()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%8C%87%E5%90%91%E7%8D%A8%E7%AB%8B%E7%9A%84%E6%B8%AC%E8%A9%A6%20DB%0A%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20yield%20s%0A%20%20%20%20%20%20%20%20s.commit()%0A%20%20%20%20finally%3A%0A%20%20%20%20%20%20%20%20s.close()%0A%0Aapp.dependency_overrides%5Bget_session%5D%20%3D%20override_session%0A%23%20...%20%E8%B7%91%E6%B8%AC%E8%A9%A6%20...%0Aapp.dependency_overrides.clear()%20%20%20%23%20%E6%94%B6%E5%B0%BE%E9%82%84%E5%8E%9F'), 'copy-btn-494')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def override_session() -&gt; Iterator[Session]:
+    s = TestSession()              # 指向獨立的測試 DB
+    try:
+        yield s
+        s.commit()
+    finally:
+        s.close()
+
+app.dependency_overrides[get_session] = override_session
+# ... 跑測試 ...
+app.dependency_overrides.clear()   # 收尾還原</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>app.dependency_overrides[real] = fake</code> ≈ Spring Test 的 <code>@MockBean</code>／<code>@TestConfiguration</code> 覆寫 bean。差別是 FastAPI 這個就是一個普通 dict，沒有任何反射魔法——你看得懂它每一步在做什麼。</p>
+</div><hr>
+<h2 id="ormsqlalchemy-20-對照-jpahibernate">ORM：SQLAlchemy 2.0 對照 JPA/Hibernate</h2><h3 id="三個核心物件enginesessionmodel">三個核心物件：Engine、Session、Model</h3><p>SQLAlchemy 是 Python 的事實標準 ORM，2.0 版本的宣告式 model 用 <code>Mapped[...]</code> + <code>mapped_column(...)</code>，<strong>型別提示直接驅動欄位定義</strong>（再次呼應第 9 章），讀起來跟 dataclass 很像。對照關係：</p>
+<table>
+<thead>
+<tr>
+<th>JPA / Hibernate</th>
+<th>SQLAlchemy 2.0</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>EntityManagerFactory</code></td>
+<td><code>Engine</code>（<code>create_engine</code>）</td>
+<td>連線工廠 / 連線池，全程式一個就好</td>
+</tr>
+<tr>
+<td><code>EntityManager</code></td>
+<td><code>Session</code></td>
+<td>一個工作單元（unit of work）</td>
+</tr>
+<tr>
+<td><code>@Entity</code> 類別</td>
+<td><code>class X(Base)</code> + <code>Mapped</code> 欄位</td>
+<td>宣告式 model</td>
+</tr>
+<tr>
+<td>persistence context</td>
+<td>identity map</td>
+<td>同一 session 內同主鍵 = 同一物件</td>
+</tr>
+<tr>
+<td><code>em.find(User, id)</code></td>
+<td><code>session.get(User, id)</code></td>
+<td>主鍵查詢，先查 identity map</td>
+</tr>
+<tr>
+<td>JPQL <code>SELECT u FROM User u WHERE...</code></td>
+<td><code>select(User).where(...)</code></td>
+<td>型別安全的查詢建構</td>
+</tr>
+<tr>
+<td><code>em.persist(x)</code> / <code>em.merge</code></td>
+<td><code>session.add(x)</code></td>
+<td>加入待寫入</td>
+</tr>
+<tr>
+<td><code>@Transactional</code> / <code>tx.commit()</code></td>
+<td><code>session.commit()</code></td>
+<td>提交</td>
+</tr>
+<tr>
+<td>Spring Data <code>JpaRepository</code></td>
+<td>自己包一層或用 <code>select</code></td>
+<td>SQLAlchemy 不內建 repository，但很好包</td>
+</tr>
+<tr>
+<td>Flyway / Liquibase</td>
+<td><strong>Alembic</strong></td>
+<td>migration 工具，下面一句帶過</td>
+</tr>
+</tbody></table>
+<h3 id="宣告-model-與基本-crudin-memory-sqlite-實跑">宣告 model 與基本 CRUD（in-memory SQLite 實跑）</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-495" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20sqlalchemy%20import%20create_engine%2C%20select%2C%20String%2C%20Float%0Afrom%20sqlalchemy.orm%20import%20DeclarativeBase%2C%20Mapped%2C%20mapped_column%2C%20Session%0A%0Aclass%20Base(DeclarativeBase)%3A%0A%20%20%20%20pass%0A%0Aclass%20Item(Base)%3A%0A%20%20%20%20__tablename__%20%3D%20%22items%22%0A%20%20%20%20id%3A%20Mapped%5Bint%5D%20%3D%20mapped_column(primary_key%3DTrue)%20%20%20%20%20%20%20%20%23%20%E4%B8%BB%E9%8D%B5%EF%BC%8C%E8%87%AA%E5%8B%95%E9%81%9E%E5%A2%9E%0A%20%20%20%20name%3A%20Mapped%5Bstr%5D%20%3D%20mapped_column(String(50))%0A%20%20%20%20price%3A%20Mapped%5Bfloat%5D%20%3D%20mapped_column(Float)%0A%20%20%20%20description%3A%20Mapped%5Bstr%20%7C%20None%5D%20%3D%20mapped_column(default%3DNone)%20%20%23%20%E5%8F%AF%E7%A9%BA%20%E2%86%92%20%E5%B0%8D%E6%87%89%20NULL%0A%0A%20%20%20%20def%20__repr__(self)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20return%20f%22Item(id%3D%7Bself.id!r%7D%2C%20name%3D%7Bself.name!r%7D%2C%20price%3D%7Bself.price!r%7D)%22%0A%0Aengine%20%3D%20create_engine(%22sqlite%3A%2F%2F%2F%3Amemory%3A%22)%0ABase.metadata.create_all(engine)%20%20%20%20%20%23%20%E4%BE%9D%20model%20%E5%BB%BA%E8%A1%A8%EF%BC%88DDL%EF%BC%89%E3%80%82%E6%AD%A3%E5%BC%8F%E7%92%B0%E5%A2%83%E7%94%A8%20Alembic%EF%BC%8C%E4%B8%8D%E8%A6%81%E9%9D%A0%E9%80%99%E5%80%8B'), 'copy-btn-495')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from sqlalchemy import create_engine, select, String, Float
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
+
+class Base(DeclarativeBase):
+    pass
+
+class Item(Base):
+    __tablename__ = "items"
+    id: Mapped[int] = mapped_column(primary_key=True)        # 主鍵，自動遞增
+    name: Mapped[str] = mapped_column(String(50))
+    price: Mapped[float] = mapped_column(Float)
+    description: Mapped[str | None] = mapped_column(default=None)  # 可空 → 對應 NULL
+
+    def __repr__(self) -&gt; str:
+        return f"Item(id={self.id!r}, name={self.name!r}, price={self.price!r})"
+
+engine = create_engine("sqlite:///:memory:")
+Base.metadata.create_all(engine)     # 依 model 建表（DDL）。正式環境用 Alembic，不要靠這個</code></pre>
+      </div>
+    <p>注意 <code>Mapped[str]</code> vs <code>Mapped[str | None]</code>——型別提示的可空性<strong>直接決定</strong>欄位是否 <code>NOT NULL</code>，不需要像 JPA 那樣寫 <code>@Column(nullable = false)</code>。這就是 2.0 風格的精髓：型別即 schema。</p>
+<p>完整 CRUD，以下輸出皆為實測：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-496" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('with%20Session(engine)%20as%20session%3A%0A%20%20%20%20session.add_all(%5B%0A%20%20%20%20%20%20%20%20Item(name%3D%22keyboard%22%2C%20price%3D89.9)%2C%0A%20%20%20%20%20%20%20%20Item(name%3D%22mouse%22%2C%20price%3D25.0%2C%20description%3D%22wireless%22)%2C%0A%20%20%20%20%5D)%0A%20%20%20%20session.commit()%0A%0A%20%20%20%20%23%20READ%EF%BC%9A%E4%B8%BB%E9%8D%B5%E6%9F%A5%E8%A9%A2%0A%20%20%20%20item%20%3D%20session.get(Item%2C%201)%0A%20%20%20%20print(item)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20Item(id%3D1%2C%20name%3D%27keyboard%27%2C%20price%3D89.9)%0A%0A%20%20%20%20%23%20identity%20map%EF%BC%9A%E5%90%8C%E4%B8%80%20session%20%E5%85%A7%E3%80%81%E5%90%8C%E4%B8%BB%E9%8D%B5%20%E2%86%92%20%E5%90%8C%E4%B8%80%E5%80%8B%20Python%20%E7%89%A9%E4%BB%B6%0A%20%20%20%20same%20%3D%20session.get(Item%2C%201)%0A%20%20%20%20print(item%20is%20same)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20True%20%E2%86%90%20%E4%B8%8D%E6%98%AF%E7%9B%B8%E7%AD%89%EF%BC%8C%E6%98%AF%E5%90%8C%E4%B8%80%E5%80%8B%E7%89%A9%E4%BB%B6%EF%BC%81%0A%0A%20%20%20%20%23%20QUERY%EF%BC%9Aselect%20%2B%20where%20%2B%20order_by%0A%20%20%20%20rows%20%3D%20session.execute(%0A%20%20%20%20%20%20%20%20select(Item).where(Item.price%20%3E%2030).order_by(Item.price)%0A%20%20%20%20).scalars().all()%0A%20%20%20%20print(rows)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%5BItem(id%3D1%2C%20name%3D%27keyboard%27%2C%20price%3D89.9)%5D%0A%0A%20%20%20%20%23%20%E5%8F%96%E5%96%AE%E4%B8%80%E5%88%97%0A%20%20%20%20m%20%3D%20session.execute(%0A%20%20%20%20%20%20%20%20select(Item).where(Item.name%20%3D%3D%20%22mouse%22)%0A%20%20%20%20).scalar_one()%0A%20%20%20%20print(m.description)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20wireless%0A%0A%20%20%20%20%23%20UPDATE%EF%BC%9A%E6%94%B9%E5%B1%AC%E6%80%A7%20%2B%20commit%EF%BC%8C%E9%9D%A0%E9%AB%92%E6%AA%A2%E6%9F%A5%EF%BC%88dirty%20tracking%EF%BC%89%E8%87%AA%E5%8B%95%E7%99%BC%20UPDATE%0A%20%20%20%20item.price%20%3D%2099.0%0A%20%20%20%20session.commit()%0A%20%20%20%20print(session.get(Item%2C%201).price)%20%20%23%2099.0'), 'copy-btn-496')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">with Session(engine) as session:
+    session.add_all([
+        Item(name="keyboard", price=89.9),
+        Item(name="mouse", price=25.0, description="wireless"),
+    ])
+    session.commit()
+
+    # READ：主鍵查詢
+    item = session.get(Item, 1)
+    print(item)                        # Item(id=1, name='keyboard', price=89.9)
+
+    # identity map：同一 session 內、同主鍵 → 同一個 Python 物件
+    same = session.get(Item, 1)
+    print(item is same)                # True ← 不是相等，是同一個物件！
+
+    # QUERY：select + where + order_by
+    rows = session.execute(
+        select(Item).where(Item.price &gt; 30).order_by(Item.price)
+    ).scalars().all()
+    print(rows)                        # [Item(id=1, name='keyboard', price=89.9)]
+
+    # 取單一列
+    m = session.execute(
+        select(Item).where(Item.name == "mouse")
+    ).scalar_one()
+    print(m.description)               # wireless
+
+    # UPDATE：改屬性 + commit，靠髒檢查（dirty tracking）自動發 UPDATE
+    item.price = 99.0
+    session.commit()
+    print(session.get(Item, 1).price)  # 99.0</code></pre>
+      </div>
+    <p>幾個關鍵 API 對 Java 工程師的提醒：</p>
+<ul>
+<li><strong><code>session.execute(select(...))</code> 回傳 <code>Result</code></strong>，不能直接迭代成 model。要拿 ORM 物件得接 <code>.scalars()</code>（解開單欄結果），再 <code>.all()</code> / <code>.first()</code> / <code>.one()</code>。這層 <code>Result</code> 包裝是 2.0 統一 Core 與 ORM 查詢介面的結果，一開始會覺得囉嗦，但它讓「查多欄」「查整個物件」「查聚合」走同一套 API。</li>
+<li><strong><code>scalar_one()</code></strong> = 「我預期剛好一列」，多於或少於一列就拋例外，對應 JPA 的 <code>getSingleResult()</code>。要「找不到回 <code>None</code>」用 <code>scalar_one_or_none()</code>。</li>
+<li><strong>UPDATE 不需要呼叫任何 <code>save</code></strong>：改了 model 屬性，session 的髒檢查會在 <code>commit</code>（或 <code>flush</code>）時自動發 <code>UPDATE</code>。這就是 Hibernate 的 dirty checking，行為一致。</li>
+</ul>
+<h3 id="session-工作單元-identity-map">Session = 工作單元 + identity map</h3><p><code>item is same</code> 回傳 <code>True</code> 不是巧合，是 <strong>identity map</strong> 的核心保證：在同一個 session（= Hibernate 的 persistence context）裡，同一主鍵的列只會有<strong>一個</strong> Python 物件代表它。這帶來兩個你從 Hibernate 已經知道的後果：</p>
+<ol>
+<li><strong>快取</strong>：第二次 <code>session.get(Item, 1)</code> 不會再查資料庫，直接回 identity map 裡的物件。</li>
+<li><strong>一致性</strong>：你在程式各處拿到的「id=1 的 item」是同一個物件，改了一處到處生效。</li>
+</ol>
+<p>session 是<strong>短命</strong>的——一個請求、一個工作單元、用完即丟，這也是為什麼上面 <code>get_session</code> 依賴每次請求開新 session。把一個 session 當成 application-scope 長期共用是反模式（會累積物件、執行緒不安全），就跟你不會把 Hibernate 的 <code>EntityManager</code> 設成單例一樣。</p>
+<blockquote><p>📌 <strong>Alembic 一句帶過</strong>：<code>Base.metadata.create_all()</code> 只適合測試與 demo。正式環境的 schema 演進用 <strong>Alembic</strong>（<code>alembic revision --autogenerate</code> 比對 model 與資料庫差異生 migration script，<code>alembic upgrade head</code> 套用），就是 Python 版的 Flyway/Liquibase，有版本號、可上下遷移、進 git 控管。</p>
+</blockquote><hr>
+<h2 id="把它們串起來可測試的-items-crud-服務">把它們串起來：可測試的 items CRUD 服務</h2><p>現在用一個檔案把 <strong>FastAPI + pydantic + SQLAlchemy + Depends</strong> 全部接起來，並用 <code>TestClient</code> 證明它能跑。這段是本章的核心交付物，可直接 <code>uv run</code> 執行。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-497" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20collections.abc%20import%20Iterator%0Afrom%20fastapi%20import%20FastAPI%2C%20Depends%2C%20HTTPException%0Afrom%20fastapi.testclient%20import%20TestClient%0Afrom%20pydantic%20import%20BaseModel%2C%20Field%2C%20ConfigDict%0Afrom%20sqlalchemy%20import%20create_engine%2C%20select%2C%20String%2C%20Float%2C%20StaticPool%0Afrom%20sqlalchemy.orm%20import%20(%0A%20%20%20%20DeclarativeBase%2C%20Mapped%2C%20mapped_column%2C%20Session%2C%20sessionmaker%2C%0A)%0A%0A%23%20----------%20ORM%20model%EF%BC%88%E8%B3%87%E6%96%99%E5%BA%AB%E7%9A%84%E5%BD%A2%E7%8B%80%EF%BC%89----------%0Aclass%20Base(DeclarativeBase)%3A%0A%20%20%20%20pass%0A%0Aclass%20ItemRow(Base)%3A%0A%20%20%20%20__tablename__%20%3D%20%22items%22%0A%20%20%20%20id%3A%20Mapped%5Bint%5D%20%3D%20mapped_column(primary_key%3DTrue)%0A%20%20%20%20name%3A%20Mapped%5Bstr%5D%20%3D%20mapped_column(String(50))%0A%20%20%20%20price%3A%20Mapped%5Bfloat%5D%20%3D%20mapped_column(Float)%0A%0A%23%20----------%20pydantic%20schema%EF%BC%88API%20%E7%9A%84%E5%BD%A2%E7%8B%80%EF%BC%89----------%0Aclass%20ItemCreate(BaseModel)%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%BC%B8%E5%85%A5%EF%BC%9A%E6%B2%92%E6%9C%89%20id%0A%20%20%20%20name%3A%20str%20%3D%20Field(min_length%3D1%2C%20max_length%3D50)%0A%20%20%20%20price%3A%20float%20%3D%20Field(gt%3D0)%0A%0Aclass%20ItemRead(BaseModel)%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%BC%B8%E5%87%BA%EF%BC%9A%E6%9C%89%20id%0A%20%20%20%20model_config%20%3D%20ConfigDict(from_attributes%3DTrue)%20%20%23%20%E5%85%81%E8%A8%B1%20model_validate%20%E5%BE%9E%20ORM%20%E7%89%A9%E4%BB%B6%E5%B1%AC%E6%80%A7%E8%AE%80%EF%BC%88%E8%A6%8B%E4%B8%8B%E3%80%8C%E9%99%B7%E9%98%B1%E4%BA%8C%E3%80%8D%EF%BC%89%0A%20%20%20%20id%3A%20int%0A%20%20%20%20name%3A%20str%0A%20%20%20%20price%3A%20float%0A%0A%23%20----------%20DB%20setup%20----------%0Aengine%20%3D%20create_engine(%0A%20%20%20%20%22sqlite%3A%2F%2F%2F%3Amemory%3A%22%2C%0A%20%20%20%20connect_args%3D%7B%22check_same_thread%22%3A%20False%7D%2C%20%20%23%20TestClient%20%E5%9C%A8%E5%88%A5%E7%9A%84%20thread%20%E8%B7%91%20handler%0A%20%20%20%20poolclass%3DStaticPool%2C%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%AE%93%E6%95%B4%E5%80%8B%20app%20%E5%85%B1%E7%94%A8%E5%90%8C%E4%B8%80%E6%A2%9D%20in-memory%20%E9%80%A3%E7%B7%9A%0A)%0ASessionLocal%20%3D%20sessionmaker(bind%3Dengine%2C%20expire_on_commit%3DFalse)%0ABase.metadata.create_all(engine)%0A%0Adef%20get_session()%20-%3E%20Iterator%5BSession%5D%3A%20%20%20%20%20%20%20%20%20%20%23%20yield%20%E4%BE%9D%E8%B3%B4%0A%20%20%20%20session%20%3D%20SessionLocal()%0A%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20yield%20session%0A%20%20%20%20%20%20%20%20session.commit()%0A%20%20%20%20except%20Exception%3A%0A%20%20%20%20%20%20%20%20session.rollback()%0A%20%20%20%20%20%20%20%20raise%0A%20%20%20%20finally%3A%0A%20%20%20%20%20%20%20%20session.close()%0A%0A%23%20----------%20%E8%B7%AF%E7%94%B1%20----------%0Aapp%20%3D%20FastAPI(title%3D%22Items%20API%22)%0A%0A%40app.post(%22%2Fitems%22%2C%20response_model%3DItemRead%2C%20status_code%3D201)%0Adef%20create_item(payload%3A%20ItemCreate%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20session%3A%20Session%20%3D%20Depends(get_session))%20-%3E%20ItemRow%3A%0A%20%20%20%20row%20%3D%20ItemRow(name%3Dpayload.name%2C%20price%3Dpayload.price)%0A%20%20%20%20session.add(row)%0A%20%20%20%20session.flush()%20%20%20%20%20%20%20%20%23%20flush%20%E5%8F%96%E5%BE%97%E8%87%AA%E5%8B%95%E7%94%A2%E7%94%9F%E7%9A%84%20id%EF%BC%88%E9%82%84%E6%B2%92%20commit%EF%BC%89%0A%20%20%20%20return%20row%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%9B%9E%20ORM%20%E7%89%A9%E4%BB%B6%EF%BC%8C%E7%94%B1%20response_model%20%E5%BA%8F%E5%88%97%E5%8C%96%E6%88%90%20ItemRead%EF%BC%88%E8%A6%8B%E4%B8%8B%E3%80%8C%E9%99%B7%E9%98%B1%E4%BA%8C%E3%80%8D%EF%BC%89%0A%0A%40app.get(%22%2Fitems%2F%7Bitem_id%7D%22%2C%20response_model%3DItemRead)%0Adef%20read_item(item_id%3A%20int%2C%20session%3A%20Session%20%3D%20Depends(get_session))%20-%3E%20ItemRow%3A%0A%20%20%20%20row%20%3D%20session.get(ItemRow%2C%20item_id)%0A%20%20%20%20if%20row%20is%20None%3A%0A%20%20%20%20%20%20%20%20raise%20HTTPException(404%2C%20%22Item%20not%20found%22)%0A%20%20%20%20return%20row%0A%0A%40app.get(%22%2Fitems%22%2C%20response_model%3Dlist%5BItemRead%5D)%0Adef%20list_items(session%3A%20Session%20%3D%20Depends(get_session))%20-%3E%20list%5BItemRow%5D%3A%0A%20%20%20%20return%20list(session.execute(select(ItemRow)).scalars().all())'), 'copy-btn-497')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from collections.abc import Iterator
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.testclient import TestClient
+from pydantic import BaseModel, Field, ConfigDict
+from sqlalchemy import create_engine, select, String, Float, StaticPool
+from sqlalchemy.orm import (
+    DeclarativeBase, Mapped, mapped_column, Session, sessionmaker,
+)
+
+# ---------- ORM model（資料庫的形狀）----------
+class Base(DeclarativeBase):
+    pass
+
+class ItemRow(Base):
+    __tablename__ = "items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50))
+    price: Mapped[float] = mapped_column(Float)
+
+# ---------- pydantic schema（API 的形狀）----------
+class ItemCreate(BaseModel):                    # 輸入：沒有 id
+    name: str = Field(min_length=1, max_length=50)
+    price: float = Field(gt=0)
+
+class ItemRead(BaseModel):                      # 輸出：有 id
+    model_config = ConfigDict(from_attributes=True)  # 允許 model_validate 從 ORM 物件屬性讀（見下「陷阱二」）
+    id: int
+    name: str
+    price: float
+
+# ---------- DB setup ----------
+engine = create_engine(
+    "sqlite:///:memory:",
+    connect_args={"check_same_thread": False},  # TestClient 在別的 thread 跑 handler
+    poolclass=StaticPool,                        # 讓整個 app 共用同一條 in-memory 連線
+)
+SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+Base.metadata.create_all(engine)
+
+def get_session() -&gt; Iterator[Session]:          # yield 依賴
+    session = SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+# ---------- 路由 ----------
+app = FastAPI(title="Items API")
+
+@app.post("/items", response_model=ItemRead, status_code=201)
+def create_item(payload: ItemCreate,
+                session: Session = Depends(get_session)) -&gt; ItemRow:
+    row = ItemRow(name=payload.name, price=payload.price)
+    session.add(row)
+    session.flush()        # flush 取得自動產生的 id（還沒 commit）
+    return row             # 回 ORM 物件，由 response_model 序列化成 ItemRead（見下「陷阱二」）
+
+@app.get("/items/{item_id}", response_model=ItemRead)
+def read_item(item_id: int, session: Session = Depends(get_session)) -&gt; ItemRow:
+    row = session.get(ItemRow, item_id)
+    if row is None:
+        raise HTTPException(404, "Item not found")
+    return row
+
+@app.get("/items", response_model=list[ItemRead])
+def list_items(session: Session = Depends(get_session)) -&gt; list[ItemRow]:
+    return list(session.execute(select(ItemRow)).scalars().all())</code></pre>
+      </div>
+    <p>接上一段 <code>TestClient</code> 測試，這就是「至少一段證明它能跑」的測試（承接第 13 章，這寫法可以直接搬進 pytest）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-498" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20test_items_crud()%20-%3E%20None%3A%0A%20%20%20%20client%20%3D%20TestClient(app)%0A%0A%20%20%20%20r%20%3D%20client.post(%22%2Fitems%22%2C%20json%3D%7B%22name%22%3A%20%22keyboard%22%2C%20%22price%22%3A%2089.9%7D)%0A%20%20%20%20assert%20r.status_code%20%3D%3D%20201%0A%20%20%20%20assert%20r.json()%20%3D%3D%20%7B%22id%22%3A%201%2C%20%22name%22%3A%20%22keyboard%22%2C%20%22price%22%3A%2089.9%7D%0A%0A%20%20%20%20assert%20client.get(%22%2Fitems%2F1%22).json()%20%3D%3D%20%7B%22id%22%3A%201%2C%20%22name%22%3A%20%22keyboard%22%2C%20%22price%22%3A%2089.9%7D%0A%20%20%20%20assert%20client.get(%22%2Fitems%22).json()%20%3D%3D%20%5B%7B%22id%22%3A%201%2C%20%22name%22%3A%20%22keyboard%22%2C%20%22price%22%3A%2089.9%7D%5D%0A%20%20%20%20assert%20client.get(%22%2Fitems%2F999%22).status_code%20%3D%3D%20404%0A%0A%20%20%20%20r%20%3D%20client.post(%22%2Fitems%22%2C%20json%3D%7B%22name%22%3A%20%22x%22%2C%20%22price%22%3A%200%7D)%20%20%20%23%20price%20%E9%81%95%E5%8F%8D%20gt%3D0%0A%20%20%20%20assert%20r.status_code%20%3D%3D%20422'), 'copy-btn-498')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def test_items_crud() -&gt; None:
+    client = TestClient(app)
+
+    r = client.post("/items", json={"name": "keyboard", "price": 89.9})
+    assert r.status_code == 201
+    assert r.json() == {"id": 1, "name": "keyboard", "price": 89.9}
+
+    assert client.get("/items/1").json() == {"id": 1, "name": "keyboard", "price": 89.9}
+    assert client.get("/items").json() == [{"id": 1, "name": "keyboard", "price": 89.9}]
+    assert client.get("/items/999").status_code == 404
+
+    r = client.post("/items", json={"name": "x", "price": 0})   # price 違反 gt=0
+    assert r.status_code == 422</code></pre>
+      </div>
+    <p>實測全部通過。這裡有兩個<strong>會在 Java 工程師身上扎一刀</strong>的陷阱，值得展開：</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱一：in-memory SQLite 的「no such table」</strong>。<code>sqlite:///:memory:</code> 預設用 <code>SingletonThreadPool</code>——<strong>每條執行緒一條連線</strong>，而每條連線是<strong>獨立的</strong>記憶體資料庫。<code>create_all(engine)</code> 在主執行緒那條連線上建了表；但 TestClient 跑 <code>sync def</code> handler 時，FastAPI 會把它丟到 threadpool 的<strong>另一條執行緒</strong>執行，那條執行緒拿到自己的<strong>新</strong> in-memory 連線、上面沒有那張表，於是 <code>INSERT</code> 炸 <code>no such table: items</code>。解法是 <code>poolclass=StaticPool</code>，強制整個 app（不分執行緒）共用<strong>同一條</strong> in-memory 連線。正式環境換成真資料庫（PostgreSQL）就沒這問題，但寫測試時這個坑幾乎人人踩過。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱二：<code>from_attributes</code> 與 <code>expire_on_commit</code> 的真正作用</strong>。<code>ItemRead</code> 的 <code>model_config = ConfigDict(from_attributes=True)</code> 讓 pydantic 能從一個<strong>物件的屬性</strong>（而不是 dict）建立 schema。它的「必要」情境是你<strong>直接</strong>呼叫 <code>ItemRead.model_validate(orm_obj)</code>：沒開 <code>from_attributes</code> 會丟 <code>ValidationError</code>。這對應 Spring 的「Entity → DTO 映射」，只是 pydantic 用一個開關搞定，不用 MapStruct。要澄清一個常見誤解：FastAPI 透過 <code>response_model</code> 回傳 ORM 物件時，<strong>即使不開 <code>from_attributes</code> 通常也能序列化成功</strong>（FastAPI 的序列化器本來就能讀物件屬性）——但開著它是更明確、推薦的作法，也讓你能無痛改用 <code>model_validate</code>。</p>
+<p><code>expire_on_commit=False</code> 同理是<strong>穩健起見的建議設定</strong>，不是本範例的必要條件。為什麼本範例不設它也沒事？因為在 FastAPI/TestClient 下，事件順序是「handler <code>return</code> → <strong>回應序列化讀屬性</strong> → <code>yield</code> 依賴 teardown 的 commit → close」——序列化發生在 commit/close 之<strong>前</strong>，屬性都還活著，所以即使用預設 <code>expire_on_commit=True</code>、本範例仍回 201 且 body 正確。那它什麼時候會咬人？一旦你改成在 handler <strong>內</strong>就 commit、之後再讀 ORM 屬性（或把物件交給背景任務處理），預設 commit 會 expire 屬性、session 關閉後再讀就爆 <code>DetachedInstanceError</code>——這時 <code>expire_on_commit=False</code> 才是救命設定。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：三個類別各司其職——<code>ItemRow</code> 是資料庫的形狀、<code>ItemCreate</code> 是輸入的形狀、<code>ItemRead</code> 是輸出的形狀。不要為了少打字把它們合併。形狀分離換來的是：改 DB 欄位不會意外洩漏給 API、API 驗證規則跟資料庫約束解耦。</p>
+</div><hr>
+<h2 id="asgi-vs-wsgi對照-servlet-容器">ASGI vs WSGI：對照 Servlet 容器</h2><h3 id="兩種介面兩種世界觀">兩種介面，兩種世界觀</h3><p>Python web 框架與 server 之間有一層標準介面，類似 Java 的 Servlet 規範把「web 框架」與「Servlet 容器（Tomcat/Jetty）」解耦。Python 有兩代這樣的介面：</p>
+<ul>
+<li><strong>WSGI</strong>（Web Server Gateway Interface）：<strong>同步</strong>介面。一個請求 = 一次函式呼叫，回傳前那條執行緒被佔住。對應傳統的 Servlet API + thread-per-request 的 Tomcat。Flask、傳統 Django 是 WSGI 框架。</li>
+<li><strong>ASGI</strong>（Asynchronous Server Gateway Interface）：<strong>非同步</strong>介面（承接第 14 章的 asyncio）。支援 <code>async</code>/<code>await</code>、長連線、WebSocket、伺服器推送（SSE）。FastAPI / Starlette 是 ASGI 框架。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>WSGI</th>
+<th>ASGI</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>介面性質</td>
+<td>同步 callable</td>
+<td>async callable（協程）</td>
+</tr>
+<tr>
+<td>Java 類比</td>
+<td>傳統 Servlet + Tomcat（thread-per-request）</td>
+<td>Servlet 3.1+ 非同步 / 反應式（WebFlux）</td>
+</tr>
+<tr>
+<td>並行模型</td>
+<td>一請求佔一條執行緒</td>
+<td>事件迴圈，單執行緒處理大量並行連線</td>
+</tr>
+<tr>
+<td>WebSocket / SSE</td>
+<td>不支援</td>
+<td>原生支援</td>
+</tr>
+<tr>
+<td>代表框架</td>
+<td>Flask、傳統 Django</td>
+<td>FastAPI、Starlette、Django(3.0+ async)</td>
+</tr>
+<tr>
+<td>對應 server</td>
+<td>gunicorn（sync worker）、uWSGI</td>
+<td>uvicorn、hypercorn、gunicorn+uvicorn worker</td>
+</tr>
+</tbody></table>
+<h3 id="關鍵釐清async-def-不會讓-cpu-bound-變快">關鍵釐清：`async def` 不會讓 CPU bound 變快</h3><p>這是第 14 章 GIL 那一章的直接延伸，也是最常被誤解的點。FastAPI 同時支援 <code>def</code>（同步）與 <code>async def</code>（非同步）的 endpoint，行為不同：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-499" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40app.get(%22%2Fsync%22)%0Adef%20sync_handler()%20-%3E%20dict%3A%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%90%8C%E6%AD%A5%20handler%0A%20%20%20%20return%20%7B%22mode%22%3A%20%22%E5%9C%A8%20threadpool%20%E5%9F%B7%E8%A1%8C%E7%B7%92%E8%A3%A1%E8%B7%91%EF%BC%8C%E4%B8%8D%E9%98%BB%E5%A1%9E%E4%BA%8B%E4%BB%B6%E8%BF%B4%E5%9C%88%22%7D%0A%0A%40app.get(%22%2Fasync%22)%0Aasync%20def%20async_handler()%20-%3E%20dict%3A%20%20%20%20%23%20%E9%9D%9E%E5%90%8C%E6%AD%A5%20handler%0A%20%20%20%20await%20asyncio.sleep(0)%20%20%20%20%20%20%20%20%20%20%20%20%23%20await%20%E9%BB%9E%E6%89%8D%E6%9C%83%E6%8A%8A%E6%8E%A7%E5%88%B6%E6%AC%8A%E4%BA%A4%E5%9B%9E%E4%BA%8B%E4%BB%B6%E8%BF%B4%E5%9C%88%0A%20%20%20%20return%20%7B%22mode%22%3A%20%22%E5%9C%A8%E4%BA%8B%E4%BB%B6%E8%BF%B4%E5%9C%88%E8%A3%A1%E8%B7%91%22%7D'), 'copy-btn-499')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@app.get("/sync")
+def sync_handler() -&gt; dict:           # 同步 handler
+    return {"mode": "在 threadpool 執行緒裡跑，不阻塞事件迴圈"}
+
+@app.get("/async")
+async def async_handler() -&gt; dict:    # 非同步 handler
+    await asyncio.sleep(0)            # await 點才會把控制權交回事件迴圈
+    return {"mode": "在事件迴圈裡跑"}</code></pre>
+      </div>
+    <p>FastAPI 的處理規則很聰明：<strong><code>def</code>（同步）handler 會被丟到 threadpool 執行</strong>，所以你寫阻塞式的 SQLAlchemy（同步）也不會卡住整個事件迴圈；<strong><code>async def</code> handler 直接在事件迴圈裡跑</strong>，適合內部全是 <code>await</code>（非阻塞 I/O）的情境。</p>
+<p>但要記牢這條：<strong><code>async</code> 解決的是 I/O 並行（在等網路/磁碟時讓出 CPU 給別的請求），不是 CPU 平行。</strong> 在 <code>async def</code> 裡塞一段純 CPU 的重計算（一個沒有 <code>await</code> 的 <code>for</code> 迴圈跑十秒），它會<strong>獨佔事件迴圈、阻塞所有其他請求</strong>——比同步版還糟（同步版至少在 threadpool 裡，不擋事件迴圈）。GIL 也仍在：單一進程內 Python bytecode 還是序列執行。CPU bound 的工作該丟進程池或獨立 worker（第 14 章 multiprocessing），不是包個 <code>async</code> 就會變快。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：在 <code>async def</code> endpoint 裡呼叫<strong>阻塞式</strong>函式（同步的 <code>requests.get</code>、同步 DB driver、<code>time.sleep</code>），會卡住整個事件迴圈、拖垮所有並行請求。要嘛改用 <code>def</code>（讓它去 threadpool），要嘛換成 async 版（<code>httpx.AsyncClient</code>、async DB driver、<code>asyncio.sleep</code>）。混用是新手最常見的效能事故。</p>
+</div><div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：WSGI ≈ thread-per-request 的傳統 Servlet/Tomcat；ASGI ≈ Servlet 3.1 非同步 I/O 或 Spring WebFlux 的反應式模型。差別是 Python 的 async 受 GIL 限制，平行計算仍要靠多進程，不像 JVM 的 thread 能直接吃滿多核。</p>
+</div><hr>
+<h2 id="部署uvicorn-gunicorn-docker">部署：uvicorn / gunicorn / Docker</h2><h3 id="從開發到生產">從開發到生產</h3><p><code>TestClient</code> 只用於測試。要真的對外服務，你需要一個 <strong>ASGI server</strong> 來跑 app。</p>
+<p><strong>開發 / 單機</strong>用 <strong>uvicorn</strong>（純 ASGI server，基於 uvloop + httptools，很快）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-500" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E5%81%87%E8%A8%AD%20app%20%E5%9C%A8%20main.py%20%E7%9A%84%20app%20%E8%AE%8A%E6%95%B8%0Auvicorn%20main%3Aapp%20--reload%20%20%20%20%20%20%20%20%20%20%23%20--reload%EF%BC%9A%E6%94%B9%E6%AA%94%E8%87%AA%E5%8B%95%E9%87%8D%E5%95%9F%EF%BC%8C%E7%AD%89%E5%90%8C%20spring-boot-devtools%0Auvicorn%20main%3Aapp%20--host%200.0.0.0%20--port%208000'), 'copy-btn-500')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash"># 假設 app 在 main.py 的 app 變數
+uvicorn main:app --reload          # --reload：改檔自動重啟，等同 spring-boot-devtools
+uvicorn main:app --host 0.0.0.0 --port 8000</code></pre>
+      </div>
+    <p><code>main:app</code> 的格式是 <code>模組:變數名</code>，對應 Java 的 <code>主類別</code>。<code>--reload</code> 只在開發用，正式環境要關掉。</p>
+<p><strong>生產</strong>要跑<strong>多個 worker 進程</strong>繞過 GIL（呼應第 14 章：多進程才有真平行）。兩種主流做法：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-501" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E5%81%9A%E6%B3%95%20A%EF%BC%9Auvicorn%20%E8%87%AA%E5%B7%B1%E9%96%8B%E5%A4%9A%20worker%0Auvicorn%20main%3Aapp%20--host%200.0.0.0%20--port%208000%20--workers%204%0A%0A%23%20%E5%81%9A%E6%B3%95%20B%EF%BC%9Agunicorn%20%E7%95%B6%E9%80%B2%E7%A8%8B%E7%AE%A1%E7%90%86%E5%99%A8%EF%BC%8C%E6%AF%8F%E5%80%8B%20worker%20%E7%94%A8%20uvicorn%20%E7%9A%84%20worker%20class%0Agunicorn%20main%3Aapp%20-w%204%20-k%20uvicorn.workers.UvicornWorker%20--bind%200.0.0.0%3A8000'), 'copy-btn-501')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash"># 做法 A：uvicorn 自己開多 worker
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+
+# 做法 B：gunicorn 當進程管理器，每個 worker 用 uvicorn 的 worker class
+gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000</code></pre>
+      </div>
+    <p>gunicorn 做法在生產更常見，因為 gunicorn 是成熟的進程管理器：worker 掛掉自動重啟、graceful reload、優雅關閉。每個 worker 是<strong>獨立進程</strong>（各有自己的 GIL 與事件迴圈），<code>-w 4</code> 就是四個進程吃四顆核——這正是 Java 不需要操心（JVM 一個進程多 thread 吃滿核）但 CPython 必須面對的部署現實。worker 數的經驗值常見是 <code>2 * CPU 核數 + 1</code>，但 I/O bound 的 async 服務可以更激進，要實測。</p>
+<table>
+<thead>
+<tr>
+<th>Spring Boot</th>
+<th>FastAPI 部署</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>內嵌 Tomcat（一進程多 thread）</td>
+<td>uvicorn / gunicorn（多進程）</td>
+<td>CPython 靠多進程吃多核</td>
+</tr>
+<tr>
+<td><code>java -jar app.jar</code></td>
+<td><code>uvicorn main:app</code></td>
+<td>啟動命令</td>
+</tr>
+<tr>
+<td><code>application.yml</code></td>
+<td>環境變數 + pydantic-settings</td>
+<td>設定來源</td>
+</tr>
+<tr>
+<td><code>@ConfigurationProperties</code></td>
+<td><code>BaseSettings</code> 子類</td>
+<td>型別化設定綁定</td>
+</tr>
+</tbody></table>
+<h3 id="設定管理pydantic-settings-對照-configurationproperties">設定管理：pydantic-settings 對照 `@ConfigurationProperties`</h3><p>正式服務的設定（DB URL、密鑰、debug 開關）走環境變數，用 <strong>pydantic-settings</strong> 綁成型別化物件——這就是 Python 版的 <code>@ConfigurationProperties</code>，連「型別轉換 + 驗證」都一起做了：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-502" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20pydantic_settings%20import%20BaseSettings%2C%20SettingsConfigDict%0A%0Aclass%20Settings(BaseSettings)%3A%0A%20%20%20%20model_config%20%3D%20SettingsConfigDict(env_prefix%3D%22APP_%22)%20%20%23%20%E5%8F%AA%E8%AE%80%20APP_%20%E9%96%8B%E9%A0%AD%E7%9A%84%E7%92%B0%E5%A2%83%E8%AE%8A%E6%95%B8%0A%20%20%20%20database_url%3A%20str%20%3D%20%22sqlite%3A%2F%2F%2F%3Amemory%3A%22%0A%20%20%20%20debug%3A%20bool%20%3D%20False'), 'copy-btn-502')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="APP_")  # 只讀 APP_ 開頭的環境變數
+    database_url: str = "sqlite:///:memory:"
+    debug: bool = False</code></pre>
+      </div>
+    <p>實測：環境變數會自動覆寫預設值，且型別自動轉換（字串 <code>&quot;true&quot;</code> → <code>bool True</code>）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-503" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('Settings().model_dump()%0A%23%20%E7%84%A1%E7%92%B0%E5%A2%83%E8%AE%8A%E6%95%B8%E6%99%82%EF%BC%9A%7B%27database_url%27%3A%20%27sqlite%3A%2F%2F%2F%3Amemory%3A%27%2C%20%27debug%27%3A%20False%7D%0A%0A%23%20%E8%A8%AD%E4%BA%86%20APP_DEBUG%3Dtrue%E3%80%81APP_DATABASE_URL%3Dpostgresql%3A%2F%2Flocalhost%2Fprod%20%E5%BE%8C%EF%BC%9A%0ASettings().model_dump()%0A%23%20%7B%27database_url%27%3A%20%27postgresql%3A%2F%2Flocalhost%2Fprod%27%2C%20%27debug%27%3A%20True%7D'), 'copy-btn-503')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">Settings().model_dump()
+# 無環境變數時：{'database_url': 'sqlite:///:memory:', 'debug': False}
+
+# 設了 APP_DEBUG=true、APP_DATABASE_URL=postgresql://localhost/prod 後：
+Settings().model_dump()
+# {'database_url': 'postgresql://localhost/prod', 'debug': True}</code></pre>
+      </div>
+    <p>把 <code>get_settings</code> 包成依賴（<code>@lru_cache</code> 讓它變單例），就能在任何 endpoint 注入設定，測試時用 <code>dependency_overrides</code> 換掉。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-504" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20functools%20import%20lru_cache%0A%0A%40lru_cache%0Adef%20get_settings()%20-%3E%20Settings%3A%20%20%20%20%23%20lru_cache%20%E2%86%92%20%E6%95%B4%E5%80%8B%E9%80%B2%E7%A8%8B%E5%8F%AA%E5%BB%BA%E4%B8%80%E6%AC%A1%EF%BC%88%E5%83%8F%20Spring%20%E5%96%AE%E4%BE%8B%20bean%EF%BC%89%0A%20%20%20%20return%20Settings()'), 'copy-btn-504')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from functools import lru_cache
+
+@lru_cache
+def get_settings() -&gt; Settings:    # lru_cache → 整個進程只建一次（像 Spring 單例 bean）
+    return Settings()</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>BaseSettings</code> 子類 ≈ <code>@ConfigurationProperties(prefix = &quot;app&quot;)</code> 的 record；<code>env_prefix=&quot;APP_&quot;</code> ≈ <code>prefix = &quot;app&quot;</code>；pydantic 的型別驗證 ≈ Spring 的 relaxed binding + JSR-303 驗證。最大差別：Spring 預設讀 <code>application.yml</code>，雲原生風格的 FastAPI 服務預設讀<strong>環境變數</strong>（十二要素 app 的主張），更貼近容器化部署。</p>
+</div><h3 id="dockerfile">Dockerfile</h3><p>最後把它裝箱。對照 Spring Boot 的「fat jar + <code>FROM eclipse-temurin</code> + <code>java -jar</code>」，FastAPI 的 Dockerfile 一樣精簡。這裡用 <code>uv</code> 管理依賴（第 1、11 章），多階段思維上把依賴安裝與程式碼分層以利快取：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">dockerfile</span>
+          <button id="copy-btn-505" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('FROM%20python%3A3.12-slim%0A%0AWORKDIR%20%2Fapp%0A%0A%23%20%E5%85%88%E8%A4%87%E8%A3%BD%E4%BE%9D%E8%B3%B4%E6%B8%85%E5%96%AE%EF%BC%8C%E5%88%A9%E7%94%A8%20Docker%20layer%20cache%EF%BC%9A%E7%A8%8B%E5%BC%8F%E7%A2%BC%E8%AE%8A%E4%BA%86%E4%B9%9F%E4%B8%8D%E5%BF%85%E9%87%8D%E8%A3%9D%E5%A5%97%E4%BB%B6%0ACOPY%20pyproject.toml%20uv.lock%20.%2F%0ARUN%20pip%20install%20--no-cache-dir%20uv%20%26%26%20uv%20sync%20--frozen%20--no-dev%0A%0ACOPY%20.%20.%0A%0AEXPOSE%208000%0A%23%20%E7%94%9F%E7%94%A2%E7%94%A8%20gunicorn%20%E7%AE%A1%E5%A4%9A%E5%80%8B%20uvicorn%20worker%0A%23%20%E5%89%8D%E6%8F%90%EF%BC%9Agunicorn%20%E8%88%87%20uvicorn%5Bstandard%5D%20%E9%83%BD%E8%A6%81%E5%88%97%E9%80%B2%20pyproject.toml%20%E7%9A%84%E4%BE%9D%E8%B3%B4%EF%BC%8C%E5%90%A6%E5%89%87%20uv%20run%20%E6%89%BE%E4%B8%8D%E5%88%B0%E6%8C%87%E4%BB%A4%0ACMD%20%5B%22uv%22%2C%20%22run%22%2C%20%22gunicorn%22%2C%20%22main%3Aapp%22%2C%20%5C%0A%20%20%20%20%20%22-w%22%2C%20%224%22%2C%20%22-k%22%2C%20%22uvicorn.workers.UvicornWorker%22%2C%20%5C%0A%20%20%20%20%20%22--bind%22%2C%20%220.0.0.0%3A8000%22%5D'), 'copy-btn-505')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-dockerfile"><code class="language-dockerfile">FROM python:3.12-slim
+
+WORKDIR /app
+
+# 先複製依賴清單，利用 Docker layer cache：程式碼變了也不必重裝套件
+COPY pyproject.toml uv.lock ./
+RUN pip install --no-cache-dir uv &amp;&amp; uv sync --frozen --no-dev
+
+COPY . .
+
+EXPOSE 8000
+# 生產用 gunicorn 管多個 uvicorn worker
+# 前提：gunicorn 與 uvicorn[standard] 都要列進 pyproject.toml 的依賴，否則 uv run 找不到指令
+CMD ["uv", "run", "gunicorn", "main:app", \
+     "-w", "4", "-k", "uvicorn.workers.UvicornWorker", \
+     "--bind", "0.0.0.0:8000"]</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>關於 worker 寫法</strong>：<code>gunicorn -k uvicorn.workers.UvicornWorker</code> 是長年慣用、目前仍可用的寫法。但截至 2025，官方已逐漸推薦兩種更現代的替代：用獨立的 <code>uvicorn-worker</code> 套件（<code>gunicorn -k uvicorn_worker.UvicornWorker</code>），或乾脆不要 gunicorn、直接 <code>uvicorn main:app --workers 4</code> 讓 uvicorn 自己管多進程。三者都能達到「多進程繞過 GIL」的目的，新專案可優先考慮後兩者。</p>
+</div><p>對照 Spring Boot 的 Dockerfile：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">dockerfile</span>
+          <button id="copy-btn-506" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20Java%20%E5%B0%8D%E7%85%A7%0AFROM%20eclipse-temurin%3A21-jre%0AWORKDIR%20%2Fapp%0ACOPY%20target%2Fapp.jar%20app.jar%0AEXPOSE%208080%0ACMD%20%5B%22java%22%2C%20%22-jar%22%2C%20%22app.jar%22%5D'), 'copy-btn-506')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-dockerfile"><code class="language-dockerfile"># Java 對照
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY target/app.jar app.jar
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]</code></pre>
+      </div>
+    <p>兩者結構幾乎一樣——基底映像、複製產物、開埠、啟動命令。差別只在 Python 沒有「打包成單一 jar」的步驟，而是把原始碼 + 依賴環境一起裝箱，啟動時由 ASGI server 載入。設定全走環境變數（<code>docker run -e APP_DATABASE_URL=...</code>），由 pydantic-settings 接收。</p>
+<hr>
+<h2 id="本章小結">本章小結</h2><ul>
+<li><strong>FastAPI 的核心殺手鏈是「型別提示 → 自動驗證 → 自動文件」</strong>：一個 pydantic model 同時是執行期驗證規則、序列化 schema、OpenAPI 文件來源。Java 要 <code>@Valid</code> + Bean Validation + springdoc 三套協作才湊得出來。</li>
+<li><strong>路由參數靠慣例推斷</strong>：名字在路徑樣板裡 = path；型別是 <code>BaseModel</code> = body；其餘簡單型別 = query（有預設值即選填）。比 Spring 每參數掛 annotation 清爽。</li>
+<li><strong>把 request / response / DB model 分成三個類別</strong>：輸入沒 id、輸出有 id、ORM 綁資料庫，形狀本就不同。輸出 schema 建議開 <code>from_attributes=True</code>——它讓 <code>model_validate(orm)</code> 能直接從物件屬性建模，也是回傳 ORM 物件時更明確的作法。</li>
+<li><strong><code>Depends</code> 是顯式的函式式 DI</strong>：依賴就是被呼叫的函式，沒有容器掃描魔法；<code>yield</code> 依賴做 setup/teardown（Python 版 try-with-resources / <code>@Transactional</code>）；<code>dependency_overrides</code> 是測試替換依賴的利器。</li>
+<li><strong>SQLAlchemy 2.0 用 <code>Mapped[...]</code> + <code>mapped_column(...)</code></strong>，型別即 schema（<code>str | None</code> → 可空）。session = 工作單元 + identity map（同 session 同主鍵 = 同物件），對應 Hibernate persistence context；UPDATE 靠髒檢查自動發。</li>
+<li><strong>ASGI（async，FastAPI）vs WSGI（同步，Flask）</strong> 對應反應式 vs thread-per-request；但 <code>async</code> 解決 I/O 並行不解決 CPU 平行，GIL 仍在，CPU bound 別包 <code>async</code>。</li>
+<li><strong>生產部署用多進程繞過 GIL</strong>：gunicorn 管多個 uvicorn worker（每進程一顆核），設定走環境變數 + pydantic-settings（≈ <code>@ConfigurationProperties</code>），裝進精簡 Dockerfile。</li>
+<li><strong>in-memory SQLite 測試記得 <code>StaticPool</code></strong>，否則 <code>sessionmaker</code> 拿到別條連線、看不到表（<code>no such table</code>）。</li>
+</ul>
+<h2 id="練習">練習</h2><ol>
+<li><p><strong>加一個 PUT 與 DELETE</strong>：在 items 服務補上 <code>@app.put(&quot;/items/{item_id}&quot;)</code>（接 <code>ItemCreate</code>、更新後回 <code>ItemRead</code>）與 <code>@app.delete(&quot;/items/{item_id}&quot;)</code>（成功回 204）。提示：更新用 <code>session.get</code> 拿到 ORM 物件後直接改屬性、靠髒檢查 commit；找不到一律回 404。寫 <code>TestClient</code> 測試覆蓋「更新存在 / 更新不存在 / 刪除後再查回 404」。</p>
+</li>
+<li><p><strong>加分頁與過濾</strong>：把 <code>list_items</code> 改成接 query 參數 <code>skip: int = 0</code>、<code>limit: int = 10</code>、<code>name_contains: str | None = None</code>，用 <code>select(...).where(ItemRow.name.contains(...)).offset(skip).limit(limit)</code> 實作。觀察 OpenAPI <code>/docs</code> 是否自動把這些 query 參數列出來。</p>
+</li>
+<li><p><strong>用 <code>dependency_overrides</code> 寫一個乾淨的 pytest fixture</strong>：建一個指向獨立 in-memory DB（記得 <code>StaticPool</code>）的 <code>get_session</code> 覆寫，包成 pytest fixture，每個測試拿到全新空白 DB。提示：fixture 裡 <code>app.dependency_overrides[get_session] = ...</code>，<code>yield client</code>，收尾 <code>app.dependency_overrides.clear()</code>（承接第 13 章）。</p>
+</li>
+<li><p><strong>驗證錯誤的自訂回應</strong>：用 <code>@app.exception_handler(RequestValidationError)</code> 攔截 422，把 pydantic 的 <code>detail</code> 陣列轉成你團隊前端想要的格式（例如 <code>{&quot;field&quot;: &quot;name&quot;, &quot;error&quot;: &quot;...&quot;}</code> 的扁平列表）。提示：handler 收到的 <code>exc.errors()</code> 就是那個結構化錯誤陣列。</p>
+</li>
+<li><p><strong>設定驅動的環境切換</strong>：用 pydantic-settings 讓服務根據 <code>APP_DATABASE_URL</code> 環境變數切換資料庫——沒設時用 in-memory SQLite，設了就連那個 URL。用 <code>get_settings</code> 依賴 + <code>@lru_cache</code> 注入，並寫一個測試證明用 <code>dependency_overrides</code> 換掉 settings 後，服務會連到測試指定的 DB。</p>
+</li>
+</ol>

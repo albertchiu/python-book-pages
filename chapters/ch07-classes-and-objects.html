@@ -1,0 +1,691 @@
+<h1 id="第-7-章python-的類別與物件">第 7 章：Python 的類別與物件</h1><p>你已經是 OOP 老手——封裝、繼承、多型這些觀念不用人教。但 Python 的 <code>class</code> 雖然長得跟 Java 很像，骨子裡的哲學卻完全相反：<strong>它沒有 <code>private</code>、沒有 <code>final</code>、沒有編譯器幫你把關</strong>，封裝靠的是慣例與信任（Python 社群的名言是「我們都是成年人」we&#39;re all consenting adults）。同時它又給了你 Java 求之不得的工具——<code>@property</code> 讓你能先寫最簡單的公開屬性、需要時再無痛加上驗證；<code>@dataclass</code> 一行幹掉 record／Lombok 的所有樣板。本章帶你把 Java 的 class 直覺重新校準成 Python 的寫法。</p>
+<hr>
+<h2 id="class-語法init-與-self">class 語法、`__init__` 與 `self`</h2><p>先看最小的對照。Java 的類別：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-212" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('public%20class%20Account%20%7B%0A%20%20%20%20private%20String%20owner%3B%0A%20%20%20%20private%20int%20balance%3B%0A%0A%20%20%20%20public%20Account(String%20owner%2C%20int%20balance)%20%7B%0A%20%20%20%20%20%20%20%20this.owner%20%3D%20owner%3B%0A%20%20%20%20%20%20%20%20this.balance%20%3D%20balance%3B%0A%20%20%20%20%7D%0A%0A%20%20%20%20public%20void%20deposit(int%20amount)%20%7B%0A%20%20%20%20%20%20%20%20this.balance%20%2B%3D%20amount%3B%0A%20%20%20%20%7D%0A%7D'), 'copy-btn-212')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">public class Account {
+    private String owner;
+    private int balance;
+
+    public Account(String owner, int balance) {
+        this.owner = owner;
+        this.balance = balance;
+    }
+
+    public void deposit(int amount) {
+        this.balance += amount;
+    }
+}</code></pre>
+      </div>
+    <p>Python 的等價物：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-213" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Account%3A%0A%20%20%20%20def%20__init__(self%2C%20owner%3A%20str%2C%20balance%3A%20int%20%3D%200)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.owner%20%3D%20owner%0A%20%20%20%20%20%20%20%20self.balance%20%3D%20balance%0A%0A%20%20%20%20def%20deposit(self%2C%20amount%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.balance%20%2B%3D%20amount'), 'copy-btn-213')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Account:
+    def __init__(self, owner: str, balance: int = 0) -&gt; None:
+        self.owner = owner
+        self.balance = balance
+
+    def deposit(self, amount: int) -&gt; None:
+        self.balance += amount</code></pre>
+      </div>
+    <p>差異一眼可見，但每一個都值得停下來想：</p>
+<ul>
+<li><strong>沒有欄位宣告區</strong>。Java 要先宣告 <code>private String owner;</code>，Python 沒有這一段——實例屬性是在 <code>__init__</code> 裡「第一次賦值」時才誕生的。<code>self.owner = owner</code> 同時是宣告也是賦值。</li>
+<li><strong><code>__init__</code> 不是建構子</strong>。它是<strong>初始化器</strong>（initializer）：物件其實是由 <code>__new__</code> 先建立好、再交給 <code>__init__</code> 填內容。99% 的時候你只需要 <code>__init__</code>，但要知道「建立」與「初始化」是兩個階段，這跟 Java 把 <code>new</code> 與建構子綁在一起不同。</li>
+<li><strong><code>self</code> 是明寫的</strong>。Java 的 <code>this</code> 是隱形的；Python 規定每個實例方法的第一個參數就是實例本身，慣例命名 <code>self</code>。它不是關鍵字，只是慣例——但請永遠叫它 <code>self</code>。</li>
+</ul>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>obj.deposit(100)</code> 在 Python 裡等價於 <code>Account.deposit(obj, 100)</code>——<code>self</code> 就是被點號左邊那個物件「自動帶入」的第一個參數。理解這點，後面的 <code>@classmethod</code>、<code>@staticmethod</code> 就不會難。</p>
+</div><p>建立實例不需要 <code>new</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-214" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('acc%20%3D%20Account(%22Albert%22%2C%20100)%20%20%20%23%20%E6%B2%92%E6%9C%89%20new%20%E9%97%9C%E9%8D%B5%E5%AD%97%0Aacc.deposit(50)%0Aprint(acc.balance)%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20150'), 'copy-btn-214')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">acc = Account("Albert", 100)   # 沒有 new 關鍵字
+acc.deposit(50)
+print(acc.balance)             # 150</code></pre>
+      </div>
+    <h3 id="方法就是綁定了-self-的函式">方法就是「綁定了 self 的函式」</h3><p>承接第 3 章「函式是一等物件」的觀念：當你透過實例存取方法，拿到的是一個<strong>bound method</strong>（綁定方法），它把 <code>self</code> 預先綁好了。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-215" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20acc%20%3D%20Account(%22Albert%22)%0A%3E%3E%3E%20f%20%3D%20acc.deposit%20%20%20%20%20%20%20%23%20%E5%8F%96%E5%87%BA%E6%96%B9%E6%B3%95%E4%BD%86%E5%85%88%E4%B8%8D%E5%91%BC%E5%8F%AB%0A%3E%3E%3E%20f%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%AE%83%E8%A8%98%E5%BE%97%E8%87%AA%E5%B7%B1%E5%B1%AC%E6%96%BC%E5%93%AA%E5%80%8B%20acc%0A%3Cbound%20method%20Account.deposit%20of%20%3C__main__.Account%20object%20at%200x...%3E%3E%0A%3E%3E%3E%20f(50)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%AD%89%E5%90%8C%20acc.deposit(50)%0A%3E%3E%3E%20acc.balance%0A50'), 'copy-btn-215')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; acc = Account("Albert")
+&gt;&gt;&gt; f = acc.deposit       # 取出方法但先不呼叫
+&gt;&gt;&gt; f                     # 它記得自己屬於哪個 acc
+&lt;bound method Account.deposit of &lt;__main__.Account object at 0x...&gt;&gt;
+&gt;&gt;&gt; f(50)                 # 等同 acc.deposit(50)
+&gt;&gt;&gt; acc.balance
+50</code></pre>
+      </div>
+    <p>這在 Java 裡要等到 method reference（<code>acc::deposit</code>）才有對應物，而且 Java 的 method reference 是「介面的實作」，Python 的 bound method 就是個普通可呼叫物件。</p>
+<hr>
+<h2 id="沒有-access-modifierprotected-與-private-的名稱改編">沒有 access modifier：`_protected` 與 `__private` 的名稱改編</h2><p>這是 Java 工程師最不習慣的一點：<strong>Python 沒有 <code>public</code>／<code>protected</code>／<code>private</code></strong>。所有屬性與方法都是公開的。封裝靠兩個慣例：</p>
+<table>
+<thead>
+<tr>
+<th>寫法</th>
+<th>意義</th>
+<th>強制力</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>公開 API</td>
+<td>無</td>
+</tr>
+<tr>
+<td><code>_name</code>（單底線）</td>
+<td>「內部用，外人別碰」</td>
+<td><strong>純慣例</strong>，直譯器不管</td>
+</tr>
+<tr>
+<td><code>__name</code>（雙底線）</td>
+<td>觸發名稱改編（name mangling）</td>
+<td>半強制：改了名字，但仍可存取</td>
+</tr>
+</tbody></table>
+<p>單底線 <code>_balance</code> 就是一句口頭約定：「這是實作細節，你要碰我攔不住，但出事自負」。linter 與 IDE 會提醒，僅此而已。</p>
+<p>雙底線 <code>__balance</code> 比較特別，它會觸發<strong>name mangling</strong>：在類別內寫 <code>self.__balance</code>，Python 會把它偷偷改名成 <code>_ClassName__balance</code>。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-216" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Account%3A%0A%20%20%20%20def%20__init__(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.__balance%20%3D%20100%20%20%20%20%20%20%23%20%E5%AF%A6%E9%9A%9B%E5%AD%98%E6%88%90%20_Account__balance%0A%0Aacc%20%3D%20Account()%0A%23%20print(acc.__balance)%20%20%20%20%20%20%20%20%20%20%20%23%20AttributeError%EF%BC%81%0Aprint(acc._Account__balance)%20%20%20%20%20%23%20100%20%E2%80%94%E2%80%94%20%E6%94%B9%E4%BA%86%E5%90%8D%E5%AD%97%EF%BC%8C%E4%BD%86%E6%A0%B9%E6%9C%AC%E6%B2%92%E6%93%8B%E4%BD%8F%E4%BD%A0'), 'copy-btn-216')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Account:
+    def __init__(self) -&gt; None:
+        self.__balance = 100      # 實際存成 _Account__balance
+
+acc = Account()
+# print(acc.__balance)           # AttributeError！
+print(acc._Account__balance)     # 100 —— 改了名字，但根本沒擋住你</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：別把 <code>__name</code> 當成 Java 的 <code>private</code>。它<strong>不是為了防止存取</strong>，而是為了<strong>避免子類別不小心覆蓋父類別的屬性</strong>（兩個類別各自的 <code>__cache</code> 不會打架，因為被改成 <code>_A__cache</code> 和 <code>_B__cache</code>）。把它當 access control 用，只會讓你的程式更難測試、更難 debug。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：預設用公開屬性。需要「告訴別人這是內部用」時用單底線 <code>_</code>。雙底線 <code>__</code> 留給「真的會在繼承階層中撞名」的少數情況——實務上很少用到。封裝在 Python 裡是<strong>設計溝通</strong>，不是<strong>執行期警察</strong>。</p>
+</div><hr>
+<h2 id="類別屬性-vs-實例屬性">類別屬性 vs 實例屬性</h2><p>Java 的 <code>static</code> 欄位與實例欄位界線分明，宣告時就決定了。Python 兩者都是「在某個物件上的屬性」，差別在掛在哪裡：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-217" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Dog%3A%0A%20%20%20%20species%20%3D%20%22Canis%20familiaris%22%20%20%20%20%20%23%20%E9%A1%9E%E5%88%A5%E5%B1%AC%E6%80%A7%EF%BC%9A%E6%89%80%E6%9C%89%E5%AF%A6%E4%BE%8B%E5%85%B1%E4%BA%AB%0A%0A%20%20%20%20def%20__init__(self%2C%20name%3A%20str)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.name%20%3D%20name%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%AF%A6%E4%BE%8B%E5%B1%AC%E6%80%A7%EF%BC%9A%E6%AF%8F%E5%80%8B%E5%AF%A6%E4%BE%8B%E5%90%84%E8%87%AA%E4%B8%80%E4%BB%BD'), 'copy-btn-217')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Dog:
+    species = "Canis familiaris"     # 類別屬性：所有實例共享
+
+    def __init__(self, name: str) -&gt; None:
+        self.name = name             # 實例屬性：每個實例各自一份</code></pre>
+      </div>
+    <p>存取時 Python 走一條<strong>查找鏈</strong>：先找實例自己的 <code>__dict__</code>，找不到再往類別找。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-218" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20a%20%3D%20Dog(%22Rex%22)%0A%3E%3E%3E%20b%20%3D%20Dog(%22Momo%22)%0A%3E%3E%3E%20a.species%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%AF%A6%E4%BE%8B%E6%B2%92%E6%9C%89%EF%BC%8C%E5%BE%80%E9%A1%9E%E5%88%A5%E6%89%BE%0A%27Canis%20familiaris%27%0A%3E%3E%3E%20Dog.species%20%3D%20%22Canis%20lupus%22%20%20%20%23%20%E6%94%B9%E9%A1%9E%E5%88%A5%E5%B1%AC%E6%80%A7%EF%BC%8C%E6%89%80%E6%9C%89%E5%AF%A6%E4%BE%8B%E5%90%8C%E6%AD%A5%E7%9C%8B%E5%88%B0%0A%3E%3E%3E%20a.species%2C%20b.species%0A(%27Canis%20lupus%27%2C%20%27Canis%20lupus%27)'), 'copy-btn-218')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; a = Dog("Rex")
+&gt;&gt;&gt; b = Dog("Momo")
+&gt;&gt;&gt; a.species            # 實例沒有，往類別找
+'Canis familiaris'
+&gt;&gt;&gt; Dog.species = "Canis lupus"   # 改類別屬性，所有實例同步看到
+&gt;&gt;&gt; a.species, b.species
+('Canis lupus', 'Canis lupus')</code></pre>
+      </div>
+    <p>到這裡都很像 Java 的 static。但有一個<strong>微妙且關鍵</strong>的差異——透過實例賦值：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-219" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20a.species%20%3D%20%22Wolf%22%20%20%20%23%20%E4%B8%8D%E6%98%AF%E6%94%B9%E9%A1%9E%E5%88%A5%E5%B1%AC%E6%80%A7%EF%BC%81%E6%98%AF%E5%9C%A8%20a%20%E4%B8%8A%E3%80%8C%E6%96%B0%E5%BB%BA%E3%80%8D%E4%B8%80%E5%80%8B%E5%AF%A6%E4%BE%8B%E5%B1%AC%E6%80%A7%0A%3E%3E%3E%20a.species%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%AF%A6%E4%BE%8B%E7%9A%84%E9%81%AE%E8%94%BD%EF%BC%88shadow%EF%BC%89%E4%BA%86%E9%A1%9E%E5%88%A5%E7%9A%84%0A%27Wolf%27%0A%3E%3E%3E%20b.species%20%20%20%20%20%20%20%20%20%20%20%20%23%20b%20%E6%B2%92%E8%A2%AB%E5%8B%95%E5%88%B0%0A%27Canis%20lupus%27%0A%3E%3E%3E%20Dog.species%20%20%20%20%20%20%20%20%20%20%23%20%E9%A1%9E%E5%88%A5%E5%B1%AC%E6%80%A7%E4%B9%9F%E6%B2%92%E8%A2%AB%E5%8B%95%E5%88%B0%0A%27Canis%20lupus%27'), 'copy-btn-219')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; a.species = "Wolf"   # 不是改類別屬性！是在 a 上「新建」一個實例屬性
+&gt;&gt;&gt; a.species            # 實例的遮蔽（shadow）了類別的
+'Wolf'
+&gt;&gt;&gt; b.species            # b 沒被動到
+'Canis lupus'
+&gt;&gt;&gt; Dog.species          # 類別屬性也沒被動到
+'Canis lupus'</code></pre>
+      </div>
+    <p>在 Java 裡 <code>a.species = &quot;Wolf&quot;</code>（若 species 是 static）會修改那個唯一的 static 欄位（而且 IDE 會警告你別用實例存取 static）。在 Python 裡，<strong>指派給 <code>instance.attr</code> 永遠是在那個實例上建立／覆寫屬性</strong>，絕不會回頭改類別。這個「讀取會穿透、寫入不穿透」的不對稱，是 Java 工程師最常誤判的地方。</p>
+<h3 id="可變類別屬性的共享陷阱">可變類別屬性的共享陷阱</h3><p>這個不對稱碰上可變物件，就會變成跟第 3 章「可變預設參數」同源的經典坑：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-220" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Team%3A%0A%20%20%20%20members%3A%20list%5Bstr%5D%20%3D%20%5B%5D%20%20%20%20%20%20%20%20%20%20%23%20%E2%9A%A0%EF%B8%8F%20%E6%89%80%E6%9C%89%E5%AF%A6%E4%BE%8B%E5%85%B1%E4%BA%AB%E5%90%8C%E4%B8%80%E5%80%8B%20list%EF%BC%81%0A%0A%20%20%20%20def%20add(self%2C%20name%3A%20str)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.members.append(name)%20%20%20%20%23%20append%20%E6%98%AF%E3%80%8C%E4%BF%AE%E6%94%B9%E3%80%8D%EF%BC%8C%E4%B8%8D%E6%98%AF%E3%80%8C%E6%8C%87%E6%B4%BE%E3%80%8D%0A%0Aa%20%3D%20Team()%0Ab%20%3D%20Team()%0Aa.add(%22Albert%22)%0Aprint(b.members)%20%20%20%20%20%20%20%20%23%20%5B%27Albert%27%5D%20%E2%80%94%E2%80%94%20b%20%E4%B9%9F%E8%A2%AB%E5%BD%B1%E9%9F%BF%E4%BA%86%EF%BC%81'), 'copy-btn-220')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Team:
+    members: list[str] = []          # ⚠️ 所有實例共享同一個 list！
+
+    def add(self, name: str) -&gt; None:
+        self.members.append(name)    # append 是「修改」，不是「指派」
+
+a = Team()
+b = Team()
+a.add("Albert")
+print(b.members)        # ['Albert'] —— b 也被影響了！</code></pre>
+      </div>
+    <p>關鍵在 <code>self.members.append(...)</code> 是<strong>就地修改</strong>那個共享的 list，從頭到尾沒有對 <code>self.members</code> 做指派，所以查找鏈一路穿透到類別屬性，大家改的是同一個。正解是把可變狀態放進 <code>__init__</code>，讓每個實例各持一份：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-221" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Team%3A%0A%20%20%20%20def%20__init__(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.members%3A%20list%5Bstr%5D%20%3D%20%5B%5D%20%20%20%23%20%E2%9C%85%20%E6%AF%8F%E5%80%8B%E5%AF%A6%E4%BE%8B%E5%90%84%E8%87%AA%E4%B8%80%E5%80%8B%20list'), 'copy-btn-221')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Team:
+    def __init__(self) -&gt; None:
+        self.members: list[str] = []   # ✅ 每個實例各自一個 list</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：類別屬性只放<strong>不可變、真正共享的常數或預設值</strong>（如設定、計數器型別的旗標）。任何「每個實例該獨立擁有」的可變狀態（list、dict、set），一律在 <code>__init__</code> 裡建立。判準跟可變預設參數完全一樣。</p>
+</div><hr>
+<h2 id="property取代-gettersetter">`@property`：取代 getter/setter</h2><p>Java 文化是「欄位一律 <code>private</code> + 配一組 getter/setter」，多半是為了「未來可能要加驗證或計算」而預先付出的樣板稅。Python 反過來：<strong>先把屬性公開，等真的需要邏輯時，再用 <code>@property</code> 把它升級成有 getter/setter 的屬性——而且呼叫端一個字都不用改</strong>。</p>
+<p>先看沒有 property 的起手式，簡單到不行：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-222" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Circle%3A%0A%20%20%20%20def%20__init__(self%2C%20radius%3A%20float)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.radius%20%3D%20radius%20%20%20%20%20%20%20%20%23%20%E5%B0%B1%E6%98%AF%E5%80%8B%E5%85%AC%E9%96%8B%E5%B1%AC%E6%80%A7%0A%0Ac%20%3D%20Circle(5)%0Ac.radius%20%3D%2010%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%9B%B4%E6%8E%A5%E5%AD%98%E5%8F%96%EF%BC%8C%E6%B2%92%E6%9C%89%20getRadius%2FsetRadius'), 'copy-btn-222')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Circle:
+    def __init__(self, radius: float) -&gt; None:
+        self.radius = radius        # 就是個公開屬性
+
+c = Circle(5)
+c.radius = 10                       # 直接存取，沒有 getRadius/setRadius</code></pre>
+      </div>
+    <p>哪天需求變了——半徑不准是負數、而且想提供一個「算出來」的 <code>area</code>。在 Java 你得把 <code>radius</code> 改 private、加 <code>getRadius/setRadius</code>，然後<strong>所有寫過 <code>c.radius</code> 的呼叫端全部要改成方法呼叫</strong>。Python 不用：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-223" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Circle%3A%0A%20%20%20%20def%20__init__(self%2C%20radius%3A%20float)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.radius%20%3D%20radius%20%20%20%20%20%20%20%20%23%20%E6%B3%A8%E6%84%8F%EF%BC%9A%E9%80%99%E8%A1%8C%E6%9C%83%E3%80%8C%E8%A7%B8%E7%99%BC%E3%80%8D%E4%B8%8B%E9%9D%A2%E7%9A%84%20setter%0A%0A%20%20%20%20%40property%0A%20%20%20%20def%20radius(self)%20-%3E%20float%3A%20%20%20%20%20%20%20%20%20%20%20%23%20getter%0A%20%20%20%20%20%20%20%20return%20self._radius%0A%0A%20%20%20%20%40radius.setter%0A%20%20%20%20def%20radius(self%2C%20value%3A%20float)%20-%3E%20None%3A%20%20%20%23%20setter%EF%BC%9A%E6%8A%8A%E9%A9%97%E8%AD%89%E6%94%BE%E9%80%99%0A%20%20%20%20%20%20%20%20if%20value%20%3C%200%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20raise%20ValueError(%22%E5%8D%8A%E5%BE%91%E4%B8%8D%E8%83%BD%E7%82%BA%E8%B2%A0%22)%0A%20%20%20%20%20%20%20%20self._radius%20%3D%20value%0A%0A%20%20%20%20%40property%0A%20%20%20%20def%20area(self)%20-%3E%20float%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%94%AF%E8%AE%80%E7%9A%84%E8%A8%88%E7%AE%97%E5%B1%AC%E6%80%A7%EF%BC%8C%E6%B2%92%E6%9C%89%20setter%0A%20%20%20%20%20%20%20%20return%203.141592653589793%20*%20self._radius%20**%202'), 'copy-btn-223')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Circle:
+    def __init__(self, radius: float) -&gt; None:
+        self.radius = radius        # 注意：這行會「觸發」下面的 setter
+
+    @property
+    def radius(self) -&gt; float:           # getter
+        return self._radius
+
+    @radius.setter
+    def radius(self, value: float) -&gt; None:   # setter：把驗證放這
+        if value &lt; 0:
+            raise ValueError("半徑不能為負")
+        self._radius = value
+
+    @property
+    def area(self) -&gt; float:             # 唯讀的計算屬性，沒有 setter
+        return 3.141592653589793 * self._radius ** 2</code></pre>
+      </div>
+    <p>呼叫端<strong>完全不變</strong>，但行為升級了：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-224" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20c%20%3D%20Circle(5)%0A%3E%3E%3E%20c.radius%20%20%20%20%20%20%20%20%20%20%23%20%E7%9C%8B%E8%B5%B7%E4%BE%86%E6%98%AF%E8%AE%80%E5%B1%AC%E6%80%A7%EF%BC%8C%E5%85%B6%E5%AF%A6%E5%91%BC%E5%8F%AB%E4%BA%86%20getter%0A5%0A%3E%3E%3E%20c.area%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%9C%8B%E8%B5%B7%E4%BE%86%E6%98%AF%E8%AE%80%E5%B1%AC%E6%80%A7%EF%BC%8C%E5%85%B6%E5%AF%A6%E6%98%AF%E5%8D%B3%E6%99%82%E8%A8%88%E7%AE%97%0A78.53981633974483%0A%3E%3E%3E%20c.radius%20%3D%20-3%20%20%20%20%20%23%20%E7%9C%8B%E8%B5%B7%E4%BE%86%E6%98%AF%E8%B3%A6%E5%80%BC%EF%BC%8C%E5%85%B6%E5%AF%A6%E5%91%BC%E5%8F%AB%E4%BA%86%20setter%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0AValueError%3A%20%E5%8D%8A%E5%BE%91%E4%B8%8D%E8%83%BD%E7%82%BA%E8%B2%A0%0A%3E%3E%3E%20c.area%20%3D%20100%20%20%20%20%20%20%23%20area%20%E6%B2%92%E6%9C%89%20setter%EF%BC%8C%E5%94%AF%E8%AE%80%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0AAttributeError%3A%20property%20%27area%27%20of%20%27Circle%27%20object%20has%20no%20setter'), 'copy-btn-224')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; c = Circle(5)
+&gt;&gt;&gt; c.radius          # 看起來是讀屬性，其實呼叫了 getter
+5
+&gt;&gt;&gt; c.area            # 看起來是讀屬性，其實是即時計算
+78.53981633974483
+&gt;&gt;&gt; c.radius = -3     # 看起來是賦值，其實呼叫了 setter
+Traceback (most recent call last):
+    ...
+ValueError: 半徑不能為負
+&gt;&gt;&gt; c.area = 100      # area 沒有 setter，唯讀
+Traceback (most recent call last):
+    ...
+AttributeError: property 'area' of 'Circle' object has no setter</code></pre>
+      </div>
+    <p>這就是 Python 封裝哲學的精髓：<strong>因為屬性存取可以「事後」變成方法呼叫，所以你不需要為了防患未然而預先寫 getter/setter</strong>。Java 那套「永遠先寫 getter/setter」的習慣，在 Python 裡是反模式（over-engineering）。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>@property</code> 的 getter 裡如果寫 <code>return self.radius</code>，會無窮遞迴（它會再呼叫 getter 自己）。慣例是底層用單底線欄位 <code>self._radius</code> 存實際值，property 名字用公開的 <code>radius</code>。上面 <code>__init__</code> 裡的 <code>self.radius = radius</code> 之所以能驗證，正是因為它走了 setter，而 setter 才把值放進 <code>self._radius</code>。</p>
+</div><div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>@property</code> ≈ Java 的 getter/setter，但差別是<strong>呼叫端語法不變</strong>（仍是 <code>c.radius</code>，不是 <code>c.getRadius()</code>）。所以你能無痛地從「公開欄位」演進到「有邏輯的屬性」，不會破壞既有程式碼。</p>
+</div><h3 id="radiusdeleter攔截-del">`@radius.deleter`：攔截 `del`</h3><p>getter/setter 之外還有第三隻手 <code>@radius.deleter</code>，攔截 <code>del c.radius</code>。用得遠比前兩者少，但偶爾需要在屬性被刪時做收尾（清快取、釋放資源）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-225" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%20%20%20%20%40radius.deleter%0A%20%20%20%20def%20radius(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20del%20self._radius%20%20%20%20%20%20%20%20%23%20%E7%9C%9F%E6%AD%A3%E5%88%AA%E6%8E%89%E5%BA%95%E5%B1%A4%E6%AC%84%E4%BD%8D'), 'copy-btn-225')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">    @radius.deleter
+    def radius(self) -&gt; None:
+        del self._radius        # 真正刪掉底層欄位</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-226" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20del%20c.radius%20%20%20%20%20%20%23%20%E8%A7%B8%E7%99%BC%20deleter%0A%3E%3E%3E%20c.radius%20%20%20%20%20%20%20%20%20%20%23%20%E5%BA%95%E5%B1%A4%20_radius%20%E5%B7%B2%E4%B8%8D%E5%9C%A8%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0AAttributeError%3A%20%27Circle%27%20object%20has%20no%20attribute%20%27_radius%27'), 'copy-btn-226')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; del c.radius      # 觸發 deleter
+&gt;&gt;&gt; c.radius          # 底層 _radius 已不在
+Traceback (most recent call last):
+    ...
+AttributeError: 'Circle' object has no attribute '_radius'</code></pre>
+      </div>
+    <p>沒定義 deleter 時，<code>del c.radius</code> 會拋 <code>AttributeError: property &#39;radius&#39; of &#39;Circle&#39; object has no deleter</code>，跟唯讀 property 被賦值的行為對稱。</p>
+<div class="callout callout-tip"><p>💡 <strong>延伸</strong>：<code>@property</code> 本身是一個掛在<strong>類別</strong>上的描述器（descriptor）——<code>Circle.radius</code> 取出來會是個 <code>property</code> 物件，攔截實例存取的就是它的 <code>__get__</code>／<code>__set__</code>／<code>__delete__</code>。<code>property</code> 是 Python 內建、最常用的描述器；如果你想把同一套驗證或計算邏輯抽出來、套到多個欄位上而不重複寫 property，可以自訂描述器類別（實作 <code>__get__</code>／<code>__set__</code>／<code>__set_name__</code>）。機制細節（含 data／non-data descriptor 的優先序）見第 10 章「Descriptor 協定」一節。</p>
+</div><hr>
+<h2 id="classmethod-與-staticmethod">`@classmethod` 與 `@staticmethod`</h2><p>這兩個 decorator 對應 Java 的 static method，但 <code>@classmethod</code> 多了一個 Java 沒有的殺手級特性。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-227" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Pizza%3A%0A%20%20%20%20def%20__init__(self%2C%20toppings%3A%20list%5Bstr%5D)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.toppings%20%3D%20toppings%0A%0A%20%20%20%20%40classmethod%0A%20%20%20%20def%20margherita(cls)%20-%3E%20%22Pizza%22%3A%20%20%20%20%20%20%20%20%20%20%23%20%E7%AC%AC%E4%B8%80%E5%8F%83%E6%95%B8%E6%98%AF%20cls%EF%BC%88%E9%A1%9E%E5%88%A5%E6%9C%AC%E8%BA%AB%EF%BC%89%0A%20%20%20%20%20%20%20%20return%20cls(%5B%22mozzarella%22%2C%20%22tomato%22%5D)%0A%0A%20%20%20%20%40staticmethod%0A%20%20%20%20def%20is_vegetarian(toppings%3A%20list%5Bstr%5D)%20-%3E%20bool%3A%20%20%20%23%20%E6%B2%92%E6%9C%89%20self%2Fcls%0A%20%20%20%20%20%20%20%20return%20%22pepperoni%22%20not%20in%20toppings'), 'copy-btn-227')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Pizza:
+    def __init__(self, toppings: list[str]) -&gt; None:
+        self.toppings = toppings
+
+    @classmethod
+    def margherita(cls) -&gt; "Pizza":          # 第一參數是 cls（類別本身）
+        return cls(["mozzarella", "tomato"])
+
+    @staticmethod
+    def is_vegetarian(toppings: list[str]) -&gt; bool:   # 沒有 self/cls
+        return "pepperoni" not in toppings</code></pre>
+      </div>
+    <ul>
+<li><strong><code>@classmethod</code></strong> 的第一參數是 <code>cls</code>（類別本身，不是實例）。最常見的用途是<strong>替代建構子</strong>（alternative constructor）／工廠方法：Python 一個類別只能有一個 <code>__init__</code>，所以「用不同方式建立物件」就靠 classmethod。</li>
+<li><strong><code>@staticmethod</code></strong> 既不收 <code>self</code> 也不收 <code>cls</code>，純粹是「放在類別命名空間裡的普通函式」——邏輯上跟這個類別有關，但不需要碰實例或類別狀態。</li>
+</ul>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-228" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20p%20%3D%20Pizza.margherita()%20%20%20%20%20%20%20%23%20%E4%B8%8D%E5%BF%85%E5%85%88%E6%9C%89%E5%AF%A6%E4%BE%8B%E5%B0%B1%E8%83%BD%E5%91%BC%E5%8F%AB%0A%3E%3E%3E%20p.toppings%0A%5B%27mozzarella%27%2C%20%27tomato%27%5D%0A%3E%3E%3E%20Pizza.is_vegetarian(%5B%22mozzarella%22%5D)%0ATrue'), 'copy-btn-228')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; p = Pizza.margherita()       # 不必先有實例就能呼叫
+&gt;&gt;&gt; p.toppings
+['mozzarella', 'tomato']
+&gt;&gt;&gt; Pizza.is_vegetarian(["mozzarella"])
+True</code></pre>
+      </div>
+    <h3 id="cls-的多型才是重點">`cls` 的多型，才是重點</h3><p>為什麼 classmethod 工廠要寫 <code>return cls(...)</code> 而不是 <code>return Pizza(...)</code>？因為 <code>cls</code> 會<strong>隨著實際呼叫的類別變動</strong>——子類別呼叫時，<code>cls</code> 就是子類別。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-229" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20DeepDishPizza(Pizza)%3A%0A%20%20%20%20pass%0A%0A%3E%3E%3E%20DeepDishPizza.margherita()%0A%3C__main__.DeepDishPizza%20object%20at%200x...%3E%20%20%20%23%20%E6%8B%BF%E5%88%B0%E7%9A%84%E6%98%AF%20DeepDishPizza%EF%BC%8C%E4%B8%8D%E6%98%AF%20Pizza%EF%BC%81'), 'copy-btn-229')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class DeepDishPizza(Pizza):
+    pass
+
+&gt;&gt;&gt; DeepDishPizza.margherita()
+&lt;__main__.DeepDishPizza object at 0x...&gt;   # 拿到的是 DeepDishPizza，不是 Pizza！</code></pre>
+      </div>
+    <p>如果 <code>margherita</code> 裡寫死 <code>return Pizza(...)</code>，子類別呼叫就會拿到錯誤的型別。這正是 Java static 工廠方法的痛點：static 方法<strong>不參與多型</strong>，<code>DeepDishPizza.margherita()</code> 在 Java 裡仍然回傳寫死的 <code>Pizza</code>。Python 的 <code>cls</code> 讓工廠方法天生對繼承友善。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：要「換個方式建立物件」就用 <code>@classmethod</code> 配 <code>cls(...)</code>（例如 <code>from_json</code>、<code>from_string</code>、<code>from_config</code>）。要「一個跟類別相關但不碰狀態的工具函式」就用 <code>@staticmethod</code>——但其實很多時候直接寫成模組層級函式更 Pythonic，不必硬塞進類別。</p>
+</div><hr>
+<h2 id="dataclass對照-java-record-lombok">`@dataclass`：對照 Java record / Lombok</h2><p>寫一個只是用來「裝資料」的類別，手刻 <code>__init__</code>、<code>__repr__</code>、<code>__eq__</code> 很煩。Java 的解法是 Lombok <code>@Data</code> 或 Java 16 的 <code>record</code>。Python 的解法是標準函式庫的 <code>@dataclass</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-230" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20dataclasses%20import%20dataclass%0A%0A%40dataclass%0Aclass%20Point%3A%0A%20%20%20%20x%3A%20int%0A%20%20%20%20y%3A%20int'), 'copy-btn-230')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: int
+    y: int</code></pre>
+      </div>
+    <p>這短短幾行，<code>@dataclass</code> 自動幫你生出 <code>__init__</code>、<code>__repr__</code>、<code>__eq__</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-231" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20p%20%3D%20Point(1%2C%202)%0A%3E%3E%3E%20p%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%87%AA%E5%8B%95%20__repr__%0APoint(x%3D1%2C%20y%3D2)%0A%3E%3E%3E%20p%20%3D%3D%20Point(1%2C%202)%20%20%20%20%20%20%20%20%23%20%E8%87%AA%E5%8B%95%20__eq__%EF%BC%9A%E4%BE%9D%E3%80%8C%E5%80%BC%E3%80%8D%E6%AF%94%E8%BC%83%EF%BC%8C%E4%B8%8D%E6%98%AF%E4%BE%9D%E8%BA%AB%E4%BB%BD%0ATrue%0A%3E%3E%3E%20p.x%0A1'), 'copy-btn-231')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; p = Point(1, 2)
+&gt;&gt;&gt; p                       # 自動 __repr__
+Point(x=1, y=2)
+&gt;&gt;&gt; p == Point(1, 2)        # 自動 __eq__：依「值」比較，不是依身份
+True
+&gt;&gt;&gt; p.x
+1</code></pre>
+      </div>
+    <p>注意那些 <code>x: int</code> 是<strong>型別提示</strong>（第 3、9 章）——<code>@dataclass</code> 靠讀取類別的型別標注來決定有哪些欄位。沒標型別的就不算欄位。</p>
+<h3 id="常用選項對照-record-的能力">常用選項，對照 record 的能力</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-232" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40dataclass(frozen%3DTrue%2C%20order%3DTrue%2C%20slots%3DTrue)%0Aclass%20Money%3A%0A%20%20%20%20amount%3A%20int%0A%20%20%20%20currency%3A%20str%20%3D%20%22TWD%22%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%9C%89%E9%A0%90%E8%A8%AD%E5%80%BC%E7%9A%84%E6%AC%84%E4%BD%8D%EF%BC%88%E8%A6%81%E6%94%BE%E5%9C%A8%E7%84%A1%E9%A0%90%E8%A8%AD%E7%9A%84%E5%BE%8C%E9%9D%A2%EF%BC%89'), 'copy-btn-232')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@dataclass(frozen=True, order=True, slots=True)
+class Money:
+    amount: int
+    currency: str = "TWD"           # 有預設值的欄位（要放在無預設的後面）</code></pre>
+      </div>
+    <table>
+<thead>
+<tr>
+<th>選項</th>
+<th>效果</th>
+<th>Java 對照</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>frozen=True</code></td>
+<td>不可變，建立後不能改欄位（且變成 hashable）</td>
+<td>record 的 final 欄位</td>
+</tr>
+<tr>
+<td><code>order=True</code></td>
+<td>自動生 <code>&lt;</code>、<code>&lt;=</code>、<code>&gt;</code>、<code>&gt;=</code>（依欄位順序比較）</td>
+<td>自己實作 <code>Comparable</code></td>
+</tr>
+<tr>
+<td><code>slots=True</code>（3.10+）</td>
+<td>用 <code>__slots__</code> 省記憶體、禁止亂加屬性</td>
+<td>一般物件配置</td>
+</tr>
+<tr>
+<td><code>kw_only=True</code>（3.10+）</td>
+<td>所有欄位變 keyword-only</td>
+<td>—</td>
+</tr>
+</tbody></table>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-233" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20m%20%3D%20Money(100)%0A%3E%3E%3E%20m.amount%20%3D%20200%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0Adataclasses.FrozenInstanceError%3A%20cannot%20assign%20to%20field%20%27amount%27%0A%3E%3E%3E%20sorted(%5BMoney(30)%2C%20Money(10)%2C%20Money(20)%5D)%20%20%20%20%23%20order%3DTrue%20%E6%89%8D%E8%83%BD%E6%8E%92%E5%BA%8F%0A%5BMoney(amount%3D10%2C%20currency%3D%27TWD%27)%2C%20Money(amount%3D20%2C%20currency%3D%27TWD%27)%2C%20Money(amount%3D30%2C%20currency%3D%27TWD%27)%5D'), 'copy-btn-233')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; m = Money(100)
+&gt;&gt;&gt; m.amount = 200
+Traceback (most recent call last):
+    ...
+dataclasses.FrozenInstanceError: cannot assign to field 'amount'
+&gt;&gt;&gt; sorted([Money(30), Money(10), Money(20)])    # order=True 才能排序
+[Money(amount=10, currency='TWD'), Money(amount=20, currency='TWD'), Money(amount=30, currency='TWD')]</code></pre>
+      </div>
+    <p><code>@dataclass(frozen=True)</code> 幾乎就是 Java <code>record</code> 的對應：不可變的純資料載體，自動有 equals/hashCode/toString。差別是 dataclass <strong>預設可變</strong>，要不可變得明寫 <code>frozen=True</code>；而且它更靈活（可選 order、slots、自訂方法）。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>slots=True</code> 省記憶體、又能擋住打錯字的屬性名，但代價是<strong>實例不再有 <code>__dict__</code></strong>——你無法臨時掛一個沒宣告的屬性。對 Java 工程師最容易中招的是<strong>測試</strong>：習慣在 mock／patch 時往實例塞個臨時旗標（<code>obj.tested = True</code>）會直接拋 <code>AttributeError: ... no __dict__ for setting new attributes</code>。此外，子類別若沒有自己宣告 <code>__slots__</code>，又會重新長出 <code>__dict__</code>，省記憶體的效果就破功。決定用 slots 前先確認沒有「事後動態加屬性」的需求。</p>
+<p>不透過 dataclass 也能直接在手寫類別頂部宣告 <code>__slots__ = (&quot;x&quot;, &quot;y&quot;)</code>，效果與陷阱完全相同（省記憶體、禁止 <code>__dict__</code>、禁止亂加屬性）；<code>@dataclass(slots=True)</code> 只是幫你把這行根據欄位自動生出來。想精算記憶體又不想用 dataclass 時，手寫 <code>__slots__</code> 是同一套機制。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：dataclass 欄位的可變預設值，跟第 3 章的可變預設參數是同一個坑。不能寫 <code>tags: list[str] = []</code>（會被所有實例共享，dataclass 甚至會直接報錯擋你），要用 <code>field(default_factory=list)</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-234" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20dataclasses%20import%20dataclass%2C%20field%0A%0A%40dataclass%0Aclass%20Article%3A%0A%20%20%20%20title%3A%20str%0A%20%20%20%20tags%3A%20list%5Bstr%5D%20%3D%20field(default_factory%3Dlist)%20%20%20%23%20%E2%9C%85%20%E6%AF%8F%E5%80%8B%E5%AF%A6%E4%BE%8B%E5%90%84%E8%87%AA%E4%B8%80%E5%80%8B%20list'), 'copy-btn-234')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from dataclasses import dataclass, field
+
+@dataclass
+class Article:
+    title: str
+    tags: list[str] = field(default_factory=list)   # ✅ 每個實例各自一個 list</code></pre>
+      </div>
+    </div><h3 id="postinit衍生欄位與驗證">`__post_init__`：衍生欄位與驗證</h3><p><code>@dataclass</code> 自動生成的 <code>__init__</code> 只做一件事——把參數一個個指派到對應欄位。但 Java 的 <code>record</code> 有 <strong>compact constructor</strong>，能在欄位賦值後插一段「算衍生值」或「驗證」的邏輯。dataclass 的對應就是 <code>__post_init__</code>：<code>__init__</code> 跑完所有欄位賦值後，會自動呼叫它（如果你有定義）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-235" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20dataclasses%20import%20dataclass%2C%20field%0A%0A%40dataclass%0Aclass%20Order%3A%0A%20%20%20%20quantity%3A%20int%0A%20%20%20%20unit_price%3A%20float%0A%20%20%20%20total%3A%20float%20%3D%20field(init%3DFalse)%20%20%20%20%20%20%20%20%23%20%E8%A1%8D%E7%94%9F%E6%AC%84%E4%BD%8D%EF%BC%9A%E4%B8%8D%E9%80%B2%20__init__%20%E5%8F%83%E6%95%B8%EF%BC%8C%E7%94%B1%E8%A8%88%E7%AE%97%E5%BE%97%E5%87%BA%0A%0A%20%20%20%20def%20__post_init__(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20if%20self.quantity%20%3C%200%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20raise%20ValueError(%22%E6%95%B8%E9%87%8F%E4%B8%8D%E8%83%BD%E7%82%BA%E8%B2%A0%22)%0A%20%20%20%20%20%20%20%20self.total%20%3D%20self.quantity%20*%20self.unit_price'), 'copy-btn-235')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from dataclasses import dataclass, field
+
+@dataclass
+class Order:
+    quantity: int
+    unit_price: float
+    total: float = field(init=False)        # 衍生欄位：不進 __init__ 參數，由計算得出
+
+    def __post_init__(self) -&gt; None:
+        if self.quantity &lt; 0:
+            raise ValueError("數量不能為負")
+        self.total = self.quantity * self.unit_price</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-236" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20o%20%3D%20Order(3%2C%20100.0)%0A%3E%3E%3E%20o%0AOrder(quantity%3D3%2C%20unit_price%3D100.0%2C%20total%3D300.0)%0A%3E%3E%3E%20Order(-1%2C%20100.0)%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0AValueError%3A%20%E6%95%B8%E9%87%8F%E4%B8%8D%E8%83%BD%E7%82%BA%E8%B2%A0'), 'copy-btn-236')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; o = Order(3, 100.0)
+&gt;&gt;&gt; o
+Order(quantity=3, unit_price=100.0, total=300.0)
+&gt;&gt;&gt; Order(-1, 100.0)
+Traceback (most recent call last):
+    ...
+ValueError: 數量不能為負</code></pre>
+      </div>
+    <p><code>field(init=False)</code> 讓 <code>total</code> 不出現在 <code>__init__</code> 的參數列（呼叫端不必傳），改由 <code>__post_init__</code> 算出來填上。這正對應 Java record「不能多宣告非標準欄位、衍生值要靠額外方法」的限制——dataclass 在這點上更靈活。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>frozen=True</code> 的 dataclass 裡，<code>__post_init__</code> <strong>不能直接賦值</strong>（<code>self.fahrenheit = ...</code> 會觸發 <code>FrozenInstanceError: cannot assign to field &#39;fahrenheit&#39;</code>，連 mypy 也會擋下來說欄位唯讀）。要繞過唯讀，得退一步直接呼叫 <code>object.__setattr__</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-237" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40dataclass(frozen%3DTrue)%0Aclass%20Temperature%3A%0A%20%20%20%20celsius%3A%20float%0A%20%20%20%20fahrenheit%3A%20float%20%3D%20field(init%3DFalse)%0A%0A%20%20%20%20def%20__post_init__(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20object.__setattr__(self%2C%20%22fahrenheit%22%2C%20self.celsius%20*%209%20%2F%205%20%2B%2032)'), 'copy-btn-237')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@dataclass(frozen=True)
+class Temperature:
+    celsius: float
+    fahrenheit: float = field(init=False)
+
+    def __post_init__(self) -&gt; None:
+        object.__setattr__(self, "fahrenheit", self.celsius * 9 / 5 + 32)</code></pre>
+      </div>
+    <p>這是 frozen dataclass 設定衍生欄位的標準寫法——<code>object.__setattr__</code> 繞過了 frozen 攔截賦值的那層 <code>__setattr__</code>。需要更嚴謹的執行期驗證時，<code>pydantic.BaseModel</code>（第 9 章）會是更省力的選擇。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：只要類別主要是「裝資料」，預設就用 <code>@dataclass</code>，別手刻 <code>__init__</code>／<code>__repr__</code>／<code>__eq__</code>。需要不可變、可雜湊、可比較的值物件（value object）時加 <code>frozen=True</code>；要算衍生欄位或做輕量驗證就加 <code>__post_init__</code>。其他替代品：<code>typing.NamedTuple</code>（不可變、像 tuple）、<code>enum.Enum</code>（固定的具名常數集合，見下方框）、<code>pydantic.BaseModel</code>（要完整執行期驗證時，詳見第 9 章）。</p>
+</div><div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 的 <code>enum</code> 是核心語言構造，Python 的對應在標準函式庫 <code>enum</code>：<code>Enum</code>（一組具名常數，成員是單例、可用 <code>is</code> 比較）、<code>IntEnum</code>／<code>StrEnum</code>（3.11+，成員同時「是」int／str，能直接拿去算術或字串操作、跟 JSON 互通）。它跟本章主題環環相扣——enum 成員本質是<strong>類別屬性</strong>、是<strong>不可變的值物件</strong>、也有漂亮的 <code>__repr__</code>（<code>&lt;Color.RED: 1&gt;</code>）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-238" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20enum%20import%20Enum%2C%20auto%0A%0Aclass%20Color(Enum)%3A%0A%20%20%20%20RED%20%3D%20auto()%0A%20%20%20%20GREEN%20%3D%20auto()%0A%20%20%20%20BLUE%20%3D%20auto()'), 'copy-btn-238')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from enum import Enum, auto
+
+class Color(Enum):
+    RED = auto()
+    GREEN = auto()
+    BLUE = auto()</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-239" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20Color.RED%0A%3CColor.RED%3A%201%3E%0A%3E%3E%3E%20Color.RED%20is%20Color.RED%20%20%20%20%20%20%20%20%20%20%23%20%E6%88%90%E5%93%A1%E6%98%AF%E5%96%AE%E4%BE%8B%EF%BC%8Cis%20%E6%AF%94%E8%BC%83%E6%88%90%E7%AB%8B%0ATrue%0A%3E%3E%3E%20list(Color)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8F%AF%E8%BF%AD%E4%BB%A3%E6%89%80%E6%9C%89%E6%88%90%E5%93%A1%0A%5B%3CColor.RED%3A%201%3E%2C%20%3CColor.GREEN%3A%202%3E%2C%20%3CColor.BLUE%3A%203%3E%5D'), 'copy-btn-239')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; Color.RED
+&lt;Color.RED: 1&gt;
+&gt;&gt;&gt; Color.RED is Color.RED          # 成員是單例，is 比較成立
+True
+&gt;&gt;&gt; list(Color)                     # 可迭代所有成員
+[&lt;Color.RED: 1&gt;, &lt;Color.GREEN: 2&gt;, &lt;Color.BLUE: 3&gt;]</code></pre>
+      </div>
+    <p>別再用一堆 <code>RED = 1; GREEN = 2</code> 的模組常數（magic number）冒充 enum——<code>enum.Enum</code> 給你型別安全、可迭代、可比較、有名字的真 enum。完整用法可參考官方 <code>enum</code> 文件，這裡先讓你知道 Java enum 在 Python 有一級對應。</p>
+</div><hr>
+<h2 id="repreqhash">`__repr__`、`__eq__`、`__hash__`</h2><p>這三個 dunder（雙底線方法，dunder = double underscore）直接對應 Java 的 <code>toString</code>／<code>equals</code>／<code>hashCode</code>。用 <code>@dataclass</code> 時它們自動生成；手刻類別時你得自己處理，而且 Python 有一條 Java 沒有的<strong>強制規則</strong>。</p>
+<h3 id="repr對照-tostring但分兩種">`__repr__`：對照 `toString`（但分兩種）</h3><p>Python 區分兩個「轉字串」的方法：</p>
+<ul>
+<li><strong><code>__repr__</code></strong>：給開發者看的，目標是<strong>明確、最好能 eval 還原</strong>。<code>repr(obj)</code>、在 REPL 直接打變數、容器內的元素都用它。</li>
+<li><strong><code>__str__</code></strong>：給使用者看的，目標是<strong>可讀</strong>。<code>print(obj)</code>、<code>str(obj)</code> 用它。沒定義 <code>__str__</code> 時會 fallback 到 <code>__repr__</code>。</li>
+</ul>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-240" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Point%3A%0A%20%20%20%20def%20__init__(self%2C%20x%3A%20int%2C%20y%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.x%20%3D%20x%0A%20%20%20%20%20%20%20%20self.y%20%3D%20y%0A%0A%20%20%20%20def%20__repr__(self)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20return%20f%22Point(x%3D%7Bself.x%7D%2C%20y%3D%7Bself.y%7D)%22%20%20%20%23%20%E6%85%A3%E4%BE%8B%EF%BC%9A%E9%95%B7%E5%BE%97%E5%83%8F%E5%BB%BA%E6%A7%8B%E5%91%BC%E5%8F%AB'), 'copy-btn-240')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Point:
+    def __init__(self, x: int, y: int) -&gt; None:
+        self.x = x
+        self.y = y
+
+    def __repr__(self) -&gt; str:
+        return f"Point(x={self.x}, y={self.y})"   # 慣例：長得像建構呼叫</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-241" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20p%20%3D%20Point(1%2C%202)%0A%3E%3E%3E%20p%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20REPL%20%E7%94%A8%20__repr__%0APoint(x%3D1%2C%20y%3D2)%0A%3E%3E%3E%20print(p)%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%B2%92%E6%9C%89%20__str__%EF%BC%8Cfallback%20%E5%88%B0%20__repr__%0APoint(x%3D1%2C%20y%3D2)%0A%3E%3E%3E%20%5Bp%2C%20p%5D%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%AE%B9%E5%99%A8%E5%85%A7%E4%B9%9F%E7%94%A8%20__repr__%0A%5BPoint(x%3D1%2C%20y%3D2)%2C%20Point(x%3D1%2C%20y%3D2)%5D'), 'copy-btn-241')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; p = Point(1, 2)
+&gt;&gt;&gt; p                  # REPL 用 __repr__
+Point(x=1, y=2)
+&gt;&gt;&gt; print(p)           # 沒有 __str__，fallback 到 __repr__
+Point(x=1, y=2)
+&gt;&gt;&gt; [p, p]             # 容器內也用 __repr__
+[Point(x=1, y=2), Point(x=1, y=2)]</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<strong>至少實作 <code>__repr__</code></strong>。一個好的 <code>__repr__</code> 在 debug、log、測試失敗訊息裡價值連城。預設的 <code>&lt;__main__.Point object at 0x10a...&gt;</code> 對你毫無幫助。<code>__str__</code> 只在「給終端使用者看的格式」跟 debug 格式不同時才另外寫。</p>
+</div><h3 id="eq-與-hash對照-equalshashcode但-python-會強制執行契約">`__eq__` 與 `__hash__`：對照 `equals`／`hashCode`，但 Python 會強制執行契約</h3><p>跟 Java 一樣，Python 也有「相等的物件雜湊值必須相同」的契約。但 Java 只是寫在文件裡靠你自律；<strong>Python 直接用語言機制強迫你遵守</strong>：一旦你定義了 <code>__eq__</code> 而沒有定義 <code>__hash__</code>，Python 會自動把 <code>__hash__</code> 設成 <code>None</code>，讓這個類別<strong>變得不可雜湊</strong>。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-242" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Point%3A%0A%20%20%20%20def%20__init__(self%2C%20x%3A%20int%2C%20y%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.x%2C%20self.y%20%3D%20x%2C%20y%0A%0A%20%20%20%20def%20__eq__(self%2C%20other%3A%20object)%20-%3E%20bool%3A%0A%20%20%20%20%20%20%20%20if%20not%20isinstance(other%2C%20Point)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20return%20NotImplemented%20%20%20%20%20%20%20%23%20%E4%B8%8D%E6%98%AF%E5%90%8C%E9%A1%9E%E5%B0%B1%E4%BA%A4%E7%B5%A6%E5%B0%8D%E6%96%B9%E5%88%A4%E6%96%B7%0A%20%20%20%20%20%20%20%20return%20(self.x%2C%20self.y)%20%3D%3D%20(other.x%2C%20other.y)'), 'copy-btn-242')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Point:
+    def __init__(self, x: int, y: int) -&gt; None:
+        self.x, self.y = x, y
+
+    def __eq__(self, other: object) -&gt; bool:
+        if not isinstance(other, Point):
+            return NotImplemented       # 不是同類就交給對方判斷
+        return (self.x, self.y) == (other.x, other.y)</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：這裡用 <code>isinstance(other, Point)</code> 對應 Java <code>equals</code> 裡的 <code>other instanceof Point</code>——兩者都<strong>允許子類別實例</strong>通過檢查，於是 <code>Point(1, 2)</code> 可能等於某個 <code>Point3D(1, 2, 0)</code>。Java 社群為此爭論多年：另一派改用 <code>getClass() == other.getClass()</code> 要求型別<strong>完全相同</strong>，子類別一律不相等（較嚴格、對稱性更乾淨，但破壞了「子型別可替換父型別」的彈性）。Python 慣例是用 <code>isinstance</code>（較寬鬆），跟標準函式庫一致；真要 Java <code>getClass()</code> 那種嚴格相等，條件得寫成 <code>type(self) is type(other)</code>（兩邊類別都要一致才相等）——光寫 <code>type(other) is Point</code> 不夠，因為從子類別那側發起的反向比較會繞過它。<code>return NotImplemented</code>（注意是回傳、不是 <code>raise</code>）則對應「我比不了，交給對方的 <code>__eq__</code> 試試」，讓 <code>a == b</code> 與 <code>b == a</code> 有機會達成對稱。</p>
+</div>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-243" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20Point(1%2C%202)%20%3D%3D%20Point(1%2C%202)%0ATrue%0A%3E%3E%3E%20%7BPoint(1%2C%202)%7D%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%83%B3%E6%94%BE%E9%80%B2%20set%EF%BC%9F%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0ATypeError%3A%20unhashable%20type%3A%20%27Point%27%20%20%20%20%20%23%20Python%20%E6%93%8B%E4%B8%8B%E4%BE%86%E4%BA%86'), 'copy-btn-243')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; Point(1, 2) == Point(1, 2)
+True
+&gt;&gt;&gt; {Point(1, 2)}                       # 想放進 set？
+Traceback (most recent call last):
+    ...
+TypeError: unhashable type: 'Point'     # Python 擋下來了</code></pre>
+      </div>
+    <p>（此為 Python 3.12／3.13 的訊息；Python 3.14 起擴充為 <code>cannot use &#39;Point&#39; as a set element (unhashable type: &#39;Point&#39;)</code>，語意相同。）</p>
+<p>為什麼？因為若可雜湊，你會得到「兩個相等卻可能落在不同雜湊桶」的危險物件——這正是 Java 工程師「override equals 忘了 override hashCode」會踩的坑。Java 讓你默默踩，Python 直接讓你用不了 set／dict key，逼你正視。解法是同時定義 <code>__hash__</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-244" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Point%3A%0A%20%20%20%20def%20__init__(self%2C%20x%3A%20int%2C%20y%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.x%2C%20self.y%20%3D%20x%2C%20y%0A%0A%20%20%20%20def%20__eq__(self%2C%20other%3A%20object)%20-%3E%20bool%3A%0A%20%20%20%20%20%20%20%20if%20not%20isinstance(other%2C%20Point)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20return%20NotImplemented%0A%20%20%20%20%20%20%20%20return%20(self.x%2C%20self.y)%20%3D%3D%20(other.x%2C%20other.y)%0A%0A%20%20%20%20def%20__hash__(self)%20-%3E%20int%3A%0A%20%20%20%20%20%20%20%20return%20hash((self.x%2C%20self.y))%20%20%20%23%20%E6%85%A3%E4%BE%8B%EF%BC%9A%E7%94%A8%E5%90%8C%E6%A8%A3%E5%8F%83%E8%88%87%20__eq__%20%E7%9A%84%E6%AC%84%E4%BD%8D%E7%B5%84%E6%88%90%20tuple%20%E5%8E%BB%20hash'), 'copy-btn-244')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Point:
+    def __init__(self, x: int, y: int) -&gt; None:
+        self.x, self.y = x, y
+
+    def __eq__(self, other: object) -&gt; bool:
+        if not isinstance(other, Point):
+            return NotImplemented
+        return (self.x, self.y) == (other.x, other.y)
+
+    def __hash__(self) -&gt; int:
+        return hash((self.x, self.y))   # 慣例：用同樣參與 __eq__ 的欄位組成 tuple 去 hash</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-245" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20p%20%3D%20Point(1%2C%202)%0A%3E%3E%3E%20hash(p)%20%3D%3D%20hash(Point(1%2C%202))%20%20%20%20%20%20%20%20%23%20%E7%9B%B8%E7%AD%89%E7%9A%84%E7%89%A9%E4%BB%B6%EF%BC%8C%E9%9B%9C%E6%B9%8A%E5%80%BC%E7%9B%B8%E5%90%8C%20%E2%9C%93%0ATrue%0A%3E%3E%3E%20%7BPoint(1%2C%202)%2C%20Point(1%2C%202)%7D%20%20%20%20%20%20%20%20%20%20%23%20%E7%8F%BE%E5%9C%A8%E5%8F%AF%E4%BB%A5%E9%80%B2%20set%EF%BC%8C%E4%B8%94%E6%9C%83%E5%8E%BB%E9%87%8D%EF%BC%88%E6%B2%BF%E7%94%A8%E5%89%8D%E9%9D%A2%E7%9A%84%20__repr__%EF%BC%89%0A%7BPoint(x%3D1%2C%20y%3D2)%7D'), 'copy-btn-245')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; p = Point(1, 2)
+&gt;&gt;&gt; hash(p) == hash(Point(1, 2))        # 相等的物件，雜湊值相同 ✓
+True
+&gt;&gt;&gt; {Point(1, 2), Point(1, 2)}          # 現在可以進 set，且會去重（沿用前面的 __repr__）
+{Point(x=1, y=2)}</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：只可雜湊<strong>不可變</strong>的物件才安全。如果物件放進 set 之後你又改了它參與 hash 的欄位，它就會在錯誤的雜湊桶裡「失蹤」——這跟 Java 把 mutable 物件當 HashMap key 的問題一模一樣。所以「可雜湊」通常跟「不可變」綁在一起。</p>
+</div><p>這也解釋了 <code>@dataclass</code> 的雜湊行為，規則完全一致：</p>
+<table>
+<thead>
+<tr>
+<th>dataclass 設定</th>
+<th><code>__eq__</code></th>
+<th><code>__hash__</code></th>
+<th>可放進 set/dict key？</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@dataclass</code>（預設）</td>
+<td>自動生成</td>
+<td>設為 <code>None</code></td>
+<td>❌ 不可雜湊</td>
+</tr>
+<tr>
+<td><code>@dataclass(frozen=True)</code></td>
+<td>自動生成</td>
+<td>自動生成</td>
+<td>✅ 可雜湊（且不可變，安全）</td>
+</tr>
+<tr>
+<td><code>@dataclass(eq=False)</code></td>
+<td>不生成（用 object 的身份比較）</td>
+<td>繼承自 object</td>
+<td>✅ 依身份雜湊</td>
+</tr>
+</tbody></table>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：要當 dict key／set 元素的值物件，用 <code>@dataclass(frozen=True)</code> 最省事——它一次給你正確的 <code>__eq__</code>＋<code>__hash__</code>＋不可變，完全符合契約。需要手刻時，記住鐵律：<strong>定義了 <code>__eq__</code> 就要一起定義 <code>__hash__</code>，且兩者用同一組欄位</strong>。</p>
+</div><hr>
+<h2 id="本章小結">本章小結</h2><ol>
+<li><strong><code>__init__</code> 是初始化器不是建構子</strong>，<code>self</code> 是明寫的第一參數。<code>obj.m(x)</code> 等價於 <code>Class.m(obj, x)</code>——理解這點，bound method 與 classmethod 都好懂。</li>
+<li><strong>Python 沒有 access modifier</strong>。封裝靠慣例：<code>_name</code> 是「內部用」的口頭約定，<code>__name</code> 是 name mangling（防繼承撞名，<strong>不是</strong> private）。別拿雙底線當存取控制。</li>
+<li><strong>實例屬性讀取會穿透到類別、寫入不會穿透</strong>。<code>instance.attr = x</code> 永遠在實例上建屬性，絕不回頭改類別——這跟 Java static 欄位的行為不同。</li>
+<li><strong>可變類別屬性會被所有實例共享</strong>，是可變預設參數的近親坑。每個實例該獨立持有的可變狀態，一律在 <code>__init__</code> 裡建立。</li>
+<li><strong><code>@property</code> 讓你先公開屬性、事後再無痛加上 getter/setter 與驗證</strong>，呼叫端語法不變。因此 Python 不需要 Java 那種「預防性 getter/setter」。</li>
+<li><strong><code>@classmethod</code> 收 <code>cls</code>，是替代建構子的首選</strong>；<code>cls</code> 參與多型，子類別呼叫工廠會拿到子類別實例。<code>@staticmethod</code> 純粹是命名空間裡的函式。</li>
+<li><strong><code>@dataclass</code> 一行取代 record／Lombok</strong>：自動生 <code>__init__</code>／<code>__repr__</code>／<code>__eq__</code>，<code>frozen=True</code> 給你不可變且可雜湊的值物件。可變預設值要用 <code>field(default_factory=...)</code>；衍生欄位／驗證用 <code>__post_init__</code>（frozen 下要 <code>object.__setattr__</code>，對應 record 的 compact constructor）；<code>slots=True</code> 省記憶體但實例沒有 <code>__dict__</code>，無法事後動態加屬性（測試 mock 時要注意）。固定的具名常數集合則用 <code>enum.Enum</code>／<code>IntEnum</code>／<code>StrEnum</code>，是 Java enum 的一級對應。</li>
+<li><strong><code>__repr__</code>／<code>__eq__</code>／<code>__hash__</code> 對應 <code>toString</code>／<code>equals</code>／<code>hashCode</code></strong>。Python 強制契約：定義 <code>__eq__</code> 而不定義 <code>__hash__</code>，類別就變不可雜湊。可雜湊通常要搭配不可變。</li>
+</ol>
+<hr>
+<h2 id="練習">練習</h2><p><strong>練習 1（封裝慣例）</strong>
+下面這段「Java 直譯」的 Python，把每個欄位都加了 getter/setter。請改寫成 Pythonic 版本：<code>name</code> 直接公開；<code>age</code> 用 <code>@property</code> 加上「不能為負」的驗證。說明改寫後呼叫端 <code>u.age = 30</code> 為什麼不用改。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-246" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20User%3A%0A%20%20%20%20def%20__init__(self%2C%20name%2C%20age)%3A%0A%20%20%20%20%20%20%20%20self._name%20%3D%20name%0A%20%20%20%20%20%20%20%20self._age%20%3D%20age%0A%20%20%20%20def%20get_name(self)%3A%20return%20self._name%0A%20%20%20%20def%20set_name(self%2C%20v)%3A%20self._name%20%3D%20v%0A%20%20%20%20def%20get_age(self)%3A%20return%20self._age%0A%20%20%20%20def%20set_age(self%2C%20v)%3A%20self._age%20%3D%20v'), 'copy-btn-246')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class User:
+    def __init__(self, name, age):
+        self._name = name
+        self._age = age
+    def get_name(self): return self._name
+    def set_name(self, v): self._name = v
+    def get_age(self): return self._age
+    def set_age(self, v): self._age = v</code></pre>
+      </div>
+    <p><strong>練習 2（找出共享陷阱）</strong>
+以下類別想讓每個 <code>ShoppingCart</code> 有自己的商品清單，但實際上所有購物車共用一份。請指出 bug 行、用一句話說明成因（提示：查找鏈與「修改 vs 指派」），並修正。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-247" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20ShoppingCart%3A%0A%20%20%20%20items%20%3D%20%5B%5D%0A%20%20%20%20def%20add(self%2C%20item)%3A%0A%20%20%20%20%20%20%20%20self.items.append(item)'), 'copy-btn-247')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class ShoppingCart:
+    items = []
+    def add(self, item):
+        self.items.append(item)</code></pre>
+      </div>
+    <p><strong>練習 3（classmethod 工廠 + 多型）</strong>
+為一個 <code>Temperature</code> 類別（<code>__init__(self, celsius: float)</code>）加上 <code>@classmethod from_fahrenheit(cls, f)</code>，內部換算成攝氏後建立物件。接著定義一個子類別 <code>PreciseTemperature(Temperature)</code>，呼叫 <code>PreciseTemperature.from_fahrenheit(98.6)</code>，並解釋為什麼回傳的是 <code>PreciseTemperature</code> 而不是 <code>Temperature</code>——以及如果把工廠裡的 <code>cls(...)</code> 寫死成 <code>Temperature(...)</code> 會發生什麼事。</p>
+<p><strong>練習 4（dataclass 設計值物件）</strong>
+用 <code>@dataclass</code> 設計一個代表 2D 向量的 <code>Vector2D(x: float, y: float)</code>，要求：(a) 不可變；(b) 能放進 <code>set</code> 去重；(c) 能用 <code>sorted()</code> 排序（依 x 再依 y）。寫出 decorator 該帶哪些參數，並用幾行程式驗證三個需求。</p>
+<p><strong>練習 5（<strong>eq</strong>/<strong>hash</strong> 契約）</strong>
+不使用 <code>@dataclass</code>，手刻一個 <code>Color(r, g, b)</code>，讓兩個 RGB 相同的 Color 相等、且能當 dict 的 key。實作後，故意「定義 <code>__eq__</code> 但拿掉 <code>__hash__</code>」，在 REPL 觀察把它放進 set 會發生什麼錯誤，並用一句話解釋 Python 為什麼要這樣設計（提示：相等物件的雜湊契約）。</p>

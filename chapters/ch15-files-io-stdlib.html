@@ -1,0 +1,689 @@
+<h1 id="第-15-章檔案io-與標準函式庫巡禮">第 15 章：檔案、I/O 與標準函式庫巡禮</h1><p>身為 Java 工程師，你習慣「任何稍微像樣的事都要拉一個函式庫」：日期要 <code>java.time</code> 或更早是 Joda、JSON 要 Jackson、CSV 要 Apache Commons、HTTP client 要 OkHttp。Python 的世界觀不太一樣——它的標準函式庫信奉「內建電池」（batteries included），檔案、JSON、CSV、SQLite、日期時區、正規表示式、子行程、CLI 解析全都在標準庫裡，<code>pip install</code> 一個都不用。這一章是一趟標準庫巡禮，目標是讓你在「想寫一段 shell script 或拉一個小工具」時，第一反應是「Python 標準庫就有」，而不是 <code>npm</code>/<code>Maven</code> 找輪子。</p>
+<hr>
+<h2 id="pathlib物件式的路徑告別字串拼接">pathlib：物件式的路徑，告別字串拼接</h2><p>Java 的 <code>java.nio.file.Path</code> / <code>Files</code> 已經把「路徑是物件、檔案操作是靜態方法」這套教會你了。Python 的舊世界是 <code>os.path</code>——一堆吃字串、回字串的函式（<code>os.path.join</code>、<code>os.path.exists</code>、<code>os.path.splitext</code>），你得自己拼字串、自己記哪個函式做什麼。現代 Python（3.4+，到 3.12 已非常成熟）用 <code>pathlib.Path</code> 取而代之，而且比 Java 更俐落。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-450" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9Ajava.nio%0APath%20base%20%3D%20Paths.get(%22%2Fvar%2Flog%22)%3B%0APath%20file%20%3D%20base.resolve(%22app%22).resolve(%22server.log%22)%3B%0Aif%20(Files.exists(file)%20%26%26%20Files.isRegularFile(file))%20%7B%0A%20%20%20%20String%20text%20%3D%20Files.readString(file%2C%20StandardCharsets.UTF_8)%3B%0A%7D'), 'copy-btn-450')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：java.nio
+Path base = Paths.get("/var/log");
+Path file = base.resolve("app").resolve("server.log");
+if (Files.exists(file) &amp;&amp; Files.isRegularFile(file)) {
+    String text = Files.readString(file, StandardCharsets.UTF_8);
+}</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-451" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20pathlib%20import%20Path%0A%0Abase%20%3D%20Path(%22%2Fvar%2Flog%22)%0Afile%20%3D%20base%20%2F%20%22app%22%20%2F%20%22server.log%22%20%20%20%20%20%20%20%20%20%20%23%20%2F%20%E9%81%8B%E7%AE%97%E5%AD%90%E7%B5%84%E8%B7%AF%E5%BE%91%EF%BC%8C%E8%B7%A8%E5%B9%B3%E5%8F%B0%0Aif%20file.exists()%20and%20file.is_file()%3A%0A%20%20%20%20text%20%3D%20file.read_text(encoding%3D%22utf-8%22)'), 'copy-btn-451')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from pathlib import Path
+
+base = Path("/var/log")
+file = base / "app" / "server.log"          # / 運算子組路徑，跨平台
+if file.exists() and file.is_file():
+    text = file.read_text(encoding="utf-8")</code></pre>
+      </div>
+    <p><code>/</code> 運算子是最 Pythonic 的亮點：<code>Path.__truediv__</code> 被多載成「組路徑」，等價於 Java 的 <code>.resolve(...)</code>，但讀起來像在寫真正的路徑。它會自動用對的分隔符（Windows 上是 <code>\</code>），所以你永遠不該手動 <code>&quot;a/&quot; + &quot;b&quot;</code> 或 <code>os.path.join</code>。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>Paths.get(a).resolve(b)</code> ≈ <code>Path(a) / b</code>。<code>Files.readString(p)</code> ≈ <code>p.read_text()</code>，<code>Files.writeString</code> ≈ <code>p.write_text()</code>，<code>Files.exists(p)</code> ≈ <code>p.exists()</code>。差別是 Python 把這些變成 <code>Path</code> 的<strong>方法</strong>，不是 <code>Files</code> 的靜態工具方法。</p>
+</div><h3 id="常用-api-速查">常用 API 速查</h3><p><code>Path</code> 物件把「路徑解析」和「檔案系統操作」都掛在自己身上：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-452" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20pathlib%20import%20Path%0A%3E%3E%3E%20p%20%3D%20Path(%22%2Fvar%2Flog%2Fapp%2Fserver.log%22)%0A%3E%3E%3E%20p.name%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%AA%94%E5%90%8D%EF%BC%88%E5%90%AB%E5%89%AF%E6%AA%94%E5%90%8D%EF%BC%89%0A%27server.log%27%0A%3E%3E%3E%20p.stem%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8E%BB%E6%8E%89%E5%89%AF%E6%AA%94%E5%90%8D%E7%9A%84%E6%AA%94%E5%90%8D%0A%27server%27%0A%3E%3E%3E%20p.suffix%20%20%20%20%20%20%20%20%20%20%23%20%E5%89%AF%E6%AA%94%E5%90%8D%0A%27.log%27%0A%3E%3E%3E%20p.parent%20%20%20%20%20%20%20%20%20%20%23%20%E7%88%B6%E7%9B%AE%E9%8C%84%EF%BC%88%E4%B9%9F%E6%98%AF%20Path%EF%BC%89%0APosixPath(%27%2Fvar%2Flog%2Fapp%27)%0A%3E%3E%3E%20p.parts%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%8B%86%E6%88%90%E5%85%83%E7%B5%84%0A(%27%2F%27%2C%20%27var%27%2C%20%27log%27%2C%20%27app%27%2C%20%27server.log%27)%0A%3E%3E%3E%20p.with_suffix(%22.gz%22)%20%20%20%23%20%E6%8A%8A%20.log%20%E6%8F%9B%E6%88%90%20.gz%EF%BC%8C%E5%9B%9E%E5%82%B3%E6%96%B0%20Path%EF%BC%88%E4%B8%8D%E5%8F%AF%E8%AE%8A%EF%BC%89%0APosixPath(%27%2Fvar%2Flog%2Fapp%2Fserver.gz%27)%0A%3E%3E%3E%20p.with_name(%22error.log%22)%0APosixPath(%27%2Fvar%2Flog%2Fapp%2Ferror.log%27)'), 'copy-btn-452')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from pathlib import Path
+&gt;&gt;&gt; p = Path("/var/log/app/server.log")
+&gt;&gt;&gt; p.name            # 檔名（含副檔名）
+'server.log'
+&gt;&gt;&gt; p.stem            # 去掉副檔名的檔名
+'server'
+&gt;&gt;&gt; p.suffix          # 副檔名
+'.log'
+&gt;&gt;&gt; p.parent          # 父目錄（也是 Path）
+PosixPath('/var/log/app')
+&gt;&gt;&gt; p.parts           # 拆成元組
+('/', 'var', 'log', 'app', 'server.log')
+&gt;&gt;&gt; p.with_suffix(".gz")   # 把 .log 換成 .gz，回傳新 Path（不可變）
+PosixPath('/var/log/app/server.gz')
+&gt;&gt;&gt; p.with_name("error.log")
+PosixPath('/var/log/app/error.log')</code></pre>
+      </div>
+    <p><code>Path</code> 是<strong>不可變</strong>的（immutable），<code>with_suffix</code>/<code>with_name</code> 都回傳新物件，這跟 Java 的 <code>Path</code> 一致。</p>
+<p>注意 <code>with_suffix</code> 是<strong>替換最後一個</strong> suffix，不是附加。<code>Path(&quot;server.log&quot;).with_suffix(&quot;.gz&quot;)</code> 得到 <code>server.gz</code>（<code>.log</code> 被換掉），不是 <code>server.log.gz</code>。若你要在現有副檔名後<strong>再加一層</strong>（<code>server.log</code> → <code>server.log.gz</code>），請用 <code>p.with_name(p.name + &quot;.gz&quot;)</code> 或 <code>Path(str(p) + &quot;.gz&quot;)</code>。</p>
+<p>讀寫一行解決，不用開檔案、不用記得關：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-453" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('config%20%3D%20Path(%22config.toml%22)%0Aconfig.write_text(%22debug%20%3D%20true%5Cn%22%2C%20encoding%3D%22utf-8%22)%20%20%20%23%20%E8%A6%86%E5%AF%AB%EF%BC%8C%E8%87%AA%E5%8B%95%E9%96%8B%E9%97%9C%E6%AA%94%0Acontent%20%3D%20config.read_text(encoding%3D%22utf-8%22)%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%B8%80%E6%AC%A1%E8%AE%80%E5%AE%8C%0Adata%20%3D%20Path(%22blob.bin%22).read_bytes()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%BA%8C%E9%80%B2%E4%BD%8D'), 'copy-btn-453')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">config = Path("config.toml")
+config.write_text("debug = true\n", encoding="utf-8")   # 覆寫，自動開關檔
+content = config.read_text(encoding="utf-8")            # 一次讀完
+data = Path("blob.bin").read_bytes()                    # 二進位</code></pre>
+      </div>
+    <h3 id="glob-與走訪目錄">glob 與走訪目錄</h3><p><code>glob</code> 是 pathlib 真正讓人上癮的地方——比 Java 的 <code>Files.newDirectoryStream</code> + glob pattern 直覺得多：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-454" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('project%20%3D%20Path(%22src%22)%0A%0A%23%20%E7%95%B6%E5%B1%A4%E6%89%80%E6%9C%89%20.py%0Afor%20py%20in%20project.glob(%22*.py%22)%3A%0A%20%20%20%20print(py)%0A%0A%23%20%E9%81%9E%E8%BF%B4%E6%89%80%E6%9C%89%E5%B1%A4%E7%9A%84%20.py%EF%BC%88**%20%E4%BB%A3%E8%A1%A8%E4%BB%BB%E6%84%8F%E5%B1%A4%E6%95%B8%EF%BC%89%0Afor%20py%20in%20project.rglob(%22*.py%22)%3A%20%20%20%20%20%20%20%23%20%E7%AD%89%E5%90%8C%20glob(%22**%2F*.py%22)%0A%20%20%20%20print(py.relative_to(project))%0A%0A%23%20iterdir%20%E5%8F%AA%E5%88%97%E7%95%B6%E5%B1%A4%EF%BC%88%E6%AA%94%E6%A1%88%20%2B%20%E5%AD%90%E7%9B%AE%E9%8C%84%EF%BC%89%EF%BC%8C%E4%B8%8D%E9%81%9E%E8%BF%B4%0Afor%20child%20in%20project.iterdir()%3A%0A%20%20%20%20kind%20%3D%20%22dir%20%22%20if%20child.is_dir()%20else%20%22file%22%0A%20%20%20%20print(kind%2C%20child.name)'), 'copy-btn-454')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">project = Path("src")
+
+# 當層所有 .py
+for py in project.glob("*.py"):
+    print(py)
+
+# 遞迴所有層的 .py（** 代表任意層數）
+for py in project.rglob("*.py"):       # 等同 glob("**/*.py")
+    print(py.relative_to(project))
+
+# iterdir 只列當層（檔案 + 子目錄），不遞迴
+for child in project.iterdir():
+    kind = "dir " if child.is_dir() else "file"
+    print(kind, child.name)</code></pre>
+      </div>
+    <p><code>glob</code>/<code>rglob</code>/<code>iterdir</code> 回傳的是<strong>惰性迭代器</strong>（lazy iterator，不是一次算完的 list），不會一次把整個目錄載進記憶體，掃幾十萬個檔案也不會爆。（嚴格來說 <code>iterdir</code> 是 generator，<code>glob</code>/<code>rglob</code> 在不同版本是 <code>map</code> 或一般 iterator，效果相同——都是惰性、邊走邊算；惰性求值的概念詳見第 6 章。）</p>
+<p>建目錄與刪除：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-455" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('out%20%3D%20Path(%22build%2Freports%22)%0Aout.mkdir(parents%3DTrue%2C%20exist_ok%3DTrue)%20%20%20%23%20%E7%AD%89%E5%90%8C%20mkdir%20-p%EF%BC%8C%E5%B7%B2%E5%AD%98%E5%9C%A8%E4%B8%8D%E5%A0%B1%E9%8C%AF%0A(out%20%2F%20%22old.txt%22).unlink(missing_ok%3DTrue)%20%20%23%20%E5%88%AA%E6%AA%94%EF%BC%8C%E4%B8%8D%E5%AD%98%E5%9C%A8%E4%B9%9F%E4%B8%8D%E5%A0%B1%E9%8C%AF'), 'copy-btn-455')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">out = Path("build/reports")
+out.mkdir(parents=True, exist_ok=True)   # 等同 mkdir -p，已存在不報錯
+(out / "old.txt").unlink(missing_ok=True)  # 刪檔，不存在也不報錯</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：新程式碼一律用 <code>pathlib.Path</code>，把 <code>os.path</code> 當成只在讀舊碼時才需要的歷史包袱。需要把 <code>Path</code> 傳給只吃字串的舊 API 時，<code>str(path)</code> 即可；反過來大多數標準庫（含 <code>open</code>）都直接吃 <code>Path</code>，因為它實作了 <code>os.PathLike</code> 協定。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>Path(&quot;/a/b&quot;) / &quot;/c&quot;</code> 會得到 <code>Path(&quot;/c&quot;)</code>，不是 <code>/a/b/c</code>——<code>/</code> 運算子右邊若是絕對路徑，會<strong>覆蓋</strong>左邊，跟 Java <code>resolve</code> 行為一致。組路徑時別讓使用者輸入帶開頭斜線的字串。</p>
+</div><hr>
+<h2 id="檔案讀寫與編碼那個會在-ci-上炸掉的-encoding">檔案讀寫與編碼：那個會在 CI 上炸掉的 encoding</h2><p>當你需要逐行串流、控制緩衝、或處理大檔時，就回到底層的 <code>open()</code>。承接第 5 章，慣用法是搭配 <code>with</code>（context manager），等同 Java 的 try-with-resources，離開區塊自動關檔——即使中途拋例外。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-456" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%20try-with-resources%0Atry%20(BufferedReader%20r%20%3D%20Files.newBufferedReader(path%2C%20StandardCharsets.UTF_8))%20%7B%0A%20%20%20%20String%20line%3B%0A%20%20%20%20while%20((line%20%3D%20r.readLine())%20!%3D%20null)%20%7B%0A%20%20%20%20%20%20%20%20process(line)%3B%0A%20%20%20%20%7D%0A%7D'), 'copy-btn-456')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java try-with-resources
+try (BufferedReader r = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+    String line;
+    while ((line = r.readLine()) != null) {
+        process(line);
+    }
+}</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-457" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('with%20open(%22access.log%22%2C%20encoding%3D%22utf-8%22)%20as%20f%3A%0A%20%20%20%20for%20line%20in%20f%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%AA%94%E6%A1%88%E7%89%A9%E4%BB%B6%E6%9C%AC%E8%BA%AB%E5%B0%B1%E6%98%AF%E9%80%90%E8%A1%8C%E7%9A%84%E8%BF%AD%E4%BB%A3%E5%99%A8%EF%BC%8C%E6%83%B0%E6%80%A7%E3%80%81%E4%B8%8D%E5%90%83%E8%A8%98%E6%86%B6%E9%AB%94%0A%20%20%20%20%20%20%20%20process(line.rstrip(%22%5Cn%22))'), 'copy-btn-457')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">with open("access.log", encoding="utf-8") as f:
+    for line in f:               # 檔案物件本身就是逐行的迭代器，惰性、不吃記憶體
+        process(line.rstrip("\n"))</code></pre>
+      </div>
+    <p>直接 <code>for line in f</code> 是 Pythonic 的逐行讀法：檔案物件是迭代器，一次只讀一行，處理 10GB 的 log 也只佔一行的記憶體。不要用 <code>f.readlines()</code>（一次全載進 list）除非你真的要整份在記憶體裡。</p>
+<h3 id="編碼最該記住的一條規則">編碼：最該記住的一條規則</h3><p><strong>永遠明確寫 <code>encoding=&quot;utf-8&quot;</code>。</strong> 這是從 Java 帶過來最容易踩的雷。Java 的 <code>new FileReader(f)</code>（無 charset）和 Python 的 <code>open(f)</code>（無 encoding）犯的是同一個錯：用<strong>平台預設編碼</strong>。在你的 Mac 上是 UTF-8、跑得好好的，到了 CI 的某些環境或 Windows（預設可能是 cp950/cp1252）就會 <code>UnicodeDecodeError</code> 或讀出亂碼。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-458" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E4%B8%8D%E8%A6%81%E9%80%99%E6%A8%A3%EF%BC%88%E4%BE%9D%E8%B3%B4%20locale%EF%BC%8C%E8%B7%A8%E6%A9%9F%E5%99%A8%E4%B8%8D%E5%8F%AF%E9%87%8D%E7%8F%BE%EF%BC%89%0Atext%20%3D%20open(%22data.txt%22).read()%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%80%99%E5%9C%A8%E6%9F%90%E4%BA%9B%E5%B9%B3%E5%8F%B0%E6%9C%83%E5%87%BA%E9%8C%AF%E6%88%96%E4%BA%82%E7%A2%BC%0A%0A%23%20%E4%B8%80%E5%BE%8B%E9%80%99%E6%A8%A3%0Atext%20%3D%20open(%22data.txt%22%2C%20encoding%3D%22utf-8%22).read()'), 'copy-btn-458')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># 不要這樣（依賴 locale，跨機器不可重現）
+text = open("data.txt").read()            # 這在某些平台會出錯或亂碼
+
+# 一律這樣
+text = open("data.txt", encoding="utf-8").read()</code></pre>
+      </div>
+    <table>
+<thead>
+<tr>
+<th>行為</th>
+<th>Java</th>
+<th>Python</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>不指定編碼</td>
+<td><code>new FileReader</code>（無 charset）用 <code>Charset.defaultCharset()</code></td>
+<td><code>open()</code> 用 <code>locale.getpreferredencoding()</code></td>
+</tr>
+<tr>
+<td>明確指定</td>
+<td><code>Files.newBufferedReader(p, UTF_8)</code></td>
+<td><code>open(p, encoding=&quot;utf-8&quot;)</code></td>
+</tr>
+<tr>
+<td>讀整份字串</td>
+<td><code>Files.readString(p, UTF_8)</code></td>
+<td><code>Path(p).read_text(encoding=&quot;utf-8&quot;)</code></td>
+</tr>
+</tbody></table>
+<blockquote><p>📌 <strong>版本註記</strong>：自 Java 18（JEP 400）起 <code>file.encoding</code> 預設改為 UTF-8，平台預設不再是 locale 相依的雷，所以「<code>new FileReader</code> 用平台預設」這個坑主要在 Java 18 之前的版本。但 <code>new FileReader</code> 無 charset 多載仍沿用 <code>Charset.defaultCharset()</code>，而 Java 11 起 <code>FileReader</code> 已新增可指定 <code>Charset</code> 的建構子——明確指定編碼在現代 Java 一樣是好習慣。</p>
+</blockquote><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：Python 核心團隊也認為這是設計缺陷。<a href="https://peps.python.org/pep-0686/" target="_blank" rel="noopener noreferrer">PEP 686</a> 規劃讓 UTF-8 成為未來的預設編碼，而 3.10+ 起你可以加 <code>-X warn_default_encoding</code>（或設環境變數 <code>PYTHONWARNDEFAULTENCODING=1</code>）讓直譯器在你忘記寫 <code>encoding=</code> 時發警告。在那之前，<strong>手寫 <code>encoding=&quot;utf-8&quot;</code> 不是可選項，是紀律</strong>。</p>
+</div><h3 id="文字-vs-二進位newline-處理">文字 vs 二進位、newline 處理</h3><p>模式字串控制文字/二進位與讀寫：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-459" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('with%20open(%22photo.jpg%22%2C%20%22rb%22)%20as%20f%3A%20%20%20%20%23%20%27b%27%20%3D%20binary%EF%BC%8C%E5%9B%9E%E5%82%B3%20bytes%EF%BC%8C%E6%B2%92%E6%9C%89%E7%B7%A8%E7%A2%BC%E6%A6%82%E5%BF%B5%0A%20%20%20%20header%20%3D%20f.read(8)%0A%0Awith%20open(%22out.csv%22%2C%20%22w%22%2C%20encoding%3D%22utf-8%22%2C%20newline%3D%22%22)%20as%20f%3A%0A%20%20%20%20...%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%AF%AB%20CSV%20%E6%99%82%20newline%3D%22%22%20%E4%BA%A4%E7%B5%A6%20csv%20%E6%A8%A1%E7%B5%84%E8%99%95%E7%90%86%E6%8F%9B%E8%A1%8C'), 'copy-btn-459')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">with open("photo.jpg", "rb") as f:    # 'b' = binary，回傳 bytes，沒有編碼概念
+    header = f.read(8)
+
+with open("out.csv", "w", encoding="utf-8", newline="") as f:
+    ...                                # 寫 CSV 時 newline="" 交給 csv 模組處理換行</code></pre>
+      </div>
+    <p>文字模式（預設）有兩個轉換：解碼（bytes ↔ str）和<strong>通用換行</strong>（universal newlines）。讀檔時 <code>\r\n</code>、<code>\r</code> 都會被翻譯成 <code>\n</code>；寫檔時 <code>\n</code> 會被翻回平台換行。這通常很貼心，但寫 CSV 時要 <code>newline=&quot;&quot;</code> 關掉它，否則 Windows 上會出現多餘的 <code>\r</code>（下一節詳述）。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：二進位模式（<code>&quot;rb&quot;</code>/<code>&quot;wb&quot;</code>）下傳 <code>encoding=</code> 會直接報錯——bytes 沒有編碼概念。文字模式回 <code>str</code>、二進位回 <code>bytes</code>，兩者不能混（這呼應 Java 的 <code>Reader</code>/<code>Writer</code> 對 <code>InputStream</code>/<code>OutputStream</code> 之分）。</p>
+</div><hr>
+<h2 id="json-csv-sqlite3序列化與內建資料庫">json / csv / sqlite3：序列化與內建資料庫</h2><h3 id="json標準庫就是你的-jackson">json：標準庫就是你的 Jackson</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-460" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Jackson%0AObjectMapper%20mapper%20%3D%20new%20ObjectMapper()%3B%0AString%20json%20%3D%20mapper.writeValueAsString(user)%3B%0AUser%20u%20%3D%20mapper.readValue(json%2C%20User.class)%3B'), 'copy-btn-460')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Jackson
+ObjectMapper mapper = new ObjectMapper();
+String json = mapper.writeValueAsString(user);
+User u = mapper.readValue(json, User.class);</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-461" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20json%0A%0Adata%20%3D%20%7B%22name%22%3A%20%22Ada%22%2C%20%22age%22%3A%2036%2C%20%22tags%22%3A%20%5B%22math%22%2C%20%22cs%22%5D%7D%0Atext%20%3D%20json.dumps(data%2C%20ensure_ascii%3DFalse%2C%20indent%3D2)%20%20%20%23%20%E5%BA%8F%E5%88%97%E5%8C%96%E6%88%90%E5%AD%97%E4%B8%B2%0Aparsed%20%3D%20json.loads(text)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E5%9B%9E%20dict'), 'copy-btn-461')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import json
+
+data = {"name": "Ada", "age": 36, "tags": ["math", "cs"]}
+text = json.dumps(data, ensure_ascii=False, indent=2)   # 序列化成字串
+parsed = json.loads(text)                               # 反序列化回 dict</code></pre>
+      </div>
+    <p>對照 Jackson 的關鍵差異：</p>
+<ul>
+<li><code>json.dumps</code> ↔ <code>writeValueAsString</code>，<code>json.loads</code> ↔ <code>readValue</code>。檔案版本是 <code>json.dump(obj, file)</code> / <code>json.load(file)</code>（少一個 <code>s</code>，<code>s</code> 代表 string）。</li>
+<li><strong>沒有「綁定到類別」這回事</strong>。<code>json.loads</code> 回傳的是 <code>dict</code>/<code>list</code>/<code>str</code>/<code>int</code>/<code>float</code>/<code>bool</code>/<code>None</code> 的組合，型別標注是 <code>Any</code>（呼應第 9 章——靜態檢查器對它一無所知，存取 <code>parsed[&quot;age&quot;]</code> 不會有型別保護）。要綁到具型別的物件，請接 <code>dataclass</code> 或 pydantic（第 9 章）。</li>
+<li><code>ensure_ascii=False</code> 很重要：預設 <code>True</code> 會把中文跳脫成 <code>\uXXXX</code>，加 <code>False</code> 才會輸出可讀的 UTF-8。</li>
+</ul>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-462" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20json%0A%3E%3E%3E%20json.dumps(%7B%22city%22%3A%20%22%E5%8F%B0%E5%8C%97%22%7D)%0A%27%7B%22city%22%3A%20%22%5C%5Cu53f0%5C%5Cu5317%22%7D%27%0A%3E%3E%3E%20json.dumps(%7B%22city%22%3A%20%22%E5%8F%B0%E5%8C%97%22%7D%2C%20ensure_ascii%3DFalse)%0A%27%7B%22city%22%3A%20%22%E5%8F%B0%E5%8C%97%22%7D%27'), 'copy-btn-462')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import json
+&gt;&gt;&gt; json.dumps({"city": "台北"})
+'{"city": "\\u53f0\\u5317"}'
+&gt;&gt;&gt; json.dumps({"city": "台北"}, ensure_ascii=False)
+'{"city": "台北"}'</code></pre>
+      </div>
+    <p>複雜物件（如 <code>datetime</code>）不能直接序列化，要給 <code>default=</code> 回呼，或先轉成可序列化型別：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-463" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20datetime%20import%20datetime%0Ajson.dumps(%7B%22now%22%3A%20datetime(2026%2C%206%2C%2014%2C%2012%2C%200)%7D%2C%20default%3Dstr)%0A%23%20%27%7B%22now%22%3A%20%222026-06-14%2012%3A00%3A00%22%7D%27'), 'copy-btn-463')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from datetime import datetime
+json.dumps({"now": datetime(2026, 6, 14, 12, 0)}, default=str)
+# '{"now": "2026-06-14 12:00:00"}'</code></pre>
+      </div>
+    <h3 id="csv別自己-split-逗號">csv：別自己 split 逗號</h3><p>CSV 看似「用逗號切就好」，但欄位內含逗號、含換行、含引號的跳脫規則會讓手寫 parser 死得很難看。用標準庫的 <code>csv</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-464" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20csv%0Afrom%20pathlib%20import%20Path%0A%0A%23%20%E5%AF%AB%EF%BC%9Anewline%3D%22%22%20%E6%98%AF%E5%AE%98%E6%96%B9%E6%96%87%E4%BB%B6%E8%A6%81%E6%B1%82%EF%BC%8C%E9%81%BF%E5%85%8D%20Windows%20%E4%B8%8A%E5%A4%9A%E9%A4%98%E7%9A%84%20%5Cr%0Awith%20open(%22people.csv%22%2C%20%22w%22%2C%20encoding%3D%22utf-8%22%2C%20newline%3D%22%22)%20as%20f%3A%0A%20%20%20%20writer%20%3D%20csv.writer(f)%0A%20%20%20%20writer.writerow(%5B%22name%22%2C%20%22city%22%5D)%0A%20%20%20%20writer.writerow(%5B%22Ada%22%2C%20%22%E5%8F%B0%E5%8C%97%2C%20%E4%BF%A1%E7%BE%A9%E5%8D%80%22%5D)%20%20%20%23%20%E5%90%AB%E9%80%97%E8%99%9F%EF%BC%8Ccsv%20%E6%9C%83%E8%87%AA%E5%8B%95%E5%8A%A0%E5%BC%95%E8%99%9F%0A%0A%23%20%E8%AE%80%E6%88%90%20dict%EF%BC%88%E7%AC%AC%E4%B8%80%E5%88%97%E7%95%B6%E8%A1%A8%E9%A0%AD%EF%BC%89%E2%80%94%E2%80%94%E6%AF%94%20index%20%E5%8F%96%E5%80%BC%E5%A5%BD%E8%AE%80%E5%A4%AA%E5%A4%9A%0Awith%20open(%22people.csv%22%2C%20encoding%3D%22utf-8%22%2C%20newline%3D%22%22)%20as%20f%3A%0A%20%20%20%20for%20row%20in%20csv.DictReader(f)%3A%0A%20%20%20%20%20%20%20%20print(row%5B%22name%22%5D%2C%20%22-%3E%22%2C%20row%5B%22city%22%5D)'), 'copy-btn-464')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import csv
+from pathlib import Path
+
+# 寫：newline="" 是官方文件要求，避免 Windows 上多餘的 \r
+with open("people.csv", "w", encoding="utf-8", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(["name", "city"])
+    writer.writerow(["Ada", "台北, 信義區"])   # 含逗號，csv 會自動加引號
+
+# 讀成 dict（第一列當表頭）——比 index 取值好讀太多
+with open("people.csv", encoding="utf-8", newline="") as f:
+    for row in csv.DictReader(f):
+        print(row["name"], "-&gt;", row["city"])</code></pre>
+      </div>
+    <p><code>csv.reader</code> 回傳每列為 <code>list[str]</code>；<code>csv.DictReader</code> 用表頭當 key 回傳 <code>dict</code>，等同 Java 你會自己包的「header-to-value map」，但內建。注意 <strong>CSV 的值永遠是字串</strong>，數字要自己 <code>int()</code>/<code>float()</code>。</p>
+<h3 id="sqlite3口袋裡的關聯式資料庫">sqlite3：口袋裡的關聯式資料庫</h3><p>這是標準庫最被低估的寶藏：一個零設定、單檔、完整 SQL 的關聯式資料庫，直接內建。對 Java 而言這像「JDBC + H2 嵌入式資料庫」整包送你，連 driver 都不用下載。Python 的 DB API 是 <a href="https://peps.python.org/pep-0249/" target="_blank" rel="noopener noreferrer">PEP 249</a>（DB-API 2.0），所有資料庫驅動（PostgreSQL 的 psycopg、MySQL 的驅動等）都遵循同一套介面，學會 sqlite3 等於學會通用模式。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-465" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20sqlite3%0A%0A%23%20%E9%80%A3%E7%B7%9A%EF%BC%88%22%3Amemory%3A%22%20%E6%98%AF%E7%B4%94%E8%A8%98%E6%86%B6%E9%AB%94%20DB%EF%BC%8C%E6%B8%AC%E8%A9%A6%E6%9C%80%E6%84%9B%E7%94%A8%EF%BC%9B%E6%88%96%E7%B5%A6%E6%AA%94%E5%90%8D%E6%8C%81%E4%B9%85%E5%8C%96%EF%BC%89%0Aconn%20%3D%20sqlite3.connect(%22app.db%22)%0Aconn.execute(%22%22%22%0A%20%20%20%20CREATE%20TABLE%20IF%20NOT%20EXISTS%20users%20(%0A%20%20%20%20%20%20%20%20id%20%20%20INTEGER%20PRIMARY%20KEY%2C%0A%20%20%20%20%20%20%20%20name%20TEXT%20NOT%20NULL%2C%0A%20%20%20%20%20%20%20%20age%20%20INTEGER%0A%20%20%20%20)%0A%22%22%22)%0A%0A%23%20%E5%8F%83%E6%95%B8%E5%8C%96%E6%9F%A5%E8%A9%A2%E2%80%94%E2%80%94%E5%8B%99%E5%BF%85%E7%94%A8%20%3F%20%E4%BD%94%E4%BD%8D%E7%AC%A6%EF%BC%8C%E7%B5%95%E4%B8%8D%E5%AD%97%E4%B8%B2%E6%8B%BC%E6%8E%A5%0Aname%2C%20age%20%3D%20%22Ada%22%2C%2036%0Aconn.execute(%22INSERT%20INTO%20users%20(name%2C%20age)%20VALUES%20(%3F%2C%20%3F)%22%2C%20(name%2C%20age))%0A%0A%23%20%E6%9F%A5%E8%A9%A2%EF%BC%9Acursor%20%E6%98%AF%E8%BF%AD%E4%BB%A3%E5%99%A8%0Afor%20row%20in%20conn.execute(%22SELECT%20name%2C%20age%20FROM%20users%20WHERE%20age%20%3E%20%3F%22%2C%20(30%2C))%3A%0A%20%20%20%20print(row)%20%20%20%20%20%20%20%20%20%20%20%20%23%20(%27Ada%27%2C%2036)%20%E2%80%94%E2%80%94%20%E9%A0%90%E8%A8%AD%E6%AF%8F%E5%88%97%E6%98%AF%20tuple%0Aconn.commit()%0Aconn.close()'), 'copy-btn-465')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import sqlite3
+
+# 連線（":memory:" 是純記憶體 DB，測試最愛用；或給檔名持久化）
+conn = sqlite3.connect("app.db")
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id   INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        age  INTEGER
+    )
+""")
+
+# 參數化查詢——務必用 ? 佔位符，絕不字串拼接
+name, age = "Ada", 36
+conn.execute("INSERT INTO users (name, age) VALUES (?, ?)", (name, age))
+
+# 查詢：cursor 是迭代器
+for row in conn.execute("SELECT name, age FROM users WHERE age &gt; ?", (30,)):
+    print(row)            # ('Ada', 36) —— 預設每列是 tuple
+conn.commit()
+conn.close()</code></pre>
+      </div>
+    <p><strong>參數化查詢防 SQL injection</strong>——這跟 Java 的 <code>PreparedStatement</code> 是同一條鐵律，而且 Python 更容易因為 f-string 太方便而犯錯：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-466" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E9%80%99%E6%9C%83%E5%87%BA%E9%8C%AF%20%E2%80%94%E2%80%94%20%E7%81%BD%E9%9B%A3%E6%80%A7%E7%9A%84%20SQL%20injection%20%E6%BC%8F%E6%B4%9E%EF%BC%8C%E6%B0%B8%E9%81%A0%E4%B8%8D%E8%A6%81%E9%80%99%E6%A8%A3%0Aconn.execute(f%22SELECT%20*%20FROM%20users%20WHERE%20name%20%3D%20%27%7Bname%7D%27%22)%20%20%20%23%20%E7%B5%95%E5%B0%8D%E7%A6%81%E6%AD%A2%0A%0A%23%20%E6%AD%A3%E7%A2%BA%EF%BC%9A%E5%80%BC%E4%BA%A4%E7%B5%A6%20driver%20%E7%94%A8%20%3F%20%E4%BD%94%E4%BD%8D%0Aconn.execute(%22SELECT%20*%20FROM%20users%20WHERE%20name%20%3D%20%3F%22%2C%20(name%2C))'), 'copy-btn-466')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># 這會出錯 —— 災難性的 SQL injection 漏洞，永遠不要這樣
+conn.execute(f"SELECT * FROM users WHERE name = '{name}'")   # 絕對禁止
+
+# 正確：值交給 driver 用 ? 佔位
+conn.execute("SELECT * FROM users WHERE name = ?", (name,))</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：佔位符用 <code>?</code>（sqlite3 的 qmark 風格），用法跟 Java JDBC <code>PreparedStatement</code> 的 <code>?</code> 幾乎一樣——位置對應、值另外用元組傳入，driver 負責跳脫。注意參數一定要包成<strong>元組</strong>，單一參數也要寫成 <code>(name,)</code>（逗號不能省，否則不是 tuple）。</p>
+</div><p>連線物件可以當 context manager，但語意是<strong>交易控制</strong>（transaction），不是關閉連線——這點和 Java 不同，容易誤解：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-467" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20sqlite3%0A%0Aconn%20%3D%20sqlite3.connect(%22%3Amemory%3A%22)%0Aconn.execute(%22CREATE%20TABLE%20t%20(x%20INTEGER)%22)%0A%0Awith%20conn%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%80%B2%E5%85%A5%E5%8D%80%E5%A1%8A%E4%B8%8D%E5%81%9A%E4%BA%8B%EF%BC%8C%E9%9B%A2%E9%96%8B%E6%99%82%20commit%EF%BC%9B%E6%8B%8B%E4%BE%8B%E5%A4%96%E5%89%87%20rollback%0A%20%20%20%20conn.execute(%22INSERT%20INTO%20t%20VALUES%20(1)%22)%0A%20%20%20%20conn.execute(%22INSERT%20INTO%20t%20VALUES%20(2)%22)%0A%23%20%E5%8D%80%E5%A1%8A%E6%AD%A3%E5%B8%B8%E7%B5%90%E6%9D%9F%20%E2%86%92%20%E8%87%AA%E5%8B%95%20commit'), 'copy-btn-467')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import sqlite3
+
+conn = sqlite3.connect(":memory:")
+conn.execute("CREATE TABLE t (x INTEGER)")
+
+with conn:                              # 進入區塊不做事，離開時 commit；拋例外則 rollback
+    conn.execute("INSERT INTO t VALUES (1)")
+    conn.execute("INSERT INTO t VALUES (2)")
+# 區塊正常結束 → 自動 commit</code></pre>
+      </div>
+    <p>讓查詢結果像 dict 一樣用欄名取值，設 <code>row_factory</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-468" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('conn.row_factory%20%3D%20sqlite3.Row%0Arow%20%3D%20conn.execute(%22SELECT%201%20AS%20x%2C%202%20AS%20y%22).fetchone()%0Aprint(row%5B%22x%22%5D%2C%20row%5B%22y%22%5D)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%94%A8%E6%AC%84%E5%90%8D%E5%8F%96%E5%80%BC%EF%BC%8C1%202'), 'copy-btn-468')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">conn.row_factory = sqlite3.Row
+row = conn.execute("SELECT 1 AS x, 2 AS y").fetchone()
+print(row["x"], row["y"])              # 用欄名取值，1 2</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：寫單元測試需要資料庫時，<code>sqlite3.connect(&quot;:memory:&quot;)</code> 是神器——零 I/O、測完即丟、不留檔案，比起在 Java 拉一個 Testcontainers 或嵌入式 H2 輕量太多。</p>
+</div><hr>
+<h2 id="datetime-與時區naive-vs-aware-的世界">datetime 與時區：naive vs aware 的世界</h2><p><code>java.time</code> 已經把日期時間的正確心智模型灌給你了：<code>Instant</code>、<code>LocalDateTime</code>、<code>ZonedDateTime</code> 的分野你很熟。Python 的 <code>datetime</code> 模組概念相近，但詞彙不同，而且有一個你<strong>必須</strong>內化的二分法：naive 與 aware。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-469" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20datetime%20import%20datetime%2C%20date%2C%20timedelta%2C%20timezone%0Afrom%20zoneinfo%20import%20ZoneInfo%20%20%20%20%20%20%20%20%20%20%20%20%23%203.9%2B%EF%BC%8C%E7%9B%B4%E6%8E%A5%E8%AE%80%E4%BD%9C%E6%A5%AD%E7%B3%BB%E7%B5%B1%E7%9A%84%20IANA%20%E6%99%82%E5%8D%80%E8%B3%87%E6%96%99%E5%BA%AB%0A%0Ad%20%3D%20date(2026%2C%206%2C%2014)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8F%AA%E6%9C%89%E6%97%A5%E6%9C%9F%EF%BC%8C%E5%B0%8D%E6%87%89%20LocalDate%0Adt%20%3D%20datetime(2026%2C%206%2C%2014%2C%2012%2C%2030)%20%20%20%20%20%20%20%23%20naive%20datetime%EF%BC%8C%E7%84%A1%E6%99%82%E5%8D%80%E8%B3%87%E8%A8%8A%0Adelta%20%3D%20timedelta(days%3D7%2C%20hours%3D3)%20%20%20%20%20%20%20%23%20%E5%B0%8D%E6%87%89%20Duration%20%2F%20Period%0Aprint(dt%20%2B%20delta)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%202026-06-21%2015%3A30%3A00'), 'copy-btn-469')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from datetime import datetime, date, timedelta, timezone
+from zoneinfo import ZoneInfo            # 3.9+，直接讀作業系統的 IANA 時區資料庫
+
+d = date(2026, 6, 14)                    # 只有日期，對應 LocalDate
+dt = datetime(2026, 6, 14, 12, 30)       # naive datetime，無時區資訊
+delta = timedelta(days=7, hours=3)       # 對應 Duration / Period
+print(dt + delta)                        # 2026-06-21 15:30:00</code></pre>
+      </div>
+    <table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>性質</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>LocalDate</code></td>
+<td><code>date</code></td>
+<td>純日期</td>
+</tr>
+<tr>
+<td><code>LocalDateTime</code></td>
+<td>naive <code>datetime</code>（無 tzinfo）</td>
+<td>牆上時鐘，<strong>不知道</strong>自己在哪個時區</td>
+</tr>
+<tr>
+<td><code>ZonedDateTime</code></td>
+<td>aware <code>datetime</code>（有 tzinfo）</td>
+<td>綁定時區，是地球上一個明確時刻</td>
+</tr>
+<tr>
+<td><code>Duration</code> / <code>Period</code></td>
+<td><code>timedelta</code></td>
+<td>時間長度</td>
+</tr>
+<tr>
+<td><code>ZoneId.of(&quot;Asia/Taipei&quot;)</code></td>
+<td><code>ZoneInfo(&quot;Asia/Taipei&quot;)</code></td>
+<td>IANA 時區</td>
+</tr>
+</tbody></table>
+<h3 id="naive-是陷阱aware-才安全">naive 是陷阱，aware 才安全</h3><p><strong>naive datetime</strong>（沒有 <code>tzinfo</code>）就像 Java 的 <code>LocalDateTime</code>：它是「牆上的 12:30」，但 12:30 在台北和倫敦是不同的瞬間。拿 naive datetime 做跨時區運算、存進資料庫、或比較先後，就是 bug 的溫床。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-470" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20datetime%20import%20datetime%2C%20timezone%0Afrom%20zoneinfo%20import%20ZoneInfo%0A%0A%23%20%E4%B8%8D%E8%A6%81%EF%BC%9Anaive%20now%EF%BC%8C%E4%B8%8D%E7%9F%A5%E9%81%93%E5%9C%A8%E5%93%AA%E5%80%8B%E6%99%82%E5%8D%80%0Anaive%20%3D%20datetime.now()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8D%B1%E9%9A%AA%EF%BC%8C%E9%81%BF%E5%85%8D%0A%0A%23%20%E8%A6%81%EF%BC%9Aaware%20now%EF%BC%8C%E7%B6%81%E5%AE%9A%E6%99%82%E5%8D%80%0Ataipei%20%3D%20datetime.now(ZoneInfo(%22Asia%2FTaipei%22))%0Autc_now%20%3D%20datetime.now(timezone.utc)%20%20%20%20%20%23%20%E5%AD%98%E8%B3%87%E6%96%99%E5%BA%AB%2F%E5%82%B3%E8%BC%B8%E4%B8%80%E5%BE%8B%E7%94%A8%20UTC%0A%0A%23%20aware%20datetime%20%E5%8F%AF%E4%BB%A5%E5%AE%89%E5%85%A8%E5%9C%B0%E8%B7%A8%E6%99%82%E5%8D%80%E8%BD%89%E6%8F%9B%0Aprint(taipei.astimezone(ZoneInfo(%22Europe%2FLondon%22)))%20%20%20%23%20%E5%90%8C%E4%B8%80%E7%9E%AC%E9%96%93%EF%BC%8C%E6%8F%9B%E5%80%8B%E6%99%82%E9%90%98%E7%9C%8B'), 'copy-btn-470')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+# 不要：naive now，不知道在哪個時區
+naive = datetime.now()                   # 危險，避免
+
+# 要：aware now，綁定時區
+taipei = datetime.now(ZoneInfo("Asia/Taipei"))
+utc_now = datetime.now(timezone.utc)     # 存資料庫/傳輸一律用 UTC
+
+# aware datetime 可以安全地跨時區轉換
+print(taipei.astimezone(ZoneInfo("Europe/London")))   # 同一瞬間，換個時鐘看</code></pre>
+      </div>
+    <p>ISO 8601 解析與輸出（資料交換的通用格式）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-471" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20datetime%20import%20datetime%0A%3E%3E%3E%20from%20zoneinfo%20import%20ZoneInfo%0A%3E%3E%3E%20datetime.fromisoformat(%222026-06-14T12%3A30%3A00%2B08%3A00%22)%20%20%20%23%20%2B08%3A00%20%E5%81%8F%E7%A7%BB%E6%A0%BC%E5%BC%8F%E5%90%84%E7%89%88%E6%9C%AC%E7%9A%86%E6%94%AF%E6%8F%B4%0Adatetime.datetime(2026%2C%206%2C%2014%2C%2012%2C%2030%2C%20tzinfo%3Ddatetime.timezone(datetime.timedelta(seconds%3D28800)))%0A%3E%3E%3E%20datetime.fromisoformat(%222026-06-14T12%3A30%3A00Z%22)%20%20%20%20%20%20%20%20%23%20Z%20%E5%BE%8C%E7%B6%B4%EF%BC%88%E8%88%87%E6%9B%B4%E5%AF%AC%E9%AC%86%E7%9A%84%20ISO%20%E8%AE%8A%E9%AB%94%EF%BC%89%E9%9C%80%203.11%2B%0Adatetime.datetime(2026%2C%206%2C%2014%2C%2012%2C%2030%2C%20tzinfo%3Ddatetime.timezone.utc)%0A%3E%3E%3E%20%23%20isoformat%20%E6%9C%83%E6%8A%8A%20%2B08%3A00%20%E5%81%8F%E7%A7%BB%E4%B8%80%E4%BD%B5%E8%BC%B8%E5%87%BA%EF%BC%88%E7%94%A8%E5%9B%BA%E5%AE%9A%E5%BB%BA%E6%A7%8B%E7%9A%84%20aware%20datetime%20%E7%A4%BA%E7%AF%84%EF%BC%8C%E5%8F%AF%E9%87%8D%E7%8F%BE%EF%BC%89%0A%3E%3E%3E%20datetime(2026%2C%206%2C%2014%2C%2012%2C%2030%2C%200%2C%20123456%2C%20tzinfo%3DZoneInfo(%22Asia%2FTaipei%22)).isoformat()%0A%272026-06-14T12%3A30%3A00.123456%2B08%3A00%27'), 'copy-btn-471')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from datetime import datetime
+&gt;&gt;&gt; from zoneinfo import ZoneInfo
+&gt;&gt;&gt; datetime.fromisoformat("2026-06-14T12:30:00+08:00")   # +08:00 偏移格式各版本皆支援
+datetime.datetime(2026, 6, 14, 12, 30, tzinfo=datetime.timezone(datetime.timedelta(seconds=28800)))
+&gt;&gt;&gt; datetime.fromisoformat("2026-06-14T12:30:00Z")        # Z 後綴（與更寬鬆的 ISO 變體）需 3.11+
+datetime.datetime(2026, 6, 14, 12, 30, tzinfo=datetime.timezone.utc)
+&gt;&gt;&gt; # isoformat 會把 +08:00 偏移一併輸出（用固定建構的 aware datetime 示範，可重現）
+&gt;&gt;&gt; datetime(2026, 6, 14, 12, 30, 0, 123456, tzinfo=ZoneInfo("Asia/Taipei")).isoformat()
+'2026-06-14T12:30:00.123456+08:00'</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：黃金法則跟 Java 一樣——<strong>內部一律用 UTC 的 aware datetime 儲存與運算，只在顯示給人看的最後一刻才 <code>astimezone</code> 轉成當地時區</strong>。<code>datetime.now(timezone.utc)</code> 取代 naive 的 <code>datetime.now()</code>，把 naive datetime 當成「尚未補全時區資訊」的半成品。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：naive 和 aware datetime <strong>不能互相比較或相減</strong>，會拋 <code>TypeError: can&#39;t subtract offset-naive and offset-aware datetimes</code>。這其實是好事——它逼你在邊界把時區補齊，而不是讓兩個語意不同的時間默默運算出錯誤答案。</p>
+</div><hr>
+<h2 id="re正規表示式">re：正規表示式</h2><p>Java 的 <code>Pattern</code>/<code>Matcher</code> 你很熟，Python 的 <code>re</code> 模組概念一一對應，但 API 更扁平，而且有個語法層的好朋友：raw string。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-472" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%0APattern%20p%20%3D%20Pattern.compile(%22(%5C%5Cd%7B4%7D)-(%5C%5Cd%7B2%7D)-(%5C%5Cd%7B2%7D)%22)%3B%0AMatcher%20m%20%3D%20p.matcher(%22date%3A%202026-06-14%22)%3B%0Aif%20(m.find())%20%7B%0A%20%20%20%20String%20year%20%3D%20m.group(1)%3B%0A%7D'), 'copy-btn-472')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java
+Pattern p = Pattern.compile("(\\d{4})-(\\d{2})-(\\d{2})");
+Matcher m = p.matcher("date: 2026-06-14");
+if (m.find()) {
+    String year = m.group(1);
+}</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-473" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20re%0A%0Apat%20%3D%20re.compile(r%22(%5Cd%7B4%7D)-(%5Cd%7B2%7D)-(%5Cd%7B2%7D)%22)%20%20%20%23%20r%22%22%20raw%20string%EF%BC%8C%E5%8F%8D%E6%96%9C%E7%B7%9A%E4%B8%8D%E7%94%A8%E8%B7%B3%E8%84%AB%0Am%20%3D%20pat.search(%22date%3A%202026-06-14%22)%0Aif%20m%3A%0A%20%20%20%20year%20%3D%20m.group(1)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%272026%27%0A%20%20%20%20print(m.groups())%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20(%272026%27%2C%20%2706%27%2C%20%2714%27)'), 'copy-btn-473')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import re
+
+pat = re.compile(r"(\d{4})-(\d{2})-(\d{2})")   # r"" raw string，反斜線不用跳脫
+m = pat.search("date: 2026-06-14")
+if m:
+    year = m.group(1)              # '2026'
+    print(m.groups())              # ('2026', '06', '14')</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：正規表示式<strong>一律用 raw string</strong> <code>r&quot;...&quot;</code>。否則 <code>\d</code> 在普通字串裡 Python 會嘗試解讀跳脫序列（雖然 <code>\d</code> 剛好沒事，但 <code>\b</code> 就會變成退格字元），你會被迫寫成 Java 那種 <code>&quot;\\d&quot;</code> 雙反斜線地獄。<code>r&quot;\d&quot;</code> 直接就是你要的兩個字元。</p>
+</div><h3 id="match-search-findall-finditer">match / search / findall / finditer</h3><p>這幾個方法的差別是 Java 工程師常搞混的：</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>行為</th>
+<th>Java 對照</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>re.match(p, s)</code></td>
+<td>只從<strong>字串開頭</strong>比對</td>
+<td><code>matcher.lookingAt()</code></td>
+</tr>
+<tr>
+<td><code>re.search(p, s)</code></td>
+<td>在字串中找<strong>第一個</strong>符合處</td>
+<td><code>matcher.find()</code>（第一次）</td>
+</tr>
+<tr>
+<td><code>re.fullmatch(p, s)</code></td>
+<td>整個字串完全符合</td>
+<td><code>matcher.matches()</code></td>
+</tr>
+<tr>
+<td><code>re.findall(p, s)</code></td>
+<td>回所有符合的<strong>字串 list</strong></td>
+<td>反覆 <code>find()</code> 收集</td>
+</tr>
+<tr>
+<td><code>re.finditer(p, s)</code></td>
+<td>回所有 match 物件的<strong>迭代器</strong></td>
+<td>反覆 <code>find()</code>（惰性）</td>
+</tr>
+</tbody></table>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-474" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('text%20%3D%20%22errors%3A%2012%2C%20warnings%3A%205%2C%20errors%3A%203%22%0A%0Are.findall(r%22%5Cd%2B%22%2C%20text)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%5B%2712%27%2C%20%275%27%2C%20%273%27%5D%20%20%E2%80%94%E2%80%94%E5%8F%AA%E8%A6%81%E5%80%BC%0Afor%20m%20in%20re.finditer(r%22(%5Cw%2B)%3A%20(%5Cd%2B)%22%2C%20text)%3A%0A%20%20%20%20print(m.group(1)%2C%20m.group(2))%20%20%20%20%20%20%23%20%E9%80%A3%E5%90%8C%E4%BD%8D%E7%BD%AE%2F%E7%BE%A4%E7%B5%84%E9%83%BD%E8%A6%81%E6%99%82%E7%94%A8%20finditer'), 'copy-btn-474')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">text = "errors: 12, warnings: 5, errors: 3"
+
+re.findall(r"\d+", text)               # ['12', '5', '3']  ——只要值
+for m in re.finditer(r"(\w+): (\d+)", text):
+    print(m.group(1), m.group(2))      # 連同位置/群組都要時用 finditer</code></pre>
+      </div>
+    <p>命名群組讓正則更可維護（對照 Java 的 <code>(?&lt;year&gt;...)</code> 完全一樣）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-475" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('m%20%3D%20re.search(r%22(%3FP%3Cyear%3E%5Cd%7B4%7D)-(%3FP%3Cmonth%3E%5Cd%7B2%7D)%22%2C%20%222026-06%22)%0Am.group(%22year%22)%20%20%20%20%20%20%20%20%23%20%272026%27%0Am.groupdict()%20%20%20%20%20%20%20%20%20%20%23%20%7B%27year%27%3A%20%272026%27%2C%20%27month%27%3A%20%2706%27%7D'), 'copy-btn-475')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">m = re.search(r"(?P&lt;year&gt;\d{4})-(?P&lt;month&gt;\d{2})", "2026-06")
+m.group("year")        # '2026'
+m.groupdict()          # {'year': '2026', 'month': '06'}</code></pre>
+      </div>
+    <p><code>re.sub</code> 做取代，可吃字串或回呼函式：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-476" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('re.sub(r%22%5Cd%2B%22%2C%20%22%23%22%2C%20%22a1b22c333%22)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%27a%23b%23c%23%27%0Are.sub(r%22%5Cd%2B%22%2C%20lambda%20m%3A%20str(int(m.group())%20*%202)%2C%0A%20%20%20%20%20%20%20%22a1b22c333%22)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%27a2b44c666%27%EF%BC%8C%E6%AF%8F%E5%80%8B%E6%95%B8%E5%AD%97%20%C3%972'), 'copy-btn-476')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">re.sub(r"\d+", "#", "a1b22c333")                       # 'a#b#c#'
+re.sub(r"\d+", lambda m: str(int(m.group()) * 2),
+       "a1b22c333")                                    # 'a2b44c666'，每個數字 ×2</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：模組層的 <code>re.search(pattern, s)</code> 會<strong>自動快取</strong>已編譯的 pattern，偶爾用幾次不必手動 <code>re.compile</code>。但若同一個 pattern 在迴圈裡跑幾萬次，<code>pat = re.compile(...)</code> 一次、之後重用 <code>pat.search(...)</code>，意圖更清楚也省去快取查找——這跟你在 Java 把 <code>Pattern.compile</code> 提到迴圈外是同一個直覺。</p>
+</div><hr>
+<h2 id="subprocess取代-shell-script-的正路">subprocess：取代 shell script 的正路</h2><p>要呼叫外部程式時，Java 你會用 <code>ProcessBuilder</code>。Python 的 <code>subprocess.run</code> 更精簡，但有幾個<strong>安全與正確性</strong>的預設你必須記住。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-477" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%20ProcessBuilder%0AProcess%20p%20%3D%20new%20ProcessBuilder(%22git%22%2C%20%22rev-parse%22%2C%20%22HEAD%22)%0A%20%20%20%20%20%20%20%20.redirectErrorStream(true).start()%3B%0AString%20out%20%3D%20new%20String(p.getInputStream().readAllBytes())%3B%0Ap.waitFor()%3B'), 'copy-btn-477')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java ProcessBuilder
+Process p = new ProcessBuilder("git", "rev-parse", "HEAD")
+        .redirectErrorStream(true).start();
+String out = new String(p.getInputStream().readAllBytes());
+p.waitFor();</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-478" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20subprocess%0A%0Aresult%20%3D%20subprocess.run(%0A%20%20%20%20%5B%22git%22%2C%20%22rev-parse%22%2C%20%22HEAD%22%5D%2C%20%20%20%23%20%E5%BC%95%E6%95%B8%E7%94%A8%20list%EF%BC%8C%E4%B8%8D%E6%98%AF%E4%B8%80%E6%95%B4%E4%B8%B2%E5%AD%97%E4%B8%B2%0A%20%20%20%20capture_output%3DTrue%2C%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%8A%93%20stdout%2Fstderr%0A%20%20%20%20text%3DTrue%2C%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%A7%A3%E7%A2%BC%E6%88%90%20str%EF%BC%88%E5%90%A6%E5%89%87%E6%98%AF%20bytes%EF%BC%89%0A%20%20%20%20check%3DTrue%2C%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%9D%9E%E9%9B%B6%E9%80%80%E5%87%BA%E7%A2%BC%E5%B0%B1%E6%8B%8B%20CalledProcessError%0A)%0Aprint(result.stdout.strip())%20%20%20%20%20%20%20%20%20%23%20%E5%91%BD%E4%BB%A4%E7%9A%84%E6%A8%99%E6%BA%96%E8%BC%B8%E5%87%BA'), 'copy-btn-478')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import subprocess
+
+result = subprocess.run(
+    ["git", "rev-parse", "HEAD"],   # 引數用 list，不是一整串字串
+    capture_output=True,             # 抓 stdout/stderr
+    text=True,                        # 解碼成 str（否則是 bytes）
+    check=True,                       # 非零退出碼就拋 CalledProcessError
+)
+print(result.stdout.strip())         # 命令的標準輸出</code></pre>
+      </div>
+    <p>四個關鍵參數，缺一個就少一道防護：</p>
+<ul>
+<li><strong>引數傳 list（<code>[&quot;git&quot;, &quot;rev-parse&quot;, &quot;HEAD&quot;]</code>）</strong>，每個引數一個元素。這是安全的核心。</li>
+<li><code>capture_output=True</code>：把 stdout/stderr 收進 <code>result.stdout</code>/<code>result.stderr</code>。</li>
+<li><code>text=True</code>：以文字模式解碼（記得這也是編碼，可加 <code>encoding=&quot;utf-8&quot;</code>）。不加就是 <code>bytes</code>。</li>
+<li><code>check=True</code>：行為等同 shell 的 <code>set -e</code>——子程式失敗（非零退出碼）就拋例外，而不是默默繼續。這跟你檢查 <code>p.exitValue()</code> 的紀律一樣，但自動化了。</li>
+</ul>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<strong>不要用 <code>shell=True</code></strong>。它會把你的命令丟給 <code>/bin/sh</code> 解析，等於開了一個 command injection 大門：<code>subprocess.run(f&quot;cat {user_input}&quot;, shell=True)</code> 裡只要 <code>user_input</code> 是 <code>&quot;; rm -rf ~&quot;</code> 就完蛋。傳 list of args（不開 shell）時，引數會原封不動交給程式、不經 shell 解析，使用者輸入裡的 <code>;</code>、<code>|</code>、<code>$()</code> 都只是普通字元，注入無從發生。需要管線（pipe）時，用 Python 串接兩個 <code>subprocess</code>，不要靠 <code>shell=True</code>。</p>
+</div><div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>ProcessBuilder(&quot;a&quot;, &quot;b&quot;)</code>（vararg 形式，不經 shell）≈ <code>subprocess.run([&quot;a&quot;, &quot;b&quot;])</code>。Java 也沒有「把整串字串丟給 shell」的預設——Python 的 <code>shell=True</code> 就是那個你在 Java 從沒有過、也不該想要的危險捷徑。</p>
+</div><hr>
+<h2 id="argparse-click寫-cli-工具">argparse / click：寫 CLI 工具</h2><p>標準庫已經能讓你寫出有 <code>--help</code>、子命令、型別轉換的專業 CLI，這正是「用 Python 取代 shell script」的最後一塊拼圖。</p>
+<h3 id="argparse標準庫宣告式">argparse：標準庫，宣告式</h3><p><code>argparse</code> 內建，零依賴，宣告式定義參數，自動產生 <code>--help</code> 和錯誤訊息：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-479" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20greet.py%0Aimport%20argparse%0A%0Adef%20main()%20-%3E%20None%3A%0A%20%20%20%20parser%20%3D%20argparse.ArgumentParser(description%3D%22%E8%B7%9F%E6%9F%90%E4%BA%BA%E6%89%93%E6%8B%9B%E5%91%BC%22)%0A%20%20%20%20parser.add_argument(%22name%22%2C%20help%3D%22%E5%B0%8D%E8%B1%A1%E5%90%8D%E5%AD%97%22)%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%BD%8D%E7%BD%AE%E5%BC%95%E6%95%B8%0A%20%20%20%20parser.add_argument(%22-c%22%2C%20%22--count%22%2C%20type%3Dint%2C%20default%3D1%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20help%3D%22%E9%87%8D%E8%A4%87%E6%AC%A1%E6%95%B8%22)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%81%B8%E9%A0%85%EF%BC%8C%E8%87%AA%E5%8B%95%E8%BD%89%20int%0A%20%20%20%20parser.add_argument(%22--shout%22%2C%20action%3D%22store_true%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20help%3D%22%E5%A4%A7%E8%81%B2%E5%96%8A%22)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%B8%83%E6%9E%97%E6%97%97%E6%A8%99%0A%20%20%20%20args%20%3D%20parser.parse_args()%0A%0A%20%20%20%20msg%20%3D%20f%22Hello%2C%20%7Bargs.name%7D!%22%0A%20%20%20%20if%20args.shout%3A%0A%20%20%20%20%20%20%20%20msg%20%3D%20msg.upper()%0A%20%20%20%20for%20_%20in%20range(args.count)%3A%0A%20%20%20%20%20%20%20%20print(msg)%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20main()'), 'copy-btn-479')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># greet.py
+import argparse
+
+def main() -&gt; None:
+    parser = argparse.ArgumentParser(description="跟某人打招呼")
+    parser.add_argument("name", help="對象名字")            # 位置引數
+    parser.add_argument("-c", "--count", type=int, default=1,
+                        help="重複次數")                    # 選項，自動轉 int
+    parser.add_argument("--shout", action="store_true",
+                        help="大聲喊")                       # 布林旗標
+    args = parser.parse_args()
+
+    msg = f"Hello, {args.name}!"
+    if args.shout:
+        msg = msg.upper()
+    for _ in range(args.count):
+        print(msg)
+
+if __name__ == "__main__":
+    main()</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-480" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20python%20greet.py%20Ada%20--count%202%20--shout%0AHELLO%2C%20ADA!%0AHELLO%2C%20ADA!%0A%24%20python%20greet.py%20--help%0Ausage%3A%20greet.py%20%5B-h%5D%20%5B-c%20COUNT%5D%20%5B--shout%5D%20name%0A...'), 'copy-btn-480')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ python greet.py Ada --count 2 --shout
+HELLO, ADA!
+HELLO, ADA!
+$ python greet.py --help
+usage: greet.py [-h] [-c COUNT] [--shout] name
+...</code></pre>
+      </div>
+    <p><code>argparse</code> 對應 Java 生態的 Apache Commons CLI 或 picocli，但<strong>內建</strong>。它支援子命令（<code>add_subparsers</code>，像 <code>git commit</code> / <code>git push</code> 那種風格），足以撐起一個正經的工具。</p>
+<h3 id="click第三方decorator-式">click：第三方，decorator 式</h3><p>當 CLI 變大（巢狀子命令、彩色輸出、互動提示），社群標準是 <a href="https://click.palletsprojects.com/" target="_blank" rel="noopener noreferrer">click</a>。它用 decorator 宣告（呼應第 10 章），把參數變成函式的引數，讀起來像在寫普通函式：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-481" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E7%94%A8%20uv%20%E9%A9%97%E8%AD%89%EF%BC%9Auv%20run%20--with%20click%20greet_click.py%20Ada%20--count%202%20--shout%0Aimport%20click%0A%0A%40click.command()%0A%40click.argument(%22name%22)%0A%40click.option(%22--count%22%2C%20default%3D1%2C%20help%3D%22%E9%87%8D%E8%A4%87%E6%AC%A1%E6%95%B8%22)%0A%40click.option(%22--shout%22%2C%20is_flag%3DTrue%2C%20help%3D%22%E5%A4%A7%E8%81%B2%E5%96%8A%22)%0Adef%20greet(name%3A%20str%2C%20count%3A%20int%2C%20shout%3A%20bool)%20-%3E%20None%3A%0A%20%20%20%20%22%22%22%E8%B7%9F%E6%9F%90%E4%BA%BA%E6%89%93%E6%8B%9B%E5%91%BC%E3%80%82%22%22%22%0A%20%20%20%20msg%20%3D%20f%22Hello%2C%20%7Bname%7D!%22%0A%20%20%20%20if%20shout%3A%0A%20%20%20%20%20%20%20%20msg%20%3D%20msg.upper()%0A%20%20%20%20for%20_%20in%20range(count)%3A%0A%20%20%20%20%20%20%20%20click.echo(msg)%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20greet()'), 'copy-btn-481')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># 用 uv 驗證：uv run --with click greet_click.py Ada --count 2 --shout
+import click
+
+@click.command()
+@click.argument("name")
+@click.option("--count", default=1, help="重複次數")
+@click.option("--shout", is_flag=True, help="大聲喊")
+def greet(name: str, count: int, shout: bool) -&gt; None:
+    """跟某人打招呼。"""
+    msg = f"Hello, {name}!"
+    if shout:
+        msg = msg.upper()
+    for _ in range(count):
+        click.echo(msg)
+
+if __name__ == "__main__":
+    greet()</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-482" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20run%20--with%20click%20greet_click.py%20Ada%20--count%202%20--shout%0AHELLO%2C%20ADA!%0AHELLO%2C%20ADA!'), 'copy-btn-482')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ uv run --with click greet_click.py Ada --count 2 --shout
+HELLO, ADA!
+HELLO, ADA!</code></pre>
+      </div>
+    <p>click 的 decorator 把「參數宣告」和「使用該參數的函式」綁在一起，少了 <code>args.name</code> 這層手動取值；<code>--help</code> 直接取自 docstring 與 <code>help=</code>。子命令用 <code>@click.group()</code> 組起來，比 argparse 的 subparser 優雅。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：選型原則——零依賴、簡單腳本用 <code>argparse</code>（標準庫，不增加部署負擔）；功能多、要分發給別人用的正式 CLI 用 <code>click</code>（或它的進化版 <a href="https://typer.tiangolo.com/" target="_blank" rel="noopener noreferrer">typer</a>，把參數宣告交給型別提示，呼應第 9 章）。這跟 Java 在 picocli vs 手刻 args 之間的權衡一樣，只是 Python 的標準庫起點高很多。</p>
+</div><hr>
+<h2 id="本章小結">本章小結</h2><ol>
+<li><strong><code>pathlib.Path</code> 取代 <code>os.path</code></strong>：物件式 API、<code>/</code> 運算子組路徑、<code>.read_text()</code>/<code>.glob()</code>/<code>.iterdir()</code> 等方法掛在 Path 上，比 Java 的 <code>Files</code> 靜態方法更順手；<code>glob</code>/<code>iterdir</code> 回產生器不吃記憶體。</li>
+<li><strong>編碼是紀律不是選項</strong>：<code>open()</code> 與 <code>read_text()</code> 一律明確寫 <code>encoding=&quot;utf-8&quot;</code>，否則依賴平台預設會在別的機器上爆掉（同 Java <code>new FileReader</code> 之坑）；PEP 686 是未來解，現在靠手寫。</li>
+<li><strong>序列化用標準庫</strong>：<code>json</code>（<code>dumps</code>/<code>loads</code>，回傳是 <code>Any</code>，要 <code>ensure_ascii=False</code>）、<code>csv</code>（<code>DictReader</code> 別自己切逗號，寫檔記得 <code>newline=&quot;&quot;</code>），都內建、不必拉 Jackson/Commons。</li>
+<li><strong>sqlite3 是口袋裡的關聯式 DB</strong>：零設定、<code>:memory:</code> 模式測試神器、遵循 DB-API 2.0；參數化查詢用 <code>?</code> 防 SQL injection（同 <code>PreparedStatement</code>），連線當 context manager 是控制交易、不是關閉。</li>
+<li><strong>datetime 分 naive 與 aware</strong>：naive ≈ <code>LocalDateTime</code>（危險）、aware ≈ <code>ZonedDateTime</code>（安全）；用 <code>datetime.now(timezone.utc)</code> 與 <code>zoneinfo.ZoneInfo</code>，內部存 UTC、顯示才 <code>astimezone</code>，naive 與 aware 不能混算。</li>
+<li><strong><code>re</code> 一律用 raw string</strong> <code>r&quot;...&quot;</code>：<code>match</code>（開頭）/<code>search</code>（任意處）/<code>fullmatch</code>（全符合）/<code>findall</code>（回字串）/<code>finditer</code>（回 match 物件）分清楚；命名群組 <code>(?P&lt;name&gt;...)</code> 與 <code>re.sub</code> 的回呼形式提升可維護性。</li>
+<li><strong><code>subprocess.run</code> 傳 list of args、配 <code>capture_output=True, text=True, check=True</code></strong>，永遠不要 <code>shell=True</code>（command injection 風險）；它是取代 shell script 的正路。</li>
+<li><strong>CLI 用 <code>argparse</code>（標準庫）或 <code>click</code>（第三方 decorator 式）</strong>：Python 的「內建電池」讓你能把一段段 shell script 升級成有 <code>--help</code>、有型別轉換、有子命令的正經工具。</li>
+</ol>
+<h2 id="練習">練習</h2><ol>
+<li><p><strong>pathlib 改寫</strong>：給一個目錄路徑，找出底下（含所有子目錄）大於 1 MB 的 <code>.log</code> 檔，印出相對路徑與大小。請只用 <code>pathlib</code>，不要用 <code>os.path</code>。
+<em>提示：<code>rglob(&quot;*.log&quot;)</code> 配 <code>.stat().st_size</code>；<code>relative_to(base)</code> 取相對路徑。</em></p>
+</li>
+<li><p><strong>編碼地雷排查</strong>：下面的程式在你機器上沒事，但同事在 Windows 上跑出 <code>UnicodeDecodeError</code>，為什麼？怎麼修？</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-483" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('names%20%3D%20open(%22names.txt%22).read().splitlines()'), 'copy-btn-483')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">names = open("names.txt").read().splitlines()</code></pre>
+      </div>
+    <p><em>提示：問題在那個沒寫的參數。順便想想如果檔案很大，<code>.read().splitlines()</code> 還有什麼缺點。</em></p>
+</li>
+<li><p><strong>SQL injection 修補</strong>：把這段有漏洞的查詢改成安全的參數化版本，並說明為什麼 f-string 在這裡是大忌。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-484" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20find_user(conn%2C%20username)%3A%0A%20%20%20%20return%20conn.execute(%0A%20%20%20%20%20%20%20%20f%22SELECT%20*%20FROM%20users%20WHERE%20name%20%3D%20%27%7Busername%7D%27%22%0A%20%20%20%20).fetchall()'), 'copy-btn-484')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def find_user(conn, username):
+    return conn.execute(
+        f"SELECT * FROM users WHERE name = '{username}'"
+    ).fetchall()</code></pre>
+      </div>
+    <p><em>提示：<code>?</code> 佔位符 + 參數元組，注意單一參數的逗號。</em></p>
+</li>
+<li><p><strong>時區運算</strong>：寫一個函式 <code>meeting_times(utc_iso: str) -&gt; dict[str, str]</code>，輸入一個 UTC 的 ISO 時間字串，回傳這個瞬間在 <code>Asia/Taipei</code>、<code>Europe/London</code>、<code>America/New_York</code> 三地各是幾點（ISO 格式）。
+<em>提示：<code>datetime.fromisoformat</code> 解析、<code>ZoneInfo</code> 建時區、<code>astimezone</code> 轉換。先確認解析出來的是 aware datetime。</em></p>
+</li>
+<li><p><strong>shell script 升級</strong>：把這個 Bash 一行命令 <code>git log --oneline -n 5 | wc -l</code> 用 Python 重寫，不准用 <code>shell=True</code>，並用 <code>check=True</code> 處理「不在 git repo」的失敗情況。
+<em>提示：兩個 <code>subprocess.run</code>，或一個 <code>subprocess.run</code> 抓 <code>git log</code> 輸出後在 Python 裡數行數（更 Pythonic，免去管線）。</em></p>
+</li>
+</ol>

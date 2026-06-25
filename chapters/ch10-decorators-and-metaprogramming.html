@@ -1,0 +1,683 @@
+<h1 id="第-10-章裝飾器與元程式設計">第 10 章：裝飾器與元程式設計</h1><p>在 Java 裡，要在不改動原始碼的前提下「橫切」一段邏輯——記時、記日誌、開交易、做權限檢查——你會想到 annotation 加上一個框架：寫個 <code>@Transactional</code>，然後讓 Spring AOP 或 AspectJ 在執行期用動態代理、或在編譯期織入（weaving）位元組碼，把行為塞進去。Python 把同一件事做得直接得多：<strong>裝飾器（decorator）就是一個吃函式、回傳函式的普通函式</strong>，沒有反射、沒有代理、沒有框架，在 <code>def</code> 執行的那一刻就把包裝套好了。本章從裝飾器原理一路往下挖到 Python 元程式設計（metaprogramming）的底層——<code>__getattr__</code>、descriptor、metaclass——你會發現 <code>@property</code>、<code>@dataclass</code>、甚至「方法為什麼能綁定 <code>self</code>」這些每天用的東西，背後都是同一套機制。重點先講在前頭：<strong>裝飾器是日常工具，descriptor 是理解 <code>@property</code> 的鑰匙，metaclass 是 99% 用不到的重武器</strong>。</p>
+<hr>
+<h2 id="裝飾器原理deco-只是語法糖">裝飾器原理：`@deco` 只是語法糖</h2><p>承接第 3 章——函式是一等物件，能被當參數傳入、當回傳值傳出。裝飾器把這兩件事合起來：<strong>一個接收函式、回傳函式的高階函式（higher-order function）</strong>。</p>
+<p>先看最樸素的形式，完全不用 <code>@</code> 符號：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-295" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20collections.abc%20import%20Callable%0Afrom%20typing%20import%20Any%0A%0Adef%20my_logger(func%3A%20Callable%5B...%2C%20Any%5D)%20-%3E%20Callable%5B...%2C%20Any%5D%3A%0A%20%20%20%20def%20wrapper(*args%3A%20Any%2C%20**kwargs%3A%20Any)%20-%3E%20Any%3A%0A%20%20%20%20%20%20%20%20print(f%22%E5%91%BC%E5%8F%AB%20%7Bfunc.__name__%7D%EF%BC%8C%E5%8F%83%E6%95%B8%20%7Bargs%7D%20%7Bkwargs%7D%22)%0A%20%20%20%20%20%20%20%20result%20%3D%20func(*args%2C%20**kwargs)%0A%20%20%20%20%20%20%20%20print(f%22%7Bfunc.__name__%7D%20%E5%9B%9E%E5%82%B3%20%7Bresult!r%7D%22)%0A%20%20%20%20%20%20%20%20return%20result%0A%20%20%20%20return%20wrapper%0A%0Adef%20add(a%3A%20int%2C%20b%3A%20int)%20-%3E%20int%3A%0A%20%20%20%20return%20a%20%2B%20b%0A%0Aadd%20%3D%20my_logger(add)%20%20%20%20%20%20%20%20%23%20%E9%97%9C%E9%8D%B5%E9%80%99%E4%B8%80%E8%A1%8C%EF%BC%9A%E6%8A%8A%20add%20%E6%8F%9B%E6%88%90%E5%8C%85%E8%A3%9D%E5%BE%8C%E7%9A%84%E7%89%88%E6%9C%AC'), 'copy-btn-295')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from collections.abc import Callable
+from typing import Any
+
+def my_logger(func: Callable[..., Any]) -&gt; Callable[..., Any]:
+    def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+        print(f"呼叫 {func.__name__}，參數 {args} {kwargs}")
+        result = func(*args, **kwargs)
+        print(f"{func.__name__} 回傳 {result!r}")
+        return result
+    return wrapper
+
+def add(a: int, b: int) -&gt; int:
+    return a + b
+
+add = my_logger(add)        # 關鍵這一行：把 add 換成包裝後的版本</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-296" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20add(3%2C%204)%0A%E5%91%BC%E5%8F%AB%20add%EF%BC%8C%E5%8F%83%E6%95%B8%20(3%2C%204)%20%7B%7D%0Aadd%20%E5%9B%9E%E5%82%B3%207%0A7'), 'copy-btn-296')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; add(3, 4)
+呼叫 add，參數 (3, 4) {}
+add 回傳 7
+7</code></pre>
+      </div>
+    <p><code>add = my_logger(add)</code> 是整個裝飾器的精髓：<code>my_logger</code> 收到原始的 <code>add</code>，回傳一個新函式 <code>wrapper</code>，我們把 <code>wrapper</code> 重新綁定到 <code>add</code> 這個名字上。之後呼叫 <code>add(3, 4)</code>，跑的其實是 <code>wrapper</code>，它在前後印日誌、中間轉發給原本的函式。</p>
+<p><code>@</code> 符號只是把這行「重新賦值」寫得漂亮一點：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-297" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40my_logger%20%20%20%20%20%20%20%20%20%20%23%20%E5%AE%8C%E5%85%A8%E7%AD%89%E5%83%B9%E6%96%BC%20add%20%3D%20my_logger(add)%0Adef%20add(a%3A%20int%2C%20b%3A%20int)%20-%3E%20int%3A%0A%20%20%20%20return%20a%20%2B%20b'), 'copy-btn-297')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@my_logger          # 完全等價於 add = my_logger(add)
+def add(a: int, b: int) -&gt; int:
+    return a + b</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>@deco</code> 與 <code>f = deco(f)</code> 是<strong>完全相同</strong>的兩種寫法，前者只是語法糖（syntactic sugar）。每次看到 <code>@something</code>，心裡就翻譯成「把下面這個函式餵給 <code>something</code>，再用回傳值蓋掉原名」。理解這條等式，裝飾器就沒有任何神祕之處了。</p>
+</div><h3 id="手寫一個計時裝飾器">手寫一個計時裝飾器</h3><p>把 logging 換成記時，結構一模一樣：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-298" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20time%0Afrom%20collections.abc%20import%20Callable%0Afrom%20functools%20import%20wraps%0Afrom%20typing%20import%20Any%0A%0Adef%20timed(func%3A%20Callable%5B...%2C%20Any%5D)%20-%3E%20Callable%5B...%2C%20Any%5D%3A%0A%20%20%20%20%40wraps(func)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%A8%8D%E5%BE%8C%E8%A7%A3%E9%87%8B%E7%82%BA%E4%BB%80%E9%BA%BC%E9%9C%80%E8%A6%81%E5%AE%83%0A%20%20%20%20def%20wrapper(*args%3A%20Any%2C%20**kwargs%3A%20Any)%20-%3E%20Any%3A%0A%20%20%20%20%20%20%20%20start%20%3D%20time.perf_counter()%0A%20%20%20%20%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20return%20func(*args%2C%20**kwargs)%0A%20%20%20%20%20%20%20%20finally%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20elapsed%20%3D%20time.perf_counter()%20-%20start%0A%20%20%20%20%20%20%20%20%20%20%20%20print(f%22%7Bfunc.__name__%7D%20%E8%8A%B1%E4%BA%86%20%7Belapsed%20*%201000%3A.2f%7D%20ms%22)%0A%20%20%20%20return%20wrapper%0A%0A%40timed%0Adef%20slow_square(n%3A%20int)%20-%3E%20int%3A%0A%20%20%20%20time.sleep(0.05)%0A%20%20%20%20return%20n%20*%20n'), 'copy-btn-298')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import time
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
+
+def timed(func: Callable[..., Any]) -&gt; Callable[..., Any]:
+    @wraps(func)                                   # 稍後解釋為什麼需要它
+    def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+        start = time.perf_counter()
+        try:
+            return func(*args, **kwargs)
+        finally:
+            elapsed = time.perf_counter() - start
+            print(f"{func.__name__} 花了 {elapsed * 1000:.2f} ms")
+    return wrapper
+
+@timed
+def slow_square(n: int) -&gt; int:
+    time.sleep(0.05)
+    return n * n</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-299" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20slow_square(9)%0Aslow_square%20%E8%8A%B1%E4%BA%86%2050.12%20ms%0A81'), 'copy-btn-299')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; slow_square(9)
+slow_square 花了 50.12 ms
+81</code></pre>
+      </div>
+    <p>用 <code>try/finally</code> 確保「即使被裝飾的函式拋例外，記時依然會印出來」——這是橫切關注點（cross-cutting concern）的典型細節。</p>
+<h3 id="對照-java目的相同機制天差地別">對照 Java：目的相同，機制天差地別</h3><table>
+<thead>
+<tr>
+<th></th>
+<th>Java（annotation + AOP）</th>
+<th>Python（decorator）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>本質</td>
+<td>annotation 是<strong>被動的中繼資料</strong>（metadata），自己什麼都不做</td>
+<td>decorator 是<strong>主動的函式</strong>，本身就執行包裝</td>
+</tr>
+<tr>
+<td>何時生效</td>
+<td>靠框架在執行期用反射 / 動態代理，或編譯期 weaving（AspectJ）</td>
+<td>在 <code>def</code> 被執行、模組載入的那一刻就套好</td>
+</tr>
+<tr>
+<td>需要框架嗎</td>
+<td>通常要（Spring 容器、AspectJ 編譯器）</td>
+<td>不需要，純語言特性</td>
+</tr>
+<tr>
+<td>攔截範圍</td>
+<td>方法呼叫（proxy 邊界）</td>
+<td>任何可呼叫物件，連巢狀函式都行</td>
+</tr>
+</tbody></table>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-300" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9Aannotation%20%E6%9C%AC%E8%BA%AB%E4%B8%8D%E5%81%9A%E4%BA%8B%EF%BC%8C%E8%A6%81%20Spring%20%E5%AE%B9%E5%99%A8%E6%8E%83%E5%88%B0%E5%AE%83%E3%80%81%E5%BB%BA%E7%AB%8B%E4%BB%A3%E7%90%86%E6%89%8D%E7%94%9F%E6%95%88%0A%40Transactional%0Apublic%20void%20transfer(Account%20from%2C%20Account%20to%2C%20BigDecimal%20amount)%20%7B%20...%20%7D'), 'copy-btn-300')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：annotation 本身不做事，要 Spring 容器掃到它、建立代理才生效
+@Transactional
+public void transfer(Account from, Account to, BigDecimal amount) { ... }</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-301" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20Python%EF%BC%9Adecorator%20%E5%9C%A8%20def%20%E5%9F%B7%E8%A1%8C%E6%99%82%E5%B0%B1%E6%8A%8A%20transfer%20%E6%8F%9B%E6%88%90%E5%8C%85%E8%A3%9D%E7%89%88%EF%BC%8C%E6%B2%92%E6%9C%89%E5%AE%B9%E5%99%A8%E3%80%81%E6%B2%92%E6%9C%89%E4%BB%A3%E7%90%86%0A%40transactional%0Adef%20transfer(src%3A%20Account%2C%20dst%3A%20Account%2C%20amount%3A%20Decimal)%20-%3E%20None%3A%0A%20%20%20%20...'), 'copy-btn-301')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># Python：decorator 在 def 執行時就把 transfer 換成包裝版，沒有容器、沒有代理
+@transactional
+def transfer(src: Account, dst: Account, amount: Decimal) -&gt; None:
+    ...</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>@Transactional</code> 是「貼張標籤，等框架來讀」；<code>@transactional</code> 是「立刻把函式換掉」。Java 的 annotation 沒有 Spring 就是死的中繼資料；Python 的 decorator 沒有任何框架就能運作，因為它本身就是會執行的程式碼。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：裝飾器在「定義時」就執行，不是「呼叫時」。<code>@timed def f(): ...</code> 一被直譯器讀到，<code>timed(f)</code> 就立刻跑了一次。如果你的裝飾器在最外層做了重量級的事（連資料庫、註冊全域狀態），那是在<strong>模組載入時</strong>發生的，不是第一次呼叫函式時。</p>
+</div><hr>
+<h2 id="functoolswraps別讓包裝抹掉身分">`functools.wraps`：別讓包裝抹掉身分</h2><p>上面 <code>timed</code> 裡那行 <code>@wraps(func)</code> 不是裝飾品。沒有它，包裝會把原函式的 metadata 全部蓋掉——因為呼叫者拿到的是 <code>wrapper</code>，不是原函式：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-302" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20collections.abc%20import%20Callable%0Afrom%20typing%20import%20Any%0A%0Adef%20bad_deco(func%3A%20Callable%5B...%2C%20Any%5D)%20-%3E%20Callable%5B...%2C%20Any%5D%3A%0A%20%20%20%20def%20wrapper(*args%3A%20Any%2C%20**kwargs%3A%20Any)%20-%3E%20Any%3A%20%20%20%20%23%20%E6%B2%92%E6%9C%89%20%40wraps%0A%20%20%20%20%20%20%20%20return%20func(*args%2C%20**kwargs)%0A%20%20%20%20return%20wrapper%0A%0A%40bad_deco%0Adef%20greet(name%3A%20str)%20-%3E%20str%3A%0A%20%20%20%20%22%22%22%E8%B7%9F%E6%9F%90%E4%BA%BA%E6%89%93%E6%8B%9B%E5%91%BC%E3%80%82%22%22%22%0A%20%20%20%20return%20f%22Hi%20%7Bname%7D%22'), 'copy-btn-302')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from collections.abc import Callable
+from typing import Any
+
+def bad_deco(func: Callable[..., Any]) -&gt; Callable[..., Any]:
+    def wrapper(*args: Any, **kwargs: Any) -&gt; Any:    # 沒有 @wraps
+        return func(*args, **kwargs)
+    return wrapper
+
+@bad_deco
+def greet(name: str) -&gt; str:
+    """跟某人打招呼。"""
+    return f"Hi {name}"</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-303" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20greet.__name__%0A%27wrapper%27%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%85%98%E4%BA%86%EF%BC%8C%E5%90%8D%E5%AD%97%E8%AE%8A%E6%88%90%20wrapper%0A%3E%3E%3E%20greet.__doc__%0A%3E%3E%3E%20%23%20None%EF%BC%8Cdocstring%20%E4%B9%9F%E4%B8%8D%E8%A6%8B%E4%BA%86'), 'copy-btn-303')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; greet.__name__
+'wrapper'                       # 慘了，名字變成 wrapper
+&gt;&gt;&gt; greet.__doc__
+&gt;&gt;&gt; # None，docstring 也不見了</code></pre>
+      </div>
+    <p><code>greet.__name__</code> 變成 <code>&#39;wrapper&#39;</code>、docstring 消失——這會搞壞日誌、除錯訊息、<code>help()</code>、以及任何靠 <code>__name__</code> 運作的工具（包括其他裝飾器）。<code>functools.wraps</code> 把原函式的 <code>__name__</code>、<code>__doc__</code>、<code>__module__</code>、<code>__qualname__</code> 等複製到 wrapper 上，並額外設一個 <code>__wrapped__</code> 指回原函式：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-304" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20functools%20import%20wraps%0A%0Adef%20good_deco(func%3A%20Callable%5B...%2C%20Any%5D)%20-%3E%20Callable%5B...%2C%20Any%5D%3A%0A%20%20%20%20%40wraps(func)%0A%20%20%20%20def%20wrapper(*args%3A%20Any%2C%20**kwargs%3A%20Any)%20-%3E%20Any%3A%0A%20%20%20%20%20%20%20%20return%20func(*args%2C%20**kwargs)%0A%20%20%20%20return%20wrapper%0A%0A%40good_deco%0Adef%20greet(name%3A%20str)%20-%3E%20str%3A%0A%20%20%20%20%22%22%22%E8%B7%9F%E6%9F%90%E4%BA%BA%E6%89%93%E6%8B%9B%E5%91%BC%E3%80%82%22%22%22%0A%20%20%20%20return%20f%22Hi%20%7Bname%7D%22'), 'copy-btn-304')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from functools import wraps
+
+def good_deco(func: Callable[..., Any]) -&gt; Callable[..., Any]:
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+        return func(*args, **kwargs)
+    return wrapper
+
+@good_deco
+def greet(name: str) -&gt; str:
+    """跟某人打招呼。"""
+    return f"Hi {name}"</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-305" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20greet.__name__%0A%27greet%27%0A%3E%3E%3E%20greet.__doc__%0A%27%E8%B7%9F%E6%9F%90%E4%BA%BA%E6%89%93%E6%8B%9B%E5%91%BC%E3%80%82%27%0A%3E%3E%3E%20greet.__wrapped__%20%20%20%20%20%20%20%20%20%20%20%20%23%20%40wraps%20%E7%95%99%E7%9A%84%E9%80%83%E7%94%9F%E9%96%80%EF%BC%9A%E5%8F%AF%E4%BB%A5%E6%8B%BF%E5%9B%9E%E5%8E%9F%E5%A7%8B%E6%9C%AA%E5%8C%85%E8%A3%9D%E7%9A%84%E5%87%BD%E5%BC%8F%0A%3Cfunction%20greet%20at%200x...%3E'), 'copy-btn-305')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; greet.__name__
+'greet'
+&gt;&gt;&gt; greet.__doc__
+'跟某人打招呼。'
+&gt;&gt;&gt; greet.__wrapped__            # @wraps 留的逃生門：可以拿回原始未包裝的函式
+&lt;function greet at 0x...&gt;</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：寫任何回傳 wrapper 的裝飾器，<strong>一律加 <code>@functools.wraps(func)</code></strong>。這是肌肉記憶等級的紀律。<code>__wrapped__</code> 還讓你能在測試時繞過裝飾器、直接呼叫原函式（<code>greet.__wrapped__(&quot;x&quot;)</code>）。</p>
+</div><h3 id="帶參數的裝飾器三層巢狀">帶參數的裝飾器：三層巢狀</h3><p><code>@timed</code> 不帶參數，直接 <code>timed(func)</code>。但 <code>@retry(times=3)</code> 這種帶參數的呢？關鍵觀察：<code>retry(times=3)</code> 是一個<strong>函式呼叫</strong>，它的回傳值才是真正的裝飾器。所以結構多了一層：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-306" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20time%0Afrom%20collections.abc%20import%20Callable%0Afrom%20functools%20import%20wraps%0Afrom%20typing%20import%20Any%0A%0Adef%20retry(times%3A%20int%20%3D%203%2C%20delay%3A%20float%20%3D%200.1)%20-%3E%20Callable%5B...%2C%20Any%5D%3A%0A%20%20%20%20%23%20%E7%AC%AC%201%20%E5%B1%A4%EF%BC%9Aretry%20%E6%8E%A5%E6%94%B6%E3%80%8C%E5%8F%83%E6%95%B8%E3%80%8D%EF%BC%8C%E5%9B%9E%E5%82%B3%E7%9C%9F%E6%AD%A3%E7%9A%84%E8%A3%9D%E9%A3%BE%E5%99%A8%0A%20%20%20%20def%20decorator(func%3A%20Callable%5B...%2C%20Any%5D)%20-%3E%20Callable%5B...%2C%20Any%5D%3A%0A%20%20%20%20%20%20%20%20%23%20%E7%AC%AC%202%20%E5%B1%A4%EF%BC%9Adecorator%20%E6%8E%A5%E6%94%B6%E3%80%8C%E5%87%BD%E5%BC%8F%E3%80%8D%EF%BC%8C%E5%9B%9E%E5%82%B3%E5%8C%85%E8%A3%9D%0A%20%20%20%20%20%20%20%20%40wraps(func)%0A%20%20%20%20%20%20%20%20def%20wrapper(*args%3A%20Any%2C%20**kwargs%3A%20Any)%20-%3E%20Any%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%AC%AC%203%20%E5%B1%A4%EF%BC%9Awrapper%20%E6%8E%A5%E6%94%B6%E3%80%8C%E5%91%BC%E5%8F%AB%E6%99%82%E7%9A%84%E5%BC%95%E6%95%B8%E3%80%8D%EF%BC%8C%E5%81%9A%E5%AF%A6%E9%9A%9B%E7%9A%84%E4%BA%8B%0A%20%20%20%20%20%20%20%20%20%20%20%20last_exc%3A%20Exception%20%7C%20None%20%3D%20None%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20attempt%20in%20range(1%2C%20times%20%2B%201)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20return%20func(*args%2C%20**kwargs)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20except%20Exception%20as%20exc%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20last_exc%20%3D%20exc%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20print(f%22%E7%AC%AC%20%7Battempt%7D%20%E6%AC%A1%E5%A4%B1%E6%95%97%EF%BC%9A%7Bexc!r%7D%22)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20time.sleep(delay)%0A%20%20%20%20%20%20%20%20%20%20%20%20assert%20last_exc%20is%20not%20None%0A%20%20%20%20%20%20%20%20%20%20%20%20raise%20last_exc%0A%20%20%20%20%20%20%20%20return%20wrapper%0A%20%20%20%20return%20decorator'), 'copy-btn-306')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import time
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
+
+def retry(times: int = 3, delay: float = 0.1) -&gt; Callable[..., Any]:
+    # 第 1 層：retry 接收「參數」，回傳真正的裝飾器
+    def decorator(func: Callable[..., Any]) -&gt; Callable[..., Any]:
+        # 第 2 層：decorator 接收「函式」，回傳包裝
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+            # 第 3 層：wrapper 接收「呼叫時的引數」，做實際的事
+            last_exc: Exception | None = None
+            for attempt in range(1, times + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    last_exc = exc
+                    print(f"第 {attempt} 次失敗：{exc!r}")
+                    time.sleep(delay)
+            assert last_exc is not None
+            raise last_exc
+        return wrapper
+    return decorator</code></pre>
+      </div>
+    <p>對應的呼叫順序這樣拆解：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-307" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40retry(times%3D3%2C%20delay%3D0.05)%0Adef%20flaky()%20-%3E%20str%3A%0A%20%20%20%20...%0A%0A%23%20%E5%AE%8C%E5%85%A8%E7%AD%89%E5%83%B9%E6%96%BC%EF%BC%9A%0A%23%20step1%20%3D%20retry(times%3D3%2C%20delay%3D0.05)%20%20%20%23%20step1%20%E6%98%AF%20decorator%0A%23%20flaky%20%3D%20step1(flaky)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20flaky%20%E8%AE%8A%E6%88%90%20wrapper'), 'copy-btn-307')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@retry(times=3, delay=0.05)
+def flaky() -&gt; str:
+    ...
+
+# 完全等價於：
+# step1 = retry(times=3, delay=0.05)   # step1 是 decorator
+# flaky = step1(flaky)                  # flaky 變成 wrapper</code></pre>
+      </div>
+    <p>實際跑一個一定會失敗的函式：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-308" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40retry(times%3D3%2C%20delay%3D0.0)%0Adef%20always_fail()%20-%3E%20None%3A%0A%20%20%20%20raise%20ValueError(%22%E5%A3%9E%E6%8E%89%E4%BA%86%22)'), 'copy-btn-308')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@retry(times=3, delay=0.0)
+def always_fail() -&gt; None:
+    raise ValueError("壞掉了")</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-309" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20always_fail()%0A%E7%AC%AC%201%20%E6%AC%A1%E5%A4%B1%E6%95%97%EF%BC%9AValueError(%27%E5%A3%9E%E6%8E%89%E4%BA%86%27)%0A%E7%AC%AC%202%20%E6%AC%A1%E5%A4%B1%E6%95%97%EF%BC%9AValueError(%27%E5%A3%9E%E6%8E%89%E4%BA%86%27)%0A%E7%AC%AC%203%20%E6%AC%A1%E5%A4%B1%E6%95%97%EF%BC%9AValueError(%27%E5%A3%9E%E6%8E%89%E4%BA%86%27)%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0AValueError%3A%20%E5%A3%9E%E6%8E%89%E4%BA%86'), 'copy-btn-309')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; always_fail()
+第 1 次失敗：ValueError('壞掉了')
+第 2 次失敗：ValueError('壞掉了')
+第 3 次失敗：ValueError('壞掉了')
+Traceback (most recent call last):
+    ...
+ValueError: 壞掉了</code></pre>
+      </div>
+    <p>三層各司其職：<strong>最外層吃裝飾器參數、中間層吃函式、最內層吃呼叫時的引數</strong>。記住這個對應，帶參數的裝飾器就不會繞暈。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>@retry</code> 與 <code>@retry()</code> 不一樣！<code>@retry</code>（不加括號）會把 <code>retry</code> 當成不帶參數的裝飾器，於是 <code>func</code> 被當成 <code>times</code> 傳進去，整個壞掉。帶參數的裝飾器<strong>一定要加括號</strong>，即使全部用預設值也得寫 <code>@retry()</code>。這是 Java 工程師（習慣 <code>@Retryable</code> 可加可不加括號）最常踩的坑。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：如果你覺得三層巢狀很煩，標準函式庫的 <code>functools.partial</code> 或第三方的 <code>wrapt</code> 能簡化；但三層結構是基礎功，看懂它你才看得懂任何別人寫的裝飾器。</p>
+</div><hr>
+<h2 id="類別裝飾器裝飾的是類別">類別裝飾器：裝飾的是類別</h2><p>裝飾器不限於函式——<code>@</code> 放在 <code>class</code> 上面，收到的就是<strong>類別物件</strong>，回傳值（通常是修改後的同一個類別）取代原類別。最常見的用途是<strong>自動註冊到 registry</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-310" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20collections.abc%20import%20Callable%0Afrom%20typing%20import%20Any%0A%0AHANDLERS%3A%20dict%5Bstr%2C%20type%5D%20%3D%20%7B%7D%0A%0Adef%20register(name%3A%20str)%20-%3E%20Callable%5B%5Btype%5D%2C%20type%5D%3A%0A%20%20%20%20def%20decorator(cls%3A%20type)%20-%3E%20type%3A%0A%20%20%20%20%20%20%20%20HANDLERS%5Bname%5D%20%3D%20cls%20%20%20%20%20%20%20%20%20%20%23%20%E6%8A%8A%E9%A1%9E%E5%88%A5%E7%99%BB%E8%A8%98%E5%88%B0%E5%85%A8%E5%9F%9F%E8%A1%A8%0A%20%20%20%20%20%20%20%20return%20cls%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8E%9F%E5%B0%81%E4%B8%8D%E5%8B%95%E5%9B%9E%E5%82%B3%EF%BC%8C%E5%8F%AA%E6%98%AF%E9%A0%86%E6%89%8B%E7%99%BB%E8%A8%98%0A%20%20%20%20return%20decorator%0A%0A%40register(%22json%22)%0Aclass%20JSONHandler%3A%0A%20%20%20%20def%20parse(self%2C%20raw%3A%20str)%20-%3E%20Any%3A%0A%20%20%20%20%20%20%20%20import%20json%0A%20%20%20%20%20%20%20%20return%20json.loads(raw)%0A%0A%40register(%22csv%22)%0Aclass%20CSVHandler%3A%0A%20%20%20%20def%20parse(self%2C%20raw%3A%20str)%20-%3E%20Any%3A%0A%20%20%20%20%20%20%20%20return%20%5Brow.split(%22%2C%22)%20for%20row%20in%20raw.splitlines()%5D'), 'copy-btn-310')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from collections.abc import Callable
+from typing import Any
+
+HANDLERS: dict[str, type] = {}
+
+def register(name: str) -&gt; Callable[[type], type]:
+    def decorator(cls: type) -&gt; type:
+        HANDLERS[name] = cls          # 把類別登記到全域表
+        return cls                    # 原封不動回傳，只是順手登記
+    return decorator
+
+@register("json")
+class JSONHandler:
+    def parse(self, raw: str) -&gt; Any:
+        import json
+        return json.loads(raw)
+
+@register("csv")
+class CSVHandler:
+    def parse(self, raw: str) -&gt; Any:
+        return [row.split(",") for row in raw.splitlines()]</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-311" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20HANDLERS%0A%7B%27json%27%3A%20%3Cclass%20%27JSONHandler%27%3E%2C%20%27csv%27%3A%20%3Cclass%20%27CSVHandler%27%3E%7D%0A%3E%3E%3E%20HANDLERS%5B%22json%22%5D().parse(%27%7B%22x%22%3A%201%7D%27)%0A%7B%27x%27%3A%201%7D'), 'copy-btn-311')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; HANDLERS
+{'json': &lt;class 'JSONHandler'&gt;, 'csv': &lt;class 'CSVHandler'&gt;}
+&gt;&gt;&gt; HANDLERS["json"]().parse('{"x": 1}')
+{'x': 1}</code></pre>
+      </div>
+    <blockquote><p>📝 <strong>關於輸出</strong>：在 REPL 或模組裡實際執行時，類別的 <code>repr</code> 會帶模組前綴，例如 <code>&lt;class &#39;__main__.JSONHandler&#39;&gt;</code>。為求簡潔，本章（以及後面 metaclass 的 <code>RegistryMeta.registry</code>、<code>Plugin.registry</code> 等輸出）一律省略 <code>__main__.</code> 這類模組前綴；逐字執行時看到前綴是正常的。</p>
+</blockquote><p>在 Java 你會用 <code>@Component</code> 加上 classpath scanning，或手動 <code>map.put(&quot;json&quot;, new JSONHandler())</code> 在某個設定類別裡。Python 的類別裝飾器讓「定義即註冊」，登記的程式碼就寫在類別旁邊，一眼可見。</p>
+<p>類別裝飾器也能<strong>增強</strong>類別——加方法、加屬性、改寫 <code>__init__</code>。而你其實天天在用一個重量級的類別裝飾器：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-312" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20dataclasses%20import%20dataclass%0A%0A%40dataclass%20%20%20%20%20%20%20%20%20%20%20%20%23%20%40dataclass%20%E5%B0%B1%E6%98%AF%E5%80%8B%E9%A1%9E%E5%88%A5%E8%A3%9D%E9%A3%BE%E5%99%A8%EF%BC%81%0Aclass%20Point%3A%0A%20%20%20%20x%3A%20int%0A%20%20%20%20y%3A%20int'), 'copy-btn-312')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from dataclasses import dataclass
+
+@dataclass            # @dataclass 就是個類別裝飾器！
+class Point:
+    x: int
+    y: int</code></pre>
+      </div>
+    <p><code>@dataclass</code>（第 7 章）收到 <code>Point</code>，讀取它的型別標注，<strong>動態生成</strong> <code>__init__</code>、<code>__repr__</code>、<code>__eq__</code> 等方法塞回類別裡，再回傳。它不是什麼編譯器魔法，就是一個你也寫得出來的類別裝飾器。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>@dataclass</code> ≈ Lombok 的 <code>@Data</code>，但機制相反。Lombok 是<strong>編譯期</strong> annotation processor，在編譯階段偷偷生成位元組碼；<code>@dataclass</code> 是<strong>執行期</strong>的普通函式，在類別定義被執行時生成方法。Lombok 需要 IDE 外掛才看得到生成的方法，<code>@dataclass</code> 生成的方法執行期就真實存在，<code>inspect.getsource</code> 之外的工具一律看得到。</p>
+</div><hr>
+<h2 id="getattr-setattr攔截屬性存取">`__getattr__` / `__setattr__`：攔截屬性存取</h2><p>元程式設計的下一層是攔截「屬性存取」本身。第 8 章用 <code>__getattr__</code> 做過自動委派，這裡把它跟兄弟方法講清楚——它們是 Python 動態屬性的核心。</p>
+<h3 id="getattr-vs-getattribute">`__getattr__` vs `__getattribute__`</h3><p>兩個名字很像，行為差很多：</p>
+<ul>
+<li><strong><code>__getattribute__</code></strong>：<strong>每一次</strong>屬性存取都呼叫它，無論屬性存不存在。它是屬性查找的總入口，預設實作負責去 <code>__dict__</code>、類別、descriptor 裡找。極少需要覆寫，覆寫錯了整個物件就壞了。</li>
+<li><strong><code>__getattr__</code></strong>：<strong>只有在正常查找失敗時</strong>才呼叫（找不到屬性、即將 <code>AttributeError</code> 之前）。這才是你 99% 想用的那個——做委派、惰性屬性、動態欄位。</li>
+</ul>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-313" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Dynamic%3A%0A%20%20%20%20def%20__init__(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.real%20%3D%2042%0A%0A%20%20%20%20def%20__getattr__(self%2C%20name%3A%20str)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20%23%20%E5%8F%AA%E6%9C%89%20self.real%20%E4%BB%A5%E5%A4%96%E3%80%81%E6%89%BE%E4%B8%8D%E5%88%B0%E7%9A%84%E5%B1%AC%E6%80%A7%E6%89%8D%E6%9C%83%E9%80%B2%E4%BE%86%0A%20%20%20%20%20%20%20%20%23%20%E6%B3%A8%E6%84%8F%EF%BC%9A%E9%80%99%E8%A3%A1%E6%A8%99%20-%3E%20str%20%E5%8F%AA%E6%98%AF%E5%9B%A0%E7%82%BA%E6%9C%AC%E7%AF%84%E4%BE%8B%E5%89%9B%E5%A5%BD%E9%83%BD%E5%9B%9E%E5%AD%97%E4%B8%B2%EF%BC%9B%0A%20%20%20%20%20%20%20%20%23%20%E7%9C%9F%E5%AF%A6%E7%9A%84%20__getattr__%20%E5%9B%9E%E5%82%B3%E5%9E%8B%E5%88%A5%E5%8F%96%E6%B1%BA%E6%96%BC%E7%94%A8%E9%80%94%EF%BC%88%E5%A7%94%E6%B4%BE%E3%80%81%E6%83%B0%E6%80%A7%E5%B1%AC%E6%80%A7%E5%B8%B8%E6%98%AF%E4%BB%BB%E6%84%8F%E5%9E%8B%E5%88%A5%EF%BC%89%EF%BC%8C%0A%20%20%20%20%20%20%20%20%23%20%E7%B0%BD%E7%AB%A0%E4%B8%A6%E9%9D%9E%E5%9B%BA%E5%AE%9A%E8%A6%81%E5%9B%9E%20str%E3%80%82%0A%20%20%20%20%20%20%20%20return%20f%22%3C%E5%8B%95%E6%85%8B%E7%94%A2%E7%94%9F%E7%9A%84%20%7Bname%7D%3E%22'), 'copy-btn-313')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Dynamic:
+    def __init__(self) -&gt; None:
+        self.real = 42
+
+    def __getattr__(self, name: str) -&gt; str:
+        # 只有 self.real 以外、找不到的屬性才會進來
+        # 注意：這裡標 -&gt; str 只是因為本範例剛好都回字串；
+        # 真實的 __getattr__ 回傳型別取決於用途（委派、惰性屬性常是任意型別），
+        # 簽章並非固定要回 str。
+        return f"&lt;動態產生的 {name}&gt;"</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-314" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20d%20%3D%20Dynamic()%0A%3E%3E%3E%20d.real%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%9C%9F%E5%AF%A6%E5%AD%98%E5%9C%A8%EF%BC%8C%E4%B8%8D%E6%9C%83%E5%91%BC%E5%8F%AB%20__getattr__%0A42%0A%3E%3E%3E%20d.anything%20%20%20%20%20%20%20%23%20%E6%89%BE%E4%B8%8D%E5%88%B0%20%E2%86%92%20%E8%A7%B8%E7%99%BC%20__getattr__%0A%27%3C%E5%8B%95%E6%85%8B%E7%94%A2%E7%94%9F%E7%9A%84%20anything%3E%27%0A%3E%3E%3E%20d.foo_bar%0A%27%3C%E5%8B%95%E6%85%8B%E7%94%A2%E7%94%9F%E7%9A%84%20foo_bar%3E%27'), 'copy-btn-314')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; d = Dynamic()
+&gt;&gt;&gt; d.real           # 真實存在，不會呼叫 __getattr__
+42
+&gt;&gt;&gt; d.anything       # 找不到 → 觸發 __getattr__
+'&lt;動態產生的 anything&gt;'
+&gt;&gt;&gt; d.foo_bar
+'&lt;動態產生的 foo_bar&gt;'</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：要做「找不到時的後備（fallback）」用 <code>__getattr__</code>；要攔截「全部」屬性存取（罕見，例如 proxy）才用 <code>__getattribute__</code>。把 <code>__getattr__</code> 理解成「屬性查找的 <code>catch</code>」就對了——只有 miss 才進來。</p>
+</div><h3 id="setattr攔截所有指派小心無窮遞迴">`__setattr__`：攔截所有指派，小心無窮遞迴</h3><p><code>__setattr__</code> 攔截<strong>每一次</strong> <code>obj.x = value</code>。拿來做唯讀物件或欄位驗證很方便，但藏著一個 Java 工程師必踩的陷阱：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-315" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20ReadOnly%3A%0A%20%20%20%20def%20__init__(self%2C%20**kwargs%3A%20object)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20%23%20%E4%B8%8D%E8%83%BD%E7%9B%B4%E6%8E%A5%E5%AF%AB%20self.x%20%3D%20...%EF%BC%8C%E5%90%A6%E5%89%87%E5%8F%88%E6%9C%83%E8%A7%B8%E7%99%BC%20__setattr__%20%E2%86%92%20%E7%84%A1%E7%AA%AE%E9%81%9E%E8%BF%B4%0A%20%20%20%20%20%20%20%20for%20key%2C%20value%20in%20kwargs.items()%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20object.__setattr__(self%2C%20key%2C%20value)%20%20%20%23%20%E7%B9%9E%E9%81%8E%E8%87%AA%E5%B7%B1%E7%9A%84%20__setattr__%0A%0A%20%20%20%20def%20__setattr__(self%2C%20name%3A%20str%2C%20value%3A%20object)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20raise%20AttributeError(f%22%7Btype(self).__name__%7D%20%E6%98%AF%E5%94%AF%E8%AE%80%E7%9A%84%EF%BC%8C%E4%B8%8D%E8%83%BD%E8%A8%AD%E5%AE%9A%20%7Bname!r%7D%22)'), 'copy-btn-315')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class ReadOnly:
+    def __init__(self, **kwargs: object) -&gt; None:
+        # 不能直接寫 self.x = ...，否則又會觸發 __setattr__ → 無窮遞迴
+        for key, value in kwargs.items():
+            object.__setattr__(self, key, value)   # 繞過自己的 __setattr__
+
+    def __setattr__(self, name: str, value: object) -&gt; None:
+        raise AttributeError(f"{type(self).__name__} 是唯讀的，不能設定 {name!r}")</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-316" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20p%20%3D%20ReadOnly(x%3D1%2C%20y%3D2)%0A%3E%3E%3E%20p.x%0A1%0A%3E%3E%3E%20p.x%20%3D%2099%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0AAttributeError%3A%20ReadOnly%20%E6%98%AF%E5%94%AF%E8%AE%80%E7%9A%84%EF%BC%8C%E4%B8%8D%E8%83%BD%E8%A8%AD%E5%AE%9A%20%27x%27'), 'copy-btn-316')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; p = ReadOnly(x=1, y=2)
+&gt;&gt;&gt; p.x
+1
+&gt;&gt;&gt; p.x = 99
+Traceback (most recent call last):
+    ...
+AttributeError: ReadOnly 是唯讀的，不能設定 'x'</code></pre>
+      </div>
+    <p>關鍵在 <code>__init__</code> 裡：<strong>不能寫 <code>self.key = value</code></strong>，因為那會再次觸發 <code>__setattr__</code>，而我們的 <code>__setattr__</code> 又要設值……要嘛無窮遞迴、要嘛（像這裡）直接拋例外。解法是繞過去——用 <code>object.__setattr__(self, key, value)</code>（或 <code>super().__setattr__(...)</code>），或直接操作 <code>self.__dict__[key] = value</code>。</p>
+<p>下面是更實用的「驗證型」版本，攔截指派並檢查：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-317" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Account%3A%0A%20%20%20%20def%20__setattr__(self%2C%20name%3A%20str%2C%20value%3A%20object)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20if%20name%20%3D%3D%20%22balance%22%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20if%20not%20isinstance(value%2C%20(int%2C%20float))%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20raise%20TypeError(%22balance%20%E5%BF%85%E9%A0%88%E6%98%AF%E6%95%B8%E5%AD%97%22)%0A%20%20%20%20%20%20%20%20%20%20%20%20if%20value%20%3C%200%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20raise%20ValueError(%22balance%20%E4%B8%8D%E8%83%BD%E7%82%BA%E8%B2%A0%22)%0A%20%20%20%20%20%20%20%20super().__setattr__(name%2C%20value)%20%20%20%20%20%20%20%20%23%20%E9%A9%97%E8%AD%89%E9%80%9A%E9%81%8E%EF%BC%8C%E4%BA%A4%E7%B5%A6%E9%A0%90%E8%A8%AD%E8%A1%8C%E7%82%BA%E7%9C%9F%E7%9A%84%E5%AD%98%E9%80%B2%E5%8E%BB'), 'copy-btn-317')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Account:
+    def __setattr__(self, name: str, value: object) -&gt; None:
+        if name == "balance":
+            if not isinstance(value, (int, float)):
+                raise TypeError("balance 必須是數字")
+            if value &lt; 0:
+                raise ValueError("balance 不能為負")
+        super().__setattr__(name, value)        # 驗證通過，交給預設行為真的存進去</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-318" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20a%20%3D%20Account()%0A%3E%3E%3E%20a.balance%20%3D%20100%0A%3E%3E%3E%20a.balance%20%3D%20-5%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0AValueError%3A%20balance%20%E4%B8%8D%E8%83%BD%E7%82%BA%E8%B2%A0'), 'copy-btn-318')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; a = Account()
+&gt;&gt;&gt; a.balance = 100
+&gt;&gt;&gt; a.balance = -5
+Traceback (most recent call last):
+    ...
+ValueError: balance 不能為負</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：在 <code>__setattr__</code> 內部設定實例屬性，<strong>一定要走 <code>super().__setattr__()</code> 或 <code>self.__dict__</code></strong>，絕不能寫 <code>self.name = value</code>，否則無窮遞迴。同理 <code>__getattribute__</code> 內部取屬性要用 <code>super().__getattribute__()</code>。這是覆寫這些 dunder 的鐵律。</p>
+</div><p>不過，當你發現自己在 <code>__setattr__</code> 裡用一堆 <code>if name == ...</code> 分流驗證時，那是個訊號：<strong>你真正想要的是 descriptor</strong>。</p>
+<hr>
+<h2 id="descriptor-協定property-的底層">Descriptor 協定：`@property` 的底層</h2><p>Descriptor（描述器）是 Python 物件模型裡最被低估、卻最強大的機制。一句話：<strong>descriptor 是一個「把屬性存取的控制權，從物件交給另一個物件」的協定</strong>。<code>@property</code>、<code>classmethod</code>、<code>staticmethod</code>、甚至「一般方法為什麼會自動綁定 <code>self</code>」——全都是 descriptor 在背後撐著。</p>
+<p>一個物件只要實作了以下任一方法，它就是 descriptor：</p>
+<ul>
+<li><code>__get__(self, obj, objtype)</code>：讀取時呼叫</li>
+<li><code>__set__(self, obj, value)</code>：指派時呼叫</li>
+<li><code>__set_name__(self, owner, name)</code>：類別定義時，自動告訴 descriptor「它被綁到哪個屬性名」</li>
+</ul>
+<p>把「非負整數欄位」這個常見驗證需求寫成 descriptor：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-319" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20NonNegative%3A%0A%20%20%20%20def%20__set_name__(self%2C%20owner%3A%20type%2C%20name%3A%20str)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20%23%20%E9%A1%9E%E5%88%A5%E5%BB%BA%E7%AB%8B%E6%99%82%E8%87%AA%E5%8B%95%E5%91%BC%E5%8F%AB%EF%BC%8Cname%20%E6%98%AF%E9%80%99%E5%80%8B%20descriptor%20%E8%A2%AB%E6%8C%87%E6%B4%BE%E5%88%B0%E7%9A%84%E5%B1%AC%E6%80%A7%E5%90%8D%0A%20%20%20%20%20%20%20%20self._name%20%3D%20f%22_%7Bname%7D%22%0A%0A%20%20%20%20def%20__get__(self%2C%20obj%3A%20object%2C%20objtype%3A%20type%20%7C%20None%20%3D%20None)%20-%3E%20int%3A%0A%20%20%20%20%20%20%20%20if%20obj%20is%20None%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%BE%9E%E9%A1%9E%E5%88%A5%EF%BC%88%E8%80%8C%E9%9D%9E%E5%AF%A6%E4%BE%8B%EF%BC%89%E5%AD%98%E5%8F%96%E6%99%82%0A%20%20%20%20%20%20%20%20%20%20%20%20return%20self%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20type%3A%20ignore%5Breturn-value%5D%0A%20%20%20%20%20%20%20%20return%20obj.__dict__.get(self._name%2C%200)%0A%0A%20%20%20%20def%20__set__(self%2C%20obj%3A%20object%2C%20value%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20if%20not%20isinstance(value%2C%20int)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20raise%20TypeError(f%22%7Bself._name%5B1%3A%5D%7D%20%E5%BF%85%E9%A0%88%E6%98%AF%20int%22)%0A%20%20%20%20%20%20%20%20if%20value%20%3C%200%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20raise%20ValueError(f%22%7Bself._name%5B1%3A%5D%7D%20%E4%B8%8D%E8%83%BD%E7%82%BA%E8%B2%A0%EF%BC%8C%E6%94%B6%E5%88%B0%20%7Bvalue%7D%22)%0A%20%20%20%20%20%20%20%20obj.__dict__%5Bself._name%5D%20%3D%20value%20%20%20%20%20%20%20%20%20%23%20%E5%AD%98%E9%80%B2%E5%AF%A6%E4%BE%8B%E7%9A%84%20__dict__%0A%0A%0Aclass%20Order%3A%0A%20%20%20%20quantity%20%3D%20NonNegative()%20%20%20%20%20%20%20%20%23%20%E4%B8%80%E5%80%8B%20descriptor%20%E5%AF%A6%E4%BE%8B%EF%BC%8C%E7%95%B6%E6%88%90%E9%A1%9E%E5%88%A5%E5%B1%AC%E6%80%A7%0A%20%20%20%20price%20%3D%20NonNegative()%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8F%AF%E4%BB%A5%E9%87%8D%E8%A4%87%E7%94%A8%EF%BC%8C%E9%9B%B6%E6%A8%A3%E6%9D%BF%0A%0A%20%20%20%20def%20__init__(self%2C%20quantity%3A%20int%2C%20price%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.quantity%20%3D%20quantity%20%20%20%20%23%20%E8%A7%B8%E7%99%BC%20NonNegative.__set__%0A%20%20%20%20%20%20%20%20self.price%20%3D%20price'), 'copy-btn-319')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class NonNegative:
+    def __set_name__(self, owner: type, name: str) -&gt; None:
+        # 類別建立時自動呼叫，name 是這個 descriptor 被指派到的屬性名
+        self._name = f"_{name}"
+
+    def __get__(self, obj: object, objtype: type | None = None) -&gt; int:
+        if obj is None:                         # 從類別（而非實例）存取時
+            return self                          # type: ignore[return-value]
+        return obj.__dict__.get(self._name, 0)
+
+    def __set__(self, obj: object, value: int) -&gt; None:
+        if not isinstance(value, int):
+            raise TypeError(f"{self._name[1:]} 必須是 int")
+        if value &lt; 0:
+            raise ValueError(f"{self._name[1:]} 不能為負，收到 {value}")
+        obj.__dict__[self._name] = value         # 存進實例的 __dict__
+
+
+class Order:
+    quantity = NonNegative()        # 一個 descriptor 實例，當成類別屬性
+    price = NonNegative()           # 可以重複用，零樣板
+
+    def __init__(self, quantity: int, price: int) -&gt; None:
+        self.quantity = quantity    # 觸發 NonNegative.__set__
+        self.price = price</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-320" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20o%20%3D%20Order(quantity%3D3%2C%20price%3D100)%0A%3E%3E%3E%20o.quantity%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%A7%B8%E7%99%BC%20NonNegative.__get__%0A3%0A%3E%3E%3E%20o.quantity%20%3D%205%20%20%20%20%20%20%20%23%20%E9%80%9A%E9%81%8E%E9%A9%97%E8%AD%89%0A%3E%3E%3E%20o.quantity%20%3D%20-1%20%20%20%20%20%20%23%20%E8%A7%B8%E7%99%BC%20__set__%20%E7%9A%84%E9%A9%97%E8%AD%89%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0AValueError%3A%20quantity%20%E4%B8%8D%E8%83%BD%E7%82%BA%E8%B2%A0%EF%BC%8C%E6%94%B6%E5%88%B0%20-1'), 'copy-btn-320')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; o = Order(quantity=3, price=100)
+&gt;&gt;&gt; o.quantity           # 觸發 NonNegative.__get__
+3
+&gt;&gt;&gt; o.quantity = 5       # 通過驗證
+&gt;&gt;&gt; o.quantity = -1      # 觸發 __set__ 的驗證
+Traceback (most recent call last):
+    ...
+ValueError: quantity 不能為負，收到 -1</code></pre>
+      </div>
+    <p>注意這套寫法的威力：<strong>驗證邏輯寫一次，<code>quantity</code> 和 <code>price</code> 兩個欄位重複用</strong>。對比前面 <code>__setattr__</code> 裡 <code>if name == ...</code> 的分流，descriptor 把「每個欄位的存取控制」抽成了可重用元件——這正是 <code>@property</code> 做不到的（每個 property 要寫一組 getter/setter）。<code>__set_name__</code>（Python 3.6+）讓 descriptor 自動知道自己叫什麼名字，省掉手動傳名字的樣板。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：上面 <code>NonNegative.__set__</code> 用 <code>isinstance(value, int)</code> 驗型別，前面 <code>Account.__setattr__</code> 用 <code>isinstance(value, (int, float))</code>，兩處都有同一個盲點——<strong>Python 的 <code>bool</code> 是 <code>int</code> 的子類別</strong>，所以 <code>isinstance(True, int)</code> 為 <code>True</code>。實測 <code>Order(quantity=True, price=100)</code> 會把 <code>True</code> 當成合法數量收下、<code>a.balance = True</code> 也會通過（<code>True</code> 等於 <code>1</code>、<code>False</code> 等於 <code>0</code>）。這正是 Java 沒有的陷阱：Java 的 <code>Boolean</code> 不是 <code>Integer</code> 的子型別，兩者毫無繼承關係，<code>boolean</code> 也不會默默當成數字。若要嚴格只收「真正的整數」，得額外排除 <code>bool</code>，例如先擋掉 <code>isinstance(value, bool)</code>，或改用 <code>type(value) is int</code> 做精確型別比對。</p>
+</div>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-321" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20isinstance(True%2C%20int)%20%20%20%20%20%20%20%20%23%20bool%20%E6%98%AF%20int%20%E7%9A%84%E5%AD%90%E9%A1%9E%E5%88%A5%EF%BC%81%0ATrue%0A%3E%3E%3E%20type(True)%20is%20int%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%BD%86%E7%B2%BE%E7%A2%BA%E5%9E%8B%E5%88%A5%E6%AF%94%E5%B0%8D%E5%B0%B1%E6%93%8B%E5%BE%97%E4%BD%8F%0AFalse'), 'copy-btn-321')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; isinstance(True, int)        # bool 是 int 的子類別！
+True
+&gt;&gt;&gt; type(True) is int            # 但精確型別比對就擋得住
+False</code></pre>
+      </div>
+    <h3 id="data-descriptor-vs-non-data-descriptor">Data descriptor vs non-data descriptor</h3><p>這裡有個影響屬性查找優先序的關鍵區別：</p>
+<ul>
+<li><strong>Data descriptor（資料描述器）</strong>：同時有 <code>__set__</code> 或 <code>__delete__</code>。它的優先序<strong>高於</strong>實例 <code>__dict__</code>。</li>
+<li><strong>Non-data descriptor（非資料描述器）</strong>：只有 <code>__get__</code>。優先序<strong>低於</strong>實例 <code>__dict__</code>。</li>
+</ul>
+<p>屬性查找（讀取 <code>obj.x</code>）的優先順序是：</p>
+<ol>
+<li>型別的 <strong>data descriptor</strong>（最高）</li>
+<li>實例的 <code>__dict__</code></li>
+<li>型別的 <strong>non-data descriptor</strong>（如一般方法、<code>@cached_property</code>）</li>
+<li>觸發 <code>__getattr__</code>（最低，前面全 miss 才進來）</li>
+</ol>
+<p>這解釋了為什麼 <code>@property</code>（是 data descriptor，有 <code>__set__</code>）總是攔得到存取，而一般方法（non-data descriptor，只有 <code>__get__</code>）會被同名的實例屬性蓋過。也解釋了 <code>functools.cached_property</code> 的把戲：它是 non-data descriptor，第一次 <code>__get__</code> 算完就把結果寫進實例 <code>__dict__</code>，之後因為實例 <code>__dict__</code> 優先序較高，就再也不會呼叫 descriptor——天然的快取。</p>
+<p><code>@property</code> 本身就是一個內建的 data descriptor 工廠。下面兩段完全等價：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-322" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Celsius%3A%0A%20%20%20%20def%20__init__(self%2C%20temp%3A%20float)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self._temp%20%3D%20temp%0A%0A%20%20%20%20%40property%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20property%20%E7%89%A9%E4%BB%B6%E5%B0%B1%E6%98%AF%E4%B8%80%E5%80%8B%20data%20descriptor%0A%20%20%20%20def%20temp(self)%20-%3E%20float%3A%0A%20%20%20%20%20%20%20%20return%20self._temp%0A%0A%20%20%20%20%40temp.setter%0A%20%20%20%20def%20temp(self%2C%20value%3A%20float)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20if%20value%20%3C%20-273.15%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20raise%20ValueError(%22%E4%BD%8E%E6%96%BC%E7%B5%95%E5%B0%8D%E9%9B%B6%E5%BA%A6%22)%0A%20%20%20%20%20%20%20%20self._temp%20%3D%20value'), 'copy-btn-322')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Celsius:
+    def __init__(self, temp: float) -&gt; None:
+        self._temp = temp
+
+    @property                      # property 物件就是一個 data descriptor
+    def temp(self) -&gt; float:
+        return self._temp
+
+    @temp.setter
+    def temp(self, value: float) -&gt; None:
+        if value &lt; -273.15:
+            raise ValueError("低於絕對零度")
+        self._temp = value</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<strong>單一欄位</strong>的計算 / 驗證屬性用 <code>@property</code>（簡單、直觀）；<strong>同一套規則要套到多個欄位</strong>（非負、字串長度上限、型別檢查……）就自己寫 descriptor，把驗證抽成可重用元件。看懂 descriptor，<code>@property</code>、<code>classmethod</code>、method binding 對你就不再是黑盒子。</p>
+</div><div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 最接近的東西是「private 欄位 + getter/setter + 反射」，但沒有真正的對等物——Java 沒有「攔截某個欄位存取並轉交給另一個物件」的語言級協定。Kotlin 的 delegated property（<code>by</code>）在概念上最接近 descriptor。</p>
+</div><hr>
+<h2 id="metaclass-簡介類別也是物件">Metaclass 簡介：類別也是物件</h2><p>最後一層，也是最深、實務上最少用的一層。先接受一個事實：<strong>在 Python 裡，類別本身也是物件</strong>。既然是物件，它一定有自己的型別——那個型別就是 <strong>metaclass（元類別）</strong>，預設是 <code>type</code>。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-323" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20class%20Foo%3A%20...%0A%3E%3E%3E%20type(Foo)%20%20%20%20%20%20%20%20%20%20%20%20%23%20Foo%20%E9%80%99%E5%80%8B%E3%80%8C%E9%A1%9E%E5%88%A5%E3%80%8D%E7%9A%84%E5%9E%8B%E5%88%A5%E6%98%AF%20type%0A%3Cclass%20%27type%27%3E%0A%3E%3E%3E%20type(42)%20%20%20%20%20%20%20%20%20%20%20%20%20%23%2042%20%E7%9A%84%E5%9E%8B%E5%88%A5%E6%98%AF%20int%0A%3Cclass%20%27int%27%3E%0A%3E%3E%3E%20type(int)%20%20%20%20%20%20%20%20%20%20%20%20%23%20int%20%E7%9A%84%E5%9E%8B%E5%88%A5%E4%B9%9F%E6%98%AF%20type%0A%3Cclass%20%27type%27%3E'), 'copy-btn-323')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; class Foo: ...
+&gt;&gt;&gt; type(Foo)            # Foo 這個「類別」的型別是 type
+&lt;class 'type'&gt;
+&gt;&gt;&gt; type(42)             # 42 的型別是 int
+&lt;class 'int'&gt;
+&gt;&gt;&gt; type(int)            # int 的型別也是 type
+&lt;class 'type'&gt;</code></pre>
+      </div>
+    <p><code>class Foo: ...</code> 這個語法，骨子裡是<strong>呼叫 <code>type</code> 來建立一個類別物件</strong>。你甚至能跳過 <code>class</code> 語法、直接用 <code>type(name, bases, namespace)</code> 動態造類別：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-324" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20Dog%20%3D%20type(%22Dog%22%2C%20()%2C%20%7B%22speak%22%3A%20lambda%20self%3A%20%22Woof%22%7D)%0A%3E%3E%3E%20Dog().speak()%0A%27Woof%27'), 'copy-btn-324')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; Dog = type("Dog", (), {"speak": lambda self: "Woof"})
+&gt;&gt;&gt; Dog().speak()
+'Woof'</code></pre>
+      </div>
+    <p><code>Dog = type(...)</code> 跟 <code>class Dog: ...</code> 建出來的東西一模一樣。metaclass 就是「製造類別的工廠」——你能自訂一個 metaclass，在<strong>類別被建立的瞬間</strong>介入（檢查、修改、註冊）。最小範例：建立子類別時自動註冊：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-325" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20RegistryMeta(type)%3A%0A%20%20%20%20registry%3A%20dict%5Bstr%2C%20type%5D%20%3D%20%7B%7D%0A%0A%20%20%20%20def%20__new__(mcs%2C%20name%3A%20str%2C%20bases%3A%20tuple%5Btype%2C%20...%5D%2C%20namespace%3A%20dict%5Bstr%2C%20object%5D)%3A%0A%20%20%20%20%20%20%20%20cls%20%3D%20super().__new__(mcs%2C%20name%2C%20bases%2C%20namespace)%0A%20%20%20%20%20%20%20%20if%20bases%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%B7%B3%E9%81%8E%E5%9F%BA%E5%BA%95%E9%A1%9E%E5%88%A5%E8%87%AA%E5%B7%B1%EF%BC%8C%E5%8F%AA%E8%A8%BB%E5%86%8A%E5%AD%90%E9%A1%9E%E5%88%A5%0A%20%20%20%20%20%20%20%20%20%20%20%20RegistryMeta.registry%5Bname%5D%20%3D%20cls%0A%20%20%20%20%20%20%20%20return%20cls%0A%0A%0Aclass%20Plugin(metaclass%3DRegistryMeta)%3A%0A%20%20%20%20pass%0A%0Aclass%20AudioPlugin(Plugin)%3A%0A%20%20%20%20pass%0A%0Aclass%20VideoPlugin(Plugin)%3A%0A%20%20%20%20pass'), 'copy-btn-325')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class RegistryMeta(type):
+    registry: dict[str, type] = {}
+
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        cls = super().__new__(mcs, name, bases, namespace)
+        if bases:                          # 跳過基底類別自己，只註冊子類別
+            RegistryMeta.registry[name] = cls
+        return cls
+
+
+class Plugin(metaclass=RegistryMeta):
+    pass
+
+class AudioPlugin(Plugin):
+    pass
+
+class VideoPlugin(Plugin):
+    pass</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-326" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20RegistryMeta.registry%0A%7B%27AudioPlugin%27%3A%20%3Cclass%20%27AudioPlugin%27%3E%2C%20%27VideoPlugin%27%3A%20%3Cclass%20%27VideoPlugin%27%3E%7D'), 'copy-btn-326')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; RegistryMeta.registry
+{'AudioPlugin': &lt;class 'AudioPlugin'&gt;, 'VideoPlugin': &lt;class 'VideoPlugin'&gt;}</code></pre>
+      </div>
+    <p>每當有人 <code>class XxxPlugin(Plugin)</code>，metaclass 的 <code>__new__</code> 就被呼叫、自動把新類別登記進 registry——子類別作者完全不必寫任何註冊程式碼。</p>
+<h3 id="但你幾乎永遠不該用它">但你幾乎永遠不該用它</h3><p>metaclass 是 Python 最重的元程式設計武器，<strong>99% 的情境用不到</strong>。理由很實際：它難讀、難除錯、會跟多重繼承的 metaclass 衝突，而且絕大多數需求有更輕的替代品：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-327" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20__init_subclass__%EF%BC%9A%E4%B8%8D%E5%AF%AB%20metaclass%20%E5%B0%B1%E8%83%BD%E5%9C%A8%E3%80%8C%E5%AD%90%E9%A1%9E%E5%88%A5%E8%A2%AB%E5%BB%BA%E7%AB%8B%E6%99%82%E3%80%8D%E4%BB%8B%E5%85%A5%EF%BC%88Python%203.6%2B%EF%BC%89%0Aclass%20Plugin%3A%0A%20%20%20%20registry%3A%20dict%5Bstr%2C%20type%5D%20%3D%20%7B%7D%0A%0A%20%20%20%20def%20__init_subclass__(cls%2C%20**kwargs%3A%20object)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20super().__init_subclass__(**kwargs)%0A%20%20%20%20%20%20%20%20Plugin.registry%5Bcls.__name__%5D%20%3D%20cls%20%20%20%20%23%20%E5%90%8C%E6%A8%A3%E7%9A%84%E8%87%AA%E5%8B%95%E8%A8%BB%E5%86%8A%EF%BC%8C%E4%BD%86%E7%B0%A1%E5%96%AE%E5%A4%AA%E5%A4%9A%0A%0Aclass%20AudioPlugin(Plugin)%3A%0A%20%20%20%20pass'), 'copy-btn-327')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># __init_subclass__：不寫 metaclass 就能在「子類別被建立時」介入（Python 3.6+）
+class Plugin:
+    registry: dict[str, type] = {}
+
+    def __init_subclass__(cls, **kwargs: object) -&gt; None:
+        super().__init_subclass__(**kwargs)
+        Plugin.registry[cls.__name__] = cls    # 同樣的自動註冊，但簡單太多
+
+class AudioPlugin(Plugin):
+    pass</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-328" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20Plugin.registry%0A%7B%27AudioPlugin%27%3A%20%3Cclass%20%27AudioPlugin%27%3E%7D'), 'copy-btn-328')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; Plugin.registry
+{'AudioPlugin': &lt;class 'AudioPlugin'&gt;}</code></pre>
+      </div>
+    <p>這個 <code>__init_subclass__</code> 版本做到跟 metaclass 一樣的自動註冊，卻不需要任何 metaclass 知識。判準很簡單：</p>
+<ul>
+<li>要在<strong>類別建立後</strong>增強它 → 用<strong>類別裝飾器</strong>（如 <code>@dataclass</code>）。</li>
+<li>要在<strong>子類別被建立時</strong>介入（註冊、驗證子類別有沒有實作某方法）→ 用 <strong><code>__init_subclass__</code></strong>。</li>
+<li>上面兩個都解決不了，才考慮 metaclass——這種情境通常出現在你寫框架（ORM、序列化、API 框架）的時候。</li>
+</ul>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：metaclass + <code>__new__</code> 在威力上接近「Java 反射 + 動態建立類別」，或 Lombok / annotation processor 那種「在類別生成階段改寫類別」的能力。但 Python 是純執行期、無編譯步驟。SQLAlchemy、Django ORM 的「定義欄位即定義資料表」就是 metaclass 的經典戰場——但那是框架作者的事，應用程式碼幾乎碰不到。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：metaclass 要「知道它存在、看得懂別人的框架程式碼」，但自己動手前先問三次「<code>__init_subclass__</code> 或類別裝飾器能不能解決？」。能，就別碰 metaclass。</p>
+</div><hr>
+<h2 id="本章小結">本章小結</h2><ol>
+<li><strong>裝飾器就是「吃函式、回傳函式」的高階函式</strong>，<code>@deco</code> 完全等價於 <code>f = deco(f)</code>，只是語法糖。它在 <code>def</code> 執行的當下就套用，不是呼叫時。</li>
+<li><strong>裝飾器 vs Java annotation</strong>：目的相同（橫切關注點），機制相反——annotation 是被動中繼資料、要靠框架反射/織入；decorator 是主動函式、純語言特性、無需框架。</li>
+<li><strong>永遠加 <code>functools.wraps</code></strong>：否則 wrapper 會抹掉原函式的 <code>__name__</code>、<code>__doc__</code> 等身分，搞壞日誌與工具。<code>@wraps</code> 還留下 <code>__wrapped__</code> 逃生門。</li>
+<li><strong>帶參數的裝飾器是三層巢狀</strong>：最外層吃裝飾器參數、中間層吃函式、最內層吃呼叫引數。<code>@retry()</code> 一定要加括號。</li>
+<li><strong>類別裝飾器收到類別、回傳（增強後的）類別</strong>，常用於自動註冊。<code>@dataclass</code> 本身就是類別裝飾器。</li>
+<li><strong><code>__getattr__</code> 只在查找失敗時呼叫</strong>（做 fallback/委派），<code>__getattribute__</code> 每次都攔截（罕用）。<code>__setattr__</code> 攔截所有指派，內部設值務必走 <code>super().__setattr__</code> 或 <code>self.__dict__</code>，否則無窮遞迴。</li>
+<li><strong>descriptor（<code>__get__</code>/<code>__set__</code>/<code>__set_name__</code>）是 <code>@property</code>、classmethod、method binding 的底層</strong>。data descriptor（有 <code>__set__</code>）優先序高於實例 <code>__dict__</code>，non-data（只有 <code>__get__</code>）較低。要把驗證套到多個欄位就自己寫 descriptor。</li>
+<li><strong>metaclass 是「類別的類別」（<code>type</code>）</strong>，能在類別建立時介入，但 99% 用不到——多半 <code>__init_subclass__</code> 或類別裝飾器就能取代，知道存在、看得懂框架碼即可。</li>
+</ol>
+<hr>
+<h2 id="練習">練習</h2><p><strong>練習 1（拆語法糖）</strong>
+不要執行，先寫出下面這段的「去語法糖」等價版本（用 <code>=</code> 賦值，不用 <code>@</code>），再執行驗證你的理解。說明 <code>count_calls</code> 是在「定義 <code>hello</code> 時」還是「第一次呼叫 <code>hello</code> 時」執行的。延伸思考：去語法糖後 <code>hello</code> 其實是 <code>wrapper</code>，而計數器 <code>func.calls</code> 掛在**原始 func（被包起來那個）**身上，不在 <code>wrapper</code> 上——試著存取 <code>hello.calls</code>，觀察為何會丟 <code>AttributeError</code>、計數器到底掛在哪個物件上。想讓 <code>hello.calls</code> 取得到，計數器該改掛哪裡（提示：改成 <code>wrapper.calls</code>，並補上 <code>@wraps</code>）？</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-329" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20count_calls(func)%3A%0A%20%20%20%20func.calls%20%3D%200%0A%20%20%20%20def%20wrapper(*args%2C%20**kwargs)%3A%0A%20%20%20%20%20%20%20%20func.calls%20%2B%3D%201%0A%20%20%20%20%20%20%20%20return%20func(*args%2C%20**kwargs)%0A%20%20%20%20return%20wrapper%0A%0A%40count_calls%0Adef%20hello()%3A%20return%20%22hi%22'), 'copy-btn-329')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def count_calls(func):
+    func.calls = 0
+    def wrapper(*args, **kwargs):
+        func.calls += 1
+        return func(*args, **kwargs)
+    return wrapper
+
+@count_calls
+def hello(): return "hi"</code></pre>
+      </div>
+    <p><strong>練習 2（修好遺失的身分）</strong>
+拿掉某個你寫的裝飾器裡的 <code>@wraps</code>，用 <code>your_func.__name__</code> 和 <code>help(your_func)</code> 觀察壞掉的樣子，再加回 <code>@wraps</code> 對比。額外題：用 <code>your_func.__wrapped__</code> 拿回原函式並直接呼叫，繞過裝飾器邏輯。</p>
+<p><strong>練習 3（帶參數的裝飾器）</strong>
+寫一個 <code>@cache_for(seconds=60)</code>：在指定秒數內，相同引數的呼叫直接回傳上次的結果（簡易 TTL 快取）。務必用三層巢狀結構，並加 <code>@wraps</code>。提示：用 <code>time.monotonic()</code> 記時間戳，用 <code>dict</code> 以引數為 key 存 <code>(timestamp, result)</code>。寫一個會 <code>print</code> 的慢函式驗證第二次呼叫沒有真的執行。</p>
+<p><strong>練習 4（descriptor 取代 property 樣板）</strong>
+你有一個 <code>Person</code>，<code>name</code> 不能是空字串、<code>age</code> 必須是 0–150 的 int。先用兩組 <code>@property</code> 寫一版，感受重複的樣板；再寫一個帶參數的 descriptor（如 <code>Validated(validator=...)</code> 或 <code>BoundedInt(low, high)</code>），讓 <code>Person</code> 用宣告的方式套用驗證。比較兩版的程式碼量與可重用性。</p>
+<p><strong>練習 5（metaclass 的輕量替代）</strong>
+用 <code>__init_subclass__</code> 寫一個 <code>Handler</code> 基底類別：任何子類別若沒有定義 <code>handle</code> 方法，就在<strong>子類別被建立的當下</strong>（不是被呼叫時）拋出 <code>TypeError</code>。寫一個正確的子類別與一個忘了實作 <code>handle</code> 的子類別來驗證。說明為什麼這裡用 <code>__init_subclass__</code> 比 metaclass 好，以及它跟 <code>@abstractmethod</code>（第 8 章，實例化時才報錯）在「何時報錯」上的差別。</p>

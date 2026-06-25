@@ -1,0 +1,710 @@
+<h1 id="第-17-章資料處理與自動化腳本">第 17 章：資料處理與自動化腳本</h1><p>身為 Java 工程師，「寫個小工具」對你來說常常是個沉重的決定：要開 Maven 專案、拉 OkHttp、拉 Jackson、拉 Apache POI、寫 <code>main</code>、打包成 fat jar，最後得到一個三百行才能抓資料寫 Excel 的東西。於是大多數人退而求其次，回去寫 bash——然後在 <code>awk</code>、<code>sed</code>、引號跳脫的地獄裡度過下午。Python 在這個區間是壓倒性的：它是業界公認的「膠水語言」（glue language），抓 HTTP、清資料、寫報表、串子行程，每一段都短到像虛擬碼，卻又有型別、有例外、可測、跨平台。這一章把第 14、15 章建立的工具（async、<code>pathlib</code>、<code>subprocess</code>、<code>argparse</code>、<code>logging</code>）和四個重量級套件（requests/httpx、pandas、BeautifulSoup、openpyxl）串起來，目標是讓你能在一個下午做出「抓資料 → 整理 → 出報表」的自動化腳本。過程中要記住兩個工程心法：<strong>向量化</strong>（vectorization，別用 for-loop 逐列算）與<strong>可重現</strong>（reproducibility，測試用本地資料、不依賴外部世界）。</p>
+<hr>
+<h2 id="http-clientrequests-vs-httpx">HTTP client：requests vs httpx</h2><p>Java 11 之前抓 HTTP 是場災難（<code>HttpURLConnection</code> 的 API 像懲罰），所以大家用 OkHttp 或 Apache HttpClient。Java 11 之後有了官方 <code>java.net.http.HttpClient</code>，總算像樣。Python 這邊長年的事實標準是 <strong>requests</strong>——「HTTP for Humans」，幾乎每個 Python 專案都依賴它。近年崛起的 <strong>httpx</strong> 則是 requests 的精神續作：API 幾乎一模一樣，但多了 async（承接第 14 章的 async/await）與 HTTP/2 支援。經驗法則：<strong>純同步、不在乎 async，就用 requests；需要 async 或 HTTP/2，就用 httpx</strong>。兩者學會一個，另一個只要改 import。</p>
+<h3 id="requests同步的業界標準">requests：同步的業界標準</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-507" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%2011%20HttpClient%0AHttpClient%20client%20%3D%20HttpClient.newHttpClient()%3B%0AHttpRequest%20req%20%3D%20HttpRequest.newBuilder()%0A%20%20%20%20%20%20%20%20.uri(URI.create(%22https%3A%2F%2Fhttpbin.org%2Fget%3Fq%3Dpython%22))%0A%20%20%20%20%20%20%20%20.header(%22User-Agent%22%2C%20%22demo%2F1.0%22)%0A%20%20%20%20%20%20%20%20.timeout(Duration.ofSeconds(10))%0A%20%20%20%20%20%20%20%20.GET()%0A%20%20%20%20%20%20%20%20.build()%3B%0AHttpResponse%3CString%3E%20resp%20%3D%20client.send(req%2C%20HttpResponse.BodyHandlers.ofString())%3B%0Aif%20(resp.statusCode()%20%2F%20100%20!%3D%202)%20throw%20new%20IOException(%22HTTP%20%22%20%2B%20resp.statusCode())%3B%0AString%20body%20%3D%20resp.body()%3B%20%20%20%2F%2F%20%E9%82%84%E8%A6%81%E8%87%AA%E5%B7%B1%E4%B8%9F%E7%B5%A6%20Jackson%20%E8%A7%A3%E6%9E%90%20JSON'), 'copy-btn-507')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java 11 HttpClient
+HttpClient client = HttpClient.newHttpClient();
+HttpRequest req = HttpRequest.newBuilder()
+        .uri(URI.create("https://httpbin.org/get?q=python"))
+        .header("User-Agent", "demo/1.0")
+        .timeout(Duration.ofSeconds(10))
+        .GET()
+        .build();
+HttpResponse&lt;String&gt; resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+if (resp.statusCode() / 100 != 2) throw new IOException("HTTP " + resp.statusCode());
+String body = resp.body();   // 還要自己丟給 Jackson 解析 JSON</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-508" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20requests%EF%BC%88%E9%9C%80%E9%80%A3%E7%B6%B2%EF%BC%89%0Aimport%20requests%0A%0Aresp%20%3D%20requests.get(%0A%20%20%20%20%22https%3A%2F%2Fhttpbin.org%2Fget%22%2C%0A%20%20%20%20params%3D%7B%22q%22%3A%20%22python%22%7D%2C%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20query%20string%EF%BC%8C%E8%87%AA%E5%8B%95%E7%B7%A8%E7%A2%BC%0A%20%20%20%20headers%3D%7B%22User-Agent%22%3A%20%22demo%2F1.0%22%7D%2C%0A%20%20%20%20timeout%3D10%2C%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8B%99%E5%BF%85%E8%A8%AD%EF%BC%81%E8%A6%8B%E4%B8%8B%E6%96%B9%E9%99%B7%E9%98%B1%0A)%0Aresp.raise_for_status()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%9D%9E%202xx%20%E7%9B%B4%E6%8E%A5%E4%B8%9F%20HTTPError%0Adata%20%3D%20resp.json()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%85%A7%E5%BB%BA%20JSON%20%E8%A7%A3%E6%9E%90%EF%BC%8C%E4%B8%8D%E7%94%A8%20Jackson'), 'copy-btn-508')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># requests（需連網）
+import requests
+
+resp = requests.get(
+    "https://httpbin.org/get",
+    params={"q": "python"},                       # query string，自動編碼
+    headers={"User-Agent": "demo/1.0"},
+    timeout=10,                                     # 務必設！見下方陷阱
+)
+resp.raise_for_status()                            # 非 2xx 直接丟 HTTPError
+data = resp.json()                                 # 內建 JSON 解析，不用 Jackson</code></pre>
+      </div>
+    <p>短了一半，而且 <code>params</code> 自動處理 URL 編碼、<code>resp.json()</code> 內建解析——這就是「HTTP for Humans」的意思。<code>raise_for_status()</code> 是關鍵習慣：requests <strong>預設不會</strong>因為 404/500 丟例外（它認為「收到回應」本身就是成功），你必須主動呼叫它把非 2xx 轉成 <code>HTTPError</code>，對應 Java 那段手寫的 <code>statusCode() / 100 != 2</code> 檢查。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>requests.get(...)</code> <strong>預設沒有 timeout</strong>，會無限等待。在生產環境這是頭號事故來源——一個慢掉的下游能把你的 thread pool 全部卡死。<strong>每一個 request 都要傳 <code>timeout</code></strong>。Java 的 <code>HttpClient</code> 至少還有連線 timeout 概念，requests 連那都沒有預設。可傳 <code>timeout=10</code>（連線＋讀取都 10 秒）或 <code>timeout=(3.05, 27)</code>（連線 3.05 秒、讀取 27 秒）。</p>
+</div><p>POST JSON body 一樣俐落，用 <code>json=</code> 參數會自動序列化並設好 <code>Content-Type</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-509" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('resp%20%3D%20requests.post(%0A%20%20%20%20%22https%3A%2F%2Fhttpbin.org%2Fpost%22%2C%0A%20%20%20%20json%3D%7B%22name%22%3A%20%22Alice%22%2C%20%22age%22%3A%2030%7D%2C%20%20%20%23%20%E8%87%AA%E5%8B%95%20json.dumps%20%2B%20Content-Type%3A%20application%2Fjson%0A%20%20%20%20timeout%3D10%2C%0A)%0Aresp.raise_for_status()%0Aprint(resp.json()%5B%22json%22%5D)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20httpbin%20%E5%9B%9E%E9%A1%AF%E6%88%91%E5%80%91%E9%80%81%E7%9A%84%20body'), 'copy-btn-509')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">resp = requests.post(
+    "https://httpbin.org/post",
+    json={"name": "Alice", "age": 30},   # 自動 json.dumps + Content-Type: application/json
+    timeout=10,
+)
+resp.raise_for_status()
+print(resp.json()["json"])               # httpbin 回顯我們送的 body</code></pre>
+      </div>
+    <p>對照之下，若要送傳統表單（<code>application/x-www-form-urlencoded</code>）則用 <code>data=</code>，送檔案用 <code>files=</code>。<code>json=</code> vs <code>data=</code> 的差別，正是 Java 裡你要手動設 <code>Content-Type</code> 並選對 body publisher 的那一步。</p>
+<h3 id="session連線重用連線池">Session：連線重用（連線池）</h3><p>這是新手最常忽略、最影響效能的一點。每次 <code>requests.get(...)</code> 都會<strong>新建一條 TCP 連線、重做一次 TLS 握手</strong>。抓一個 URL 沒差，但在迴圈裡抓一百個就是一百次握手。解法是用 <code>Session</code>——它內部維護一個連線池（connection pool），對同一 host 的請求會重用 keep-alive 連線，並且讓你設一次 header/cookie 就套用到所有請求。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-510" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9AHttpClient%20%E6%9C%AC%E8%BA%AB%E5%B0%B1%E6%98%AF%E5%9F%B7%E8%A1%8C%E7%B7%92%E5%AE%89%E5%85%A8%E3%80%81%E5%8F%AF%E9%87%8D%E7%94%A8%E7%9A%84%EF%BC%8C%E5%BB%BA%E4%B8%80%E5%80%8B%E7%94%A8%E5%88%B0%E5%BA%95%0AHttpClient%20client%20%3D%20HttpClient.newHttpClient()%3B%20%20%20%2F%2F%20%E9%87%8D%E7%94%A8%E9%80%99%E4%B8%80%E5%80%8B%0A%2F%2F%20OkHttp%20%E5%90%8C%E7%90%86%EF%BC%9A%E4%B8%80%E5%80%8B%20OkHttpClient%20%E8%B5%B0%E5%85%A8%E7%A8%8B%EF%BC%8C%E8%83%8C%E5%BE%8C%E6%9C%89%E9%80%A3%E7%B7%9A%E6%B1%A0'), 'copy-btn-510')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：HttpClient 本身就是執行緒安全、可重用的，建一個用到底
+HttpClient client = HttpClient.newHttpClient();   // 重用這一個
+// OkHttp 同理：一個 OkHttpClient 走全程，背後有連線池</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-511" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20requests%EF%BC%88%E9%9C%80%E9%80%A3%E7%B6%B2%EF%BC%89%EF%BC%9ASession%20%E5%B0%8D%E6%87%89%20Java%20%E9%87%8D%E7%94%A8%E5%90%8C%E4%B8%80%E5%80%8B%20HttpClient%0Aimport%20requests%0A%0Awith%20requests.Session()%20as%20session%3A%0A%20%20%20%20session.headers.update(%7B%22User-Agent%22%3A%20%22python-book-demo%2F1.0%22%7D)%0A%20%20%20%20for%20page%20in%20range(1%2C%204)%3A%0A%20%20%20%20%20%20%20%20resp%20%3D%20session.get(%0A%20%20%20%20%20%20%20%20%20%20%20%20%22https%3A%2F%2Fhttpbin.org%2Fget%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20params%3D%7B%22q%22%3A%20%22python%22%2C%20%22page%22%3A%20page%7D%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20timeout%3D10%2C%0A%20%20%20%20%20%20%20%20)%0A%20%20%20%20%20%20%20%20resp.raise_for_status()%0A%20%20%20%20%20%20%20%20print(resp.json()%5B%22args%22%5D)%20%20%20%20%20%20%23%20%7B%27page%27%3A%20%271%27%2C%20%27q%27%3A%20%27python%27%7D%20...'), 'copy-btn-511')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># requests（需連網）：Session 對應 Java 重用同一個 HttpClient
+import requests
+
+with requests.Session() as session:
+    session.headers.update({"User-Agent": "python-book-demo/1.0"})
+    for page in range(1, 4):
+        resp = session.get(
+            "https://httpbin.org/get",
+            params={"q": "python", "page": page},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        print(resp.json()["args"])      # {'page': '1', 'q': 'python'} ...</code></pre>
+      </div>
+    <p>執行上面這段會印出三次 <code>args</code>，三個請求共用同一條底層連線。<code>Session</code> 用 <code>with</code> 確保收尾時釋放連線池。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>requests.get()</code>（無 Session）≈ 每次 <code>HttpClient.newHttpClient()</code> 再丟掉——浪費。<code>requests.Session()</code> ≈ 建一個 <code>HttpClient</code>/<code>OkHttpClient</code> 用到底——這才是正確姿勢。Session 之於 requests，就像 connection pool 之於 JDBC。</p>
+</div><h3 id="httpx同樣的-api外加-async-與-http2">httpx：同樣的 API，外加 async 與 HTTP/2</h3><p>httpx 的同步 API 幾乎是 requests 的拷貝（<code>httpx.get(...)</code>、<code>Client</code> 對應 <code>Session</code>），但它真正的賣點是 async。回想第 14 章：當你要<strong>併發</strong>抓很多 URL，同步逐一抓會被 I/O 等待拖死，而 async 能在等待時去做別的請求。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-512" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20httpx%20async%EF%BC%88%E9%9C%80%E9%80%A3%E7%B6%B2%EF%BC%89%EF%BC%9A%E4%BD%B5%E7%99%BC%E6%8A%93%E5%A4%9A%E5%80%8B%20URL%0Aimport%20asyncio%0Aimport%20httpx%0A%0Aasync%20def%20fetch(client%3A%20httpx.AsyncClient%2C%20page%3A%20int)%20-%3E%20dict%3A%0A%20%20%20%20resp%20%3D%20await%20client.get(%0A%20%20%20%20%20%20%20%20%22https%3A%2F%2Fhttpbin.org%2Fget%22%2C%0A%20%20%20%20%20%20%20%20params%3D%7B%22page%22%3A%20page%7D%2C%0A%20%20%20%20%20%20%20%20timeout%3D10.0%2C%0A%20%20%20%20)%0A%20%20%20%20resp.raise_for_status()%0A%20%20%20%20return%20resp.json()%5B%22args%22%5D%0A%0Aasync%20def%20main()%20-%3E%20None%3A%0A%20%20%20%20async%20with%20httpx.AsyncClient()%20as%20client%3A%20%20%20%20%20%20%20%20%23%20%E5%B0%8D%E6%87%89%20requests.Session%0A%20%20%20%20%20%20%20%20%23%20gather%20%E5%90%8C%E6%99%82%E7%99%BC%E5%87%BA%E4%B8%89%E5%80%8B%E8%AB%8B%E6%B1%82%EF%BC%8C%E7%B8%BD%E8%80%97%E6%99%82%20%E2%89%88%20%E6%9C%80%E6%85%A2%E9%82%A3%E4%B8%80%E5%80%8B%EF%BC%8C%E8%80%8C%E9%9D%9E%E4%B8%89%E8%80%85%E7%9B%B8%E5%8A%A0%0A%20%20%20%20%20%20%20%20results%20%3D%20await%20asyncio.gather(%0A%20%20%20%20%20%20%20%20%20%20%20%20*(fetch(client%2C%20p)%20for%20p%20in%20range(1%2C%204))%0A%20%20%20%20%20%20%20%20)%0A%20%20%20%20%20%20%20%20for%20r%20in%20results%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20print(r)%0A%0Aasyncio.run(main())'), 'copy-btn-512')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># httpx async（需連網）：併發抓多個 URL
+import asyncio
+import httpx
+
+async def fetch(client: httpx.AsyncClient, page: int) -&gt; dict:
+    resp = await client.get(
+        "https://httpbin.org/get",
+        params={"page": page},
+        timeout=10.0,
+    )
+    resp.raise_for_status()
+    return resp.json()["args"]
+
+async def main() -&gt; None:
+    async with httpx.AsyncClient() as client:        # 對應 requests.Session
+        # gather 同時發出三個請求，總耗時 ≈ 最慢那一個，而非三者相加
+        results = await asyncio.gather(
+            *(fetch(client, p) for p in range(1, 4))
+        )
+        for r in results:
+            print(r)
+
+asyncio.run(main())</code></pre>
+      </div>
+    <p>關鍵字 <code>async with</code> / <code>await</code> 就是第 14 章那套；<code>asyncio.gather</code> 把多個 coroutine 同時跑，相當於 Java 的 <code>CompletableFuture.allOf(...)</code>。同步版本抓三頁要等三輪 round-trip，async 版本三個請求重疊，總時間趨近於單一最慢請求——這正是 async I/O 的甜蜜點。</p>
+<table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>java.net.http.HttpClient</code>（同步 <code>send</code>）</td>
+<td><code>requests</code> / <code>httpx</code>（同步）</td>
+<td>阻塞式，最直觀</td>
+</tr>
+<tr>
+<td><code>HttpClient.sendAsync</code> + <code>CompletableFuture</code></td>
+<td><code>httpx.AsyncClient</code> + <code>await</code></td>
+<td>非阻塞併發</td>
+</tr>
+<tr>
+<td>OkHttp <code>OkHttpClient</code>（一個用到底）</td>
+<td><code>Session</code> / <code>Client</code> / <code>AsyncClient</code></td>
+<td>連線池重用</td>
+</tr>
+<tr>
+<td><code>resp.statusCode()</code> 手動檢查</td>
+<td><code>resp.raise_for_status()</code></td>
+<td>非 2xx 轉例外</td>
+</tr>
+<tr>
+<td>Jackson <code>readValue(body, ...)</code></td>
+<td><code>resp.json()</code></td>
+<td>內建 JSON 解析</td>
+</tr>
+</tbody></table>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：先用 requests，需要 async/HTTP/2 時整段換 httpx——<code>import</code> 改掉、<code>Session</code> 改 <code>Client</code>、加 <code>async</code>/<code>await</code>，邏輯幾乎不動。不要一開始就為「以後可能要 async」過度設計；YAGNI 在 Python 比在 Java 更管用，因為換的成本極低。</p>
+</div><hr>
+<h2 id="pandas-入門dataframe-思維">pandas 入門：DataFrame 思維</h2><p>pandas 是 Python 資料處理的核心，但對 Java 工程師而言最大的障礙不是 API，而是<strong>思維轉換</strong>。你習慣「資料 = 一堆物件，處理 = 對 collection 跑迴圈或 Stream」。pandas 要你換成另一套世界觀：把資料想成一張<strong>表</strong>，整欄整欄地操作。請同時用三個熟悉的心智模型來理解 <code>DataFrame</code>：</p>
+<ul>
+<li><strong>程式化的試算表</strong>（Excel）——有列有欄、有欄名。</li>
+<li><strong>記憶體裡的 SQL 表</strong>——可以 <code>select</code>、<code>where</code>、<code>group by</code>、<code>join</code>。</li>
+<li><strong>欄導向資料集</strong>（columnar）——每一欄是同型別的連續陣列，這是它快的根源。</li>
+</ul>
+<p><code>Series</code> 是單一欄（帶索引的一維陣列），<code>DataFrame</code> 是多個 <code>Series</code> 並排（共享列索引）。</p>
+<h3 id="建立選取過濾">建立、選取、過濾</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-513" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20pandas%20as%20pd%0A%0Aorders%20%3D%20pd.DataFrame(%7B%0A%20%20%20%20%22order_id%22%3A%20%5B1%2C%202%2C%203%2C%204%2C%205%5D%2C%0A%20%20%20%20%22customer%22%3A%20%5B%22Alice%22%2C%20%22Bob%22%2C%20%22Alice%22%2C%20%22Carol%22%2C%20%22Bob%22%5D%2C%0A%20%20%20%20%22category%22%3A%20%5B%22book%22%2C%20%22book%22%2C%20%22toy%22%2C%20%22book%22%2C%20%22toy%22%5D%2C%0A%20%20%20%20%22amount%22%3A%20%5B120%2C%2080%2C%20200%2C%2060%2C%20150%5D%2C%0A%7D)%0Aprint(orders)'), 'copy-btn-513')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import pandas as pd
+
+orders = pd.DataFrame({
+    "order_id": [1, 2, 3, 4, 5],
+    "customer": ["Alice", "Bob", "Alice", "Carol", "Bob"],
+    "category": ["book", "book", "toy", "book", "toy"],
+    "amount": [120, 80, 200, 60, 150],
+})
+print(orders)</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-514" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%20%20%20order_id%20customer%20category%20%20amount%0A0%20%20%20%20%20%20%20%20%201%20%20%20%20Alice%20%20%20%20%20book%20%20%20%20%20120%0A1%20%20%20%20%20%20%20%20%202%20%20%20%20%20%20Bob%20%20%20%20%20book%20%20%20%20%20%2080%0A2%20%20%20%20%20%20%20%20%203%20%20%20%20Alice%20%20%20%20%20%20toy%20%20%20%20%20200%0A3%20%20%20%20%20%20%20%20%204%20%20%20%20Carol%20%20%20%20%20book%20%20%20%20%20%2060%0A4%20%20%20%20%20%20%20%20%205%20%20%20%20%20%20Bob%20%20%20%20%20%20toy%20%20%20%20%20150'), 'copy-btn-514')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">   order_id customer category  amount
+0         1    Alice     book     120
+1         2      Bob     book      80
+2         3    Alice      toy     200
+3         4    Carol     book      60
+4         5      Bob      toy     150</code></pre>
+      </div>
+    <p>選取與過濾，請直接對照 SQL：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-515" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20orders%5B%22amount%22%5D%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%81%B8%E4%B8%80%E6%AC%84%20%E2%86%92%20Series%EF%BC%8C%E7%AD%89%E5%90%8C%20SELECT%20amount%0A0%20%20%20%20120%0A1%20%20%20%20%2080%0A2%20%20%20%20200%0A3%20%20%20%20%2060%0A4%20%20%20%20150%0AName%3A%20amount%2C%20dtype%3A%20int64%0A%0A%3E%3E%3E%20orders%5Borders%5B%22amount%22%5D%20%3E%20100%5D%20%20%20%20%23%20boolean%20mask%20%E2%86%92%20WHERE%20amount%20%3E%20100%0A%20%20%20order_id%20customer%20category%20%20amount%0A0%20%20%20%20%20%20%20%20%201%20%20%20%20Alice%20%20%20%20%20book%20%20%20%20%20120%0A2%20%20%20%20%20%20%20%20%203%20%20%20%20Alice%20%20%20%20%20%20toy%20%20%20%20%20200%0A4%20%20%20%20%20%20%20%20%205%20%20%20%20%20%20Bob%20%20%20%20%20%20toy%20%20%20%20%20150%0A%0A%3E%3E%3E%20orders.loc%5Borders%5B%22category%22%5D%20%3D%3D%20%22book%22%2C%20%22amount%22%5D.sum()%20%20%20%23%20WHERE%20%2B%20%E8%81%9A%E5%90%88%0A260'), 'copy-btn-515')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; orders["amount"]              # 選一欄 → Series，等同 SELECT amount
+0    120
+1     80
+2    200
+3     60
+4    150
+Name: amount, dtype: int64
+
+&gt;&gt;&gt; orders[orders["amount"] &gt; 100]    # boolean mask → WHERE amount &gt; 100
+   order_id customer category  amount
+0         1    Alice     book     120
+2         3    Alice      toy     200
+4         5      Bob      toy     150
+
+&gt;&gt;&gt; orders.loc[orders["category"] == "book", "amount"].sum()   # WHERE + 聚合
+260</code></pre>
+      </div>
+    <p><code>orders[&quot;amount&quot;] &gt; 100</code> 不是回傳 <code>bool</code>，而是回傳一整欄 <code>True</code>/<code>False</code> 的 <code>Series</code>（boolean mask），再用它去索引 <code>DataFrame</code> 篩列。這就是向量化過濾——你描述「條件」，pandas 一次套用到整欄。<code>.loc[列條件, 欄]</code> 是最常用的二維存取（label-based），<code>.iloc[數字, 數字]</code> 則是純位置存取（integer-based），對應的差別就像 SQL 的欄名 vs JDBC <code>ResultSet.getObject(1)</code>。</p>
+<h3 id="新增欄與-groupby-聚合">新增欄與 groupby 聚合</h3><p>新增欄就是賦值給一個新欄名，而且<strong>整欄一次算完</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-516" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20orders%5B%22amount_with_tax%22%5D%20%3D%20orders%5B%22amount%22%5D%20*%201.05%20%20%20%23%20%E6%95%B4%E6%AC%84%E4%B9%98%EF%BC%8C%E4%B8%8D%E6%98%AF%E9%80%90%E5%88%97%0A%3E%3E%3E%20orders%5B%5B%22order_id%22%2C%20%22amount%22%2C%20%22amount_with_tax%22%5D%5D%0A%20%20%20order_id%20%20amount%20%20amount_with_tax%0A0%20%20%20%20%20%20%20%20%201%20%20%20%20%20120%20%20%20%20%20%20%20%20%20%20%20%20126.0%0A1%20%20%20%20%20%20%20%20%202%20%20%20%20%20%2080%20%20%20%20%20%20%20%20%20%20%20%20%2084.0%0A2%20%20%20%20%20%20%20%20%203%20%20%20%20%20200%20%20%20%20%20%20%20%20%20%20%20%20210.0%0A3%20%20%20%20%20%20%20%20%204%20%20%20%20%20%2060%20%20%20%20%20%20%20%20%20%20%20%20%2063.0%0A4%20%20%20%20%20%20%20%20%205%20%20%20%20%20150%20%20%20%20%20%20%20%20%20%20%20%20157.5'), 'copy-btn-516')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; orders["amount_with_tax"] = orders["amount"] * 1.05   # 整欄乘，不是逐列
+&gt;&gt;&gt; orders[["order_id", "amount", "amount_with_tax"]]
+   order_id  amount  amount_with_tax
+0         1     120            126.0
+1         2      80             84.0
+2         3     200            210.0
+3         4      60             63.0
+4         5     150            157.5</code></pre>
+      </div>
+    <p><code>groupby</code> 對應 SQL 的 <code>GROUP BY</code>，也對應 Java Stream 的 <code>Collectors.groupingBy</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-517" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%20Stream%0AMap%3CString%2C%20Integer%3E%20totals%20%3D%20orders.stream()%0A%20%20%20%20%20%20%20%20.collect(Collectors.groupingBy(%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20Order%3A%3Acustomer%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20Collectors.summingInt(Order%3A%3Aamount)))%3B'), 'copy-btn-517')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java Stream
+Map&lt;String, Integer&gt; totals = orders.stream()
+        .collect(Collectors.groupingBy(
+                Order::customer,
+                Collectors.summingInt(Order::amount)));</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-518" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20orders.groupby(%22customer%22)%5B%22amount%22%5D.agg(%5B%22sum%22%2C%20%22count%22%5D)%0A%20%20%20%20%20%20%20%20%20%20sum%20%20count%0Acustomer%0AAlice%20%20%20%20%20320%20%20%20%20%20%202%0ABob%20%20%20%20%20%20%20230%20%20%20%20%20%202%0ACarol%20%20%20%20%20%2060%20%20%20%20%20%201%0A%0A%3E%3E%3E%20orders.groupby(%22category%22)%5B%22amount%22%5D.sum()%0Acategory%0Abook%20%20%20%20260%0Atoy%20%20%20%20%20350%0AName%3A%20amount%2C%20dtype%3A%20int64'), 'copy-btn-518')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; orders.groupby("customer")["amount"].agg(["sum", "count"])
+          sum  count
+customer
+Alice     320      2
+Bob       230      2
+Carol      60      1
+
+&gt;&gt;&gt; orders.groupby("category")["amount"].sum()
+category
+book    260
+toy     350
+Name: amount, dtype: int64</code></pre>
+      </div>
+    <p>比 Stream 那串 <code>Collectors.groupingBy(..., summingInt(...))</code> 短太多，而且你可以一次要多個聚合（<code>[&quot;sum&quot;, &quot;count&quot;]</code>），不用巢狀 collector。<code>groupby</code> 回傳的結果帶著分組鍵作為索引，這點像 SQL 結果集而非 Java <code>Map</code>。</p>
+<h3 id="向量化思維最重要的一課">向量化思維：最重要的一課</h3><p>這是整個 pandas 章節的核心。Java 工程師的本能是「遍歷每一列、逐筆處理」，在 pandas 裡這是<strong>反模式</strong>（anti-pattern）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-519" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E5%8F%8D%E6%A8%A1%E5%BC%8F%EF%BC%9A%E9%80%90%E5%88%97%20for-loop%EF%BC%88%E6%85%A2%2010%EF%BD%9E100%20%E5%80%8D%EF%BC%8C%E5%88%A5%E9%80%99%E6%A8%A3%EF%BC%89%0Atotals%20%3D%20%5B%5D%0Afor%20i%20in%20range(len(orders))%3A%0A%20%20%20%20row%20%3D%20orders.iloc%5Bi%5D%0A%20%20%20%20totals.append(row%5B%22amount%22%5D%20*%201.05)%0Aorders%5B%22bad_total%22%5D%20%3D%20totals'), 'copy-btn-519')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># 反模式：逐列 for-loop（慢 10～100 倍，別這樣）
+totals = []
+for i in range(len(orders)):
+    row = orders.iloc[i]
+    totals.append(row["amount"] * 1.05)
+orders["bad_total"] = totals</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-520" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20Pythonic%20%2F%20pandas%20way%EF%BC%9A%E5%90%91%E9%87%8F%E5%8C%96%EF%BC%8C%E4%B8%80%E8%A1%8C%0Aorders%5B%22good_total%22%5D%20%3D%20orders%5B%22amount%22%5D%20*%201.05'), 'copy-btn-520')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># Pythonic / pandas way：向量化，一行
+orders["good_total"] = orders["amount"] * 1.05</code></pre>
+      </div>
+    <p>兩者結果一樣，但效能天差地遠。原因在底層：pandas 的每一欄是 NumPy 陣列，是<strong>連續記憶體裡的同型別資料</strong>；<code>orders[&quot;amount&quot;] * 1.05</code> 這個乘法是在 C 層級對整塊記憶體跑迴圈，沒有 Python 直譯器的逐次 dispatch、沒有逐列建立 Python 物件的開銷。而 <code>for i in range(...)</code> + <code>iloc[i]</code> 每一圈都要：跨越 Python/C 邊界、把一列打包成 <code>Series</code> 物件、再拆出值——每一步都是純 Python 的慢速路徑。</p>
+<p>這跟 Java Stream 表面上像（都是「宣告式描述轉換」），但本質不同：Stream 仍在 JVM 逐元素跑你的 lambda；pandas 向量化是把運算<strong>整批下放到編譯好的 C/NumPy</strong>。所以「用 Stream 還是 for 迴圈」在 Java 裡多半是風格選擇，「用向量化還是 for 迴圈」在 pandas 裡是<strong>數量級的效能差異</strong>。</p>
+<p>條件邏輯也要向量化。要做「if-else 產生新欄」，別跑迴圈，用 <code>numpy.where</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-521" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20numpy%20as%20np%0Aorders%5B%22tier%22%5D%20%3D%20np.where(orders%5B%22amount%22%5D%20%3E%3D%20100%2C%20%22high%22%2C%20%22low%22)'), 'copy-btn-521')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import numpy as np
+orders["tier"] = np.where(orders["amount"] &gt;= 100, "high", "low")</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：在 pandas 裡看到自己寫 <code>for</code> 跑列、<code>iterrows()</code>、<code>apply(axis=1)</code>，先停下來問「這能不能用整欄運算、boolean mask、<code>groupby</code>、<code>np.where</code> 表達？」九成可以。把「逐列思考」改成「整欄思考」，是吃透 pandas 的關鍵 mindset shift。</p>
+</div><h3 id="讀寫-csvexcel">讀寫 CSV／Excel</h3><p>實務上資料多半來自檔案。<code>read_csv</code>/<code>to_csv</code> 一行搞定（為了可重現，這裡用 <code>io.StringIO</code> 把字串當檔案讀，你的真實程式碼換成檔案路徑即可）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-522" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20io%0Aimport%20pandas%20as%20pd%0A%0Acsv_text%20%3D%20%22%22%22date%2Cproduct%2Cregion%2Cunits%2Cprice%0A2026-01-05%2Claptop%2CAPAC%2C3%2C1200%0A2026-01-05%2Cmouse%2CAPAC%2C10%2C25%0A2026-01-06%2Claptop%2CEU%2C2%2C1250%0A2026-01-06%2Cmouse%2CEU%2C5%2C28%0A%22%22%22%0Adf%20%3D%20pd.read_csv(io.StringIO(csv_text)%2C%20parse_dates%3D%5B%22date%22%5D)%0Adf%5B%22revenue%22%5D%20%3D%20df%5B%22units%22%5D%20*%20df%5B%22price%22%5D%0Aprint(df.groupby(%22region%22)%5B%22revenue%22%5D.sum())'), 'copy-btn-522')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import io
+import pandas as pd
+
+csv_text = """date,product,region,units,price
+2026-01-05,laptop,APAC,3,1200
+2026-01-05,mouse,APAC,10,25
+2026-01-06,laptop,EU,2,1250
+2026-01-06,mouse,EU,5,28
+"""
+df = pd.read_csv(io.StringIO(csv_text), parse_dates=["date"])
+df["revenue"] = df["units"] * df["price"]
+print(df.groupby("region")["revenue"].sum())</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-523" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('region%0AAPAC%20%20%20%203850%0AEU%20%20%20%20%20%202640%0AName%3A%20revenue%2C%20dtype%3A%20int64'), 'copy-btn-523')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">region
+APAC    3850
+EU      2640
+Name: revenue, dtype: int64</code></pre>
+      </div>
+    <p><code>parse_dates=[&quot;date&quot;]</code> 讓 pandas 把那一欄解析成 <code>datetime64</code>（對應 Java 你得手動 <code>LocalDate.parse</code> 每一格）。寫回用 <code>df.to_csv(&quot;out.csv&quot;, index=False)</code>（<code>index=False</code> 避免把列索引也寫進去，這是新手常忘的）。Excel 則是 <code>df.to_excel(&quot;out.xlsx&quot;, index=False)</code>——<strong>底層正是用 openpyxl</strong>，下一節會看到。</p>
+<hr>
+<h2 id="網頁爬蟲beautifulsoup">網頁爬蟲：BeautifulSoup</h2><p>抓網頁有兩步：<strong>取得 HTML</strong>（用上面的 requests/httpx）與<strong>解析 HTML</strong>（用 BeautifulSoup，套件名 <code>beautifulsoup4</code>）。對照 Java，BeautifulSoup ≈ <strong>Jsoup</strong>——都是把 HTML 解析成可查詢的樹，支援 CSS selector。差別是 Python 這邊解析器可插拔（內建 <code>html.parser</code>，或裝 <code>lxml</code> 求快）。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點 / 可重現心法</strong>：教學與測試<strong>絕對不要</strong>真的去爬線上網站——網站會改版、會擋你、會讓你的測試時好時壞。正確做法是把 HTML 當成<strong>本地字串</strong>（或測試 fixture 檔）來解析，這樣範例 100% 可重現、可進 CI、不依賴連網。真實程式碼裡才把這段字串換成 <code>resp.text</code>。下面整段就用本地 HTML 字串示範。</p>
+</div>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-524" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20bs4%20import%20BeautifulSoup%0A%0A%23%20%E7%9C%9F%E5%AF%A6%E6%83%85%E5%A2%83%EF%BC%9AHTML%20%3D%20requests.get(url%2C%20timeout%3D10).text%0A%23%20%E6%95%99%E5%AD%B8%2F%E6%B8%AC%E8%A9%A6%EF%BC%9A%E7%94%A8%E6%9C%AC%E5%9C%B0%E5%AD%97%E4%B8%B2%EF%BC%8C%E5%AE%8C%E5%85%A8%E5%8F%AF%E9%87%8D%E7%8F%BE%0AHTML%20%3D%20%22%22%22%0A%3Chtml%3E%0A%20%20%3Cbody%3E%0A%20%20%20%20%3Ch1%20id%3D%22title%22%3E2026%20%E6%9A%A2%E9%8A%B7%E6%9B%B8%E6%A6%9C%3C%2Fh1%3E%0A%20%20%20%20%3Cul%20class%3D%22book-list%22%3E%0A%20%20%20%20%20%20%3Cli%20class%3D%22book%22%20data-isbn%3D%22978-1%22%3E%3Cspan%20class%3D%22name%22%3E%E6%B5%81%E6%9A%A2%E7%9A%84%20Python%3C%2Fspan%3E%3Cspan%20class%3D%22price%22%3E880%3C%2Fspan%3E%3C%2Fli%3E%0A%20%20%20%20%20%20%3Cli%20class%3D%22book%22%20data-isbn%3D%22978-2%22%3E%3Cspan%20class%3D%22name%22%3E%E8%A8%AD%E8%A8%88%E8%B3%87%E6%96%99%E5%AF%86%E9%9B%86%E5%9E%8B%E6%87%89%E7%94%A8%3C%2Fspan%3E%3Cspan%20class%3D%22price%22%3E980%3C%2Fspan%3E%3C%2Fli%3E%0A%20%20%20%20%20%20%3Cli%20class%3D%22book%22%20data-isbn%3D%22978-3%22%3E%3Cspan%20class%3D%22name%22%3EEffective%20Java%3C%2Fspan%3E%3Cspan%20class%3D%22price%22%3E650%3C%2Fspan%3E%3C%2Fli%3E%0A%20%20%20%20%3C%2Ful%3E%0A%20%20%20%20%3Ca%20href%3D%22https%3A%2F%2Fexample.com%2Fnext%22%20class%3D%22next%22%3E%E4%B8%8B%E4%B8%80%E9%A0%81%3C%2Fa%3E%0A%20%20%3C%2Fbody%3E%0A%3C%2Fhtml%3E%0A%22%22%22%0A%0Asoup%20%3D%20BeautifulSoup(HTML%2C%20%22html.parser%22)'), 'copy-btn-524')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from bs4 import BeautifulSoup
+
+# 真實情境：HTML = requests.get(url, timeout=10).text
+# 教學/測試：用本地字串，完全可重現
+HTML = """
+&lt;html&gt;
+  &lt;body&gt;
+    &lt;h1 id="title"&gt;2026 暢銷書榜&lt;/h1&gt;
+    &lt;ul class="book-list"&gt;
+      &lt;li class="book" data-isbn="978-1"&gt;&lt;span class="name"&gt;流暢的 Python&lt;/span&gt;&lt;span class="price"&gt;880&lt;/span&gt;&lt;/li&gt;
+      &lt;li class="book" data-isbn="978-2"&gt;&lt;span class="name"&gt;設計資料密集型應用&lt;/span&gt;&lt;span class="price"&gt;980&lt;/span&gt;&lt;/li&gt;
+      &lt;li class="book" data-isbn="978-3"&gt;&lt;span class="name"&gt;Effective Java&lt;/span&gt;&lt;span class="price"&gt;650&lt;/span&gt;&lt;/li&gt;
+    &lt;/ul&gt;
+    &lt;a href="https://example.com/next" class="next"&gt;下一頁&lt;/a&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+"""
+
+soup = BeautifulSoup(HTML, "html.parser")</code></pre>
+      </div>
+    <p><code>find</code> 取第一個符合的元素、<code>find_all</code> 取全部、<code>get_text</code> 取文字、<code>[&quot;attr&quot;]</code> 取屬性：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-525" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20soup.find(%22h1%22).get_text(strip%3DTrue)%20%20%20%20%20%20%20%20%23%20%E7%AC%AC%E4%B8%80%E5%80%8B%20%3Ch1%3E%20%E7%9A%84%E6%96%87%E5%AD%97%0A%272026%20%E6%9A%A2%E9%8A%B7%E6%9B%B8%E6%A6%9C%27%0A%0A%3E%3E%3E%20for%20li%20in%20soup.find_all(%22li%22%2C%20class_%3D%22book%22)%3A%20%20%20%23%20%E6%B3%A8%E6%84%8F%E6%98%AF%20class_%EF%BC%88%E9%81%BF%E9%96%8B%E9%97%9C%E9%8D%B5%E5%AD%97%EF%BC%89%0A...%20%20%20%20%20name%20%3D%20li.find(%22span%22%2C%20class_%3D%22name%22).get_text(strip%3DTrue)%0A...%20%20%20%20%20price%20%3D%20li.find(%22span%22%2C%20class_%3D%22price%22).get_text(strip%3DTrue)%0A...%20%20%20%20%20isbn%20%3D%20li%5B%22data-isbn%22%5D%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8F%96%E5%B1%AC%E6%80%A7%0A...%20%20%20%20%20print(f%22%7Bisbn%7D%3A%20%7Bname%7D%20-%3E%20%7Bprice%7D%22)%0A978-1%3A%20%E6%B5%81%E6%9A%A2%E7%9A%84%20Python%20-%3E%20880%0A978-2%3A%20%E8%A8%AD%E8%A8%88%E8%B3%87%E6%96%99%E5%AF%86%E9%9B%86%E5%9E%8B%E6%87%89%E7%94%A8%20-%3E%20980%0A978-3%3A%20Effective%20Java%20-%3E%20650'), 'copy-btn-525')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; soup.find("h1").get_text(strip=True)        # 第一個 &lt;h1&gt; 的文字
+'2026 暢銷書榜'
+
+&gt;&gt;&gt; for li in soup.find_all("li", class_="book"):   # 注意是 class_（避開關鍵字）
+...     name = li.find("span", class_="name").get_text(strip=True)
+...     price = li.find("span", class_="price").get_text(strip=True)
+...     isbn = li["data-isbn"]                    # 取屬性
+...     print(f"{isbn}: {name} -&gt; {price}")
+978-1: 流暢的 Python -&gt; 880
+978-2: 設計資料密集型應用 -&gt; 980
+978-3: Effective Java -&gt; 650</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：用 <code>class_=</code> 不是 <code>class=</code>。<code>class</code> 是 Python 保留字，BeautifulSoup 用尾底線 <code>class_</code> 規避——這跟你在 Java 用 <code>clazz</code> 當變數名是同一個尷尬。</p>
+</div><p>更強大的是 <code>select</code>/<code>select_one</code>，吃<strong>標準 CSS selector</strong>，跟 Jsoup 的 <code>select</code> 一模一樣，也跟你前端調 <code>document.querySelectorAll</code> 的肌肉記憶相同：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-526" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20%5Bspan.get_text(strip%3DTrue)%20for%20span%20in%20soup.select(%22li.book%20span.name%22)%5D%0A%5B%27%E6%B5%81%E6%9A%A2%E7%9A%84%20Python%27%2C%20%27%E8%A8%AD%E8%A8%88%E8%B3%87%E6%96%99%E5%AF%86%E9%9B%86%E5%9E%8B%E6%87%89%E7%94%A8%27%2C%20%27Effective%20Java%27%5D%0A%0A%3E%3E%3E%20soup.select_one(%22a.next%22)%5B%22href%22%5D%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8F%96%E9%80%A3%E7%B5%90%20%E2%86%92%20%E5%8F%AF%E6%8B%BF%E5%8E%BB%E6%8A%93%E4%B8%8B%E4%B8%80%E9%A0%81%0A%27https%3A%2F%2Fexample.com%2Fnext%27'), 'copy-btn-526')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; [span.get_text(strip=True) for span in soup.select("li.book span.name")]
+['流暢的 Python', '設計資料密集型應用', 'Effective Java']
+
+&gt;&gt;&gt; soup.select_one("a.next")["href"]            # 取連結 → 可拿去抓下一頁
+'https://example.com/next'</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-527" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%20Jsoup%20%E5%B0%8D%E7%85%A7%0ADocument%20doc%20%3D%20Jsoup.parse(html)%3B%0AElements%20names%20%3D%20doc.select(%22li.book%20span.name%22)%3B%0Afor%20(Element%20e%20%3A%20names)%20System.out.println(e.text())%3B%0AString%20next%20%3D%20doc.selectFirst(%22a.next%22).attr(%22href%22)%3B'), 'copy-btn-527')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java Jsoup 對照
+Document doc = Jsoup.parse(html);
+Elements names = doc.select("li.book span.name");
+for (Element e : names) System.out.println(e.text());
+String next = doc.selectFirst("a.next").attr("href");</code></pre>
+      </div>
+    <p>幾乎一行對一行。<code>find_all</code> 對應 <code>find</code>，<code>select</code> 對應 <code>select</code>，<code>get_text()</code> 對應 <code>.text()</code>，<code>[&quot;href&quot;]</code> 對應 <code>.attr(&quot;href&quot;)</code>。</p>
+<h3 id="禮貌爬蟲守則">禮貌爬蟲守則</h3><p>抓資料是技術問題，<strong>怎麼抓是工程倫理與法遵問題</strong>。資深工程師務必守住：</p>
+<ol>
+<li><strong>先看 <code>robots.txt</code></strong>（<code>https://site/robots.txt</code>），它聲明哪些路徑不歡迎機器人。標準庫的 <code>urllib.robotparser</code> 可以程式化判讀。尊重它，這是業界基本禮貌也可能涉及法律。</li>
+<li><strong>設誠實的 <code>User-Agent</code></strong>，標明你是誰、附聯絡方式，別偽裝成瀏覽器去躲偵測。</li>
+<li><strong>限速</strong>（rate limit）：請求之間 <code>time.sleep</code> 一下，別在迴圈裡全速狂打。把對方伺服器打爆，輕則被封 IP，重則構成攻擊。</li>
+<li><strong>優先用官方 API</strong>：很多站有 JSON API，抓 API 比解析 HTML 穩定（不會因改版而碎），也通常是對方允許的方式。</li>
+<li><strong>遵守法遵與授權</strong>：服務條款（ToS）、著作權、個資。爬公開資料不等於可以任意散布或商用。</li>
+</ol>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-528" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20time%0Aimport%20requests%0Afrom%20urllib.robotparser%20import%20RobotFileParser%0A%0Arp%20%3D%20RobotFileParser()%0Arp.set_url(%22https%3A%2F%2Fexample.com%2Frobots.txt%22)%0Arp.read()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%9C%80%E9%80%A3%E7%B6%B2%0Aua%20%3D%20%22python-book-bot%2F1.0%20(%2Bmailto%3Ame%40example.com)%22%0Aif%20rp.can_fetch(ua%2C%20%22https%3A%2F%2Fexample.com%2Flist%22)%3A%0A%20%20%20%20resp%20%3D%20requests.get(%22https%3A%2F%2Fexample.com%2Flist%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20headers%3D%7B%22User-Agent%22%3A%20ua%7D%2C%20timeout%3D10)%0A%20%20%20%20%23%20...%20%E8%A7%A3%E6%9E%90%20...%0A%20%20%20%20time.sleep(1.0)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%99%90%E9%80%9F%EF%BC%9A%E6%AF%8F%E7%A7%92%E6%9C%80%E5%A4%9A%E4%B8%80%E6%AC%A1'), 'copy-btn-528')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import time
+import requests
+from urllib.robotparser import RobotFileParser
+
+rp = RobotFileParser()
+rp.set_url("https://example.com/robots.txt")
+rp.read()                                          # 需連網
+ua = "python-book-bot/1.0 (+mailto:me@example.com)"
+if rp.can_fetch(ua, "https://example.com/list"):
+    resp = requests.get("https://example.com/list",
+                        headers={"User-Agent": ua}, timeout=10)
+    # ... 解析 ...
+    time.sleep(1.0)                                # 限速：每秒最多一次</code></pre>
+      </div>
+    <hr>
+<h2 id="excel報表自動化openpyxl">Excel／報表自動化：openpyxl</h2><p>「把結果產成 Excel 給老闆/客戶」是企業環境最務實的需求。Java 這邊的答案是 <strong>Apache POI</strong>——功能強大但 API 極其囉嗦（<code>XSSFWorkbook</code>、<code>createSheet</code>、<code>createRow</code>、<code>createCell</code>、<code>CellStyle</code>、<code>DataFormat</code>……寫個三欄表要四十行）。Python 的對應是 <strong>openpyxl</strong>，讀寫 <code>.xlsx</code>，API 短得多。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-529" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Apache%20POI%EF%BC%88%E7%B2%BE%E7%B0%A1%E7%A4%BA%E6%84%8F%EF%BC%89%0AWorkbook%20wb%20%3D%20new%20XSSFWorkbook()%3B%0ASheet%20sheet%20%3D%20wb.createSheet(%22%E5%A0%B1%E8%A1%A8%22)%3B%0ARow%20header%20%3D%20sheet.createRow(0)%3B%0Aheader.createCell(0).setCellValue(%22%E7%94%A2%E5%93%81%22)%3B%0Aheader.createCell(1).setCellValue(%22Q1%22)%3B%0A%2F%2F%20...%20%E6%AF%8F%E5%80%8B%20cell%20%E9%83%BD%E8%A6%81%20createCell%20%2B%20setCellValue%0Atry%20(FileOutputStream%20out%20%3D%20new%20FileOutputStream(%22report.xlsx%22))%20%7B%0A%20%20%20%20wb.write(out)%3B%0A%7D'), 'copy-btn-529')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Apache POI（精簡示意）
+Workbook wb = new XSSFWorkbook();
+Sheet sheet = wb.createSheet("報表");
+Row header = sheet.createRow(0);
+header.createCell(0).setCellValue("產品");
+header.createCell(1).setCellValue("Q1");
+// ... 每個 cell 都要 createCell + setCellValue
+try (FileOutputStream out = new FileOutputStream("report.xlsx")) {
+    wb.write(out);
+}</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-530" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20openpyxl%20import%20Workbook%2C%20load_workbook%0Afrom%20openpyxl.styles%20import%20Font%2C%20PatternFill%0Afrom%20pathlib%20import%20Path%0A%0Awb%20%3D%20Workbook()%0Aws%20%3D%20wb.active%0Aws.title%20%3D%20%22%E5%A0%B1%E8%A1%A8%22%0A%0A%23%20%E5%AF%AB%E4%B8%80%E6%95%B4%E5%88%97%E7%9B%B4%E6%8E%A5%E7%94%A8%20append%EF%BC%9B%E5%96%AE%E6%A0%BC%E7%94%A8%20ws%5B%22A1%22%5D%20%E6%88%96%20ws.cell(row%2C%20column)%0Aws.append(%5B%22%E7%94%A2%E5%93%81%22%2C%20%22Q1%22%2C%20%22Q2%22%2C%20%22%E5%90%88%E8%A8%88%22%5D)%0Afor%20cell%20in%20ws%5B1%5D%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%AC%AC%E4%B8%80%E5%88%97%E5%8A%A0%E7%B2%97%E3%80%81%E4%B8%8A%E8%89%B2%0A%20%20%20%20cell.font%20%3D%20Font(bold%3DTrue%2C%20color%3D%22FFFFFF%22)%0A%20%20%20%20cell.fill%20%3D%20PatternFill(%22solid%22%2C%20fgColor%3D%224F81BD%22)%0A%0Adata%20%3D%20%5B(%22%E7%AD%86%E9%9B%BB%22%2C%20120%2C%20150)%2C%20(%22%E6%BB%91%E9%BC%A0%22%2C%20300%2C%20280)%2C%20(%22%E9%8D%B5%E7%9B%A4%22%2C%2090%2C%20110)%5D%0Afor%20i%2C%20(name%2C%20q1%2C%20q2)%20in%20enumerate(data%2C%20start%3D2)%3A%0A%20%20%20%20ws.cell(row%3Di%2C%20column%3D1%2C%20value%3Dname)%0A%20%20%20%20ws.cell(row%3Di%2C%20column%3D2%2C%20value%3Dq1)%0A%20%20%20%20ws.cell(row%3Di%2C%20column%3D3%2C%20value%3Dq2)%0A%20%20%20%20ws.cell(row%3Di%2C%20column%3D4%2C%20value%3Df%22%3DB%7Bi%7D%2BC%7Bi%7D%22)%20%20%20%23%20%E5%AF%AB%E5%85%A5%20Excel%20%E5%85%AC%E5%BC%8F%0A%0Aout%20%3D%20Path(%22%2Ftmp%2Freport_demo.xlsx%22)%0Awb.save(out)'), 'copy-btn-530')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill
+from pathlib import Path
+
+wb = Workbook()
+ws = wb.active
+ws.title = "報表"
+
+# 寫一整列直接用 append；單格用 ws["A1"] 或 ws.cell(row, column)
+ws.append(["產品", "Q1", "Q2", "合計"])
+for cell in ws[1]:                                  # 第一列加粗、上色
+    cell.font = Font(bold=True, color="FFFFFF")
+    cell.fill = PatternFill("solid", fgColor="4F81BD")
+
+data = [("筆電", 120, 150), ("滑鼠", 300, 280), ("鍵盤", 90, 110)]
+for i, (name, q1, q2) in enumerate(data, start=2):
+    ws.cell(row=i, column=1, value=name)
+    ws.cell(row=i, column=2, value=q1)
+    ws.cell(row=i, column=3, value=q2)
+    ws.cell(row=i, column=4, value=f"=B{i}+C{i}")   # 寫入 Excel 公式
+
+out = Path("/tmp/report_demo.xlsx")
+wb.save(out)</code></pre>
+      </div>
+    <p>注意兩個 Python 化的細節：<code>ws[&quot;A1&quot;]</code> 用 <code>__getitem__</code> 多載成「A1 儲存格」，賦值就是寫入；<code>ws.cell(row, column, value=...)</code> 則用數字座標（方便迴圈）。座標是 <strong>1-based</strong>（Excel 慣例），別用 Java 的 0-based 直覺去算。公式直接寫成字串 <code>&quot;=B2+C2&quot;</code>，openpyxl 原樣存進去，由 Excel 開檔時計算。</p>
+<p>讀回驗證——這是自動化腳本該有的紀律，寫完馬上讀回確認：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-531" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('wb2%20%3D%20load_workbook(out)%0Aws2%20%3D%20wb2%5B%22%E5%A0%B1%E8%A1%A8%22%5D%0Aprint(%22title%3A%22%2C%20ws2.title)%0Aprint(%22A2%3A%22%2C%20ws2%5B%22A2%22%5D.value)%0Aprint(%22D2%20formula%3A%22%2C%20ws2%5B%22D2%22%5D.value)%0Aprint(%22size%3A%22%2C%20ws2.max_row%2C%20%22x%22%2C%20ws2.max_column)'), 'copy-btn-531')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">wb2 = load_workbook(out)
+ws2 = wb2["報表"]
+print("title:", ws2.title)
+print("A2:", ws2["A2"].value)
+print("D2 formula:", ws2["D2"].value)
+print("size:", ws2.max_row, "x", ws2.max_column)</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-532" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('title%3A%20%E5%A0%B1%E8%A1%A8%0AA2%3A%20%E7%AD%86%E9%9B%BB%0AD2%20formula%3A%20%3DB2%2BC2%0Asize%3A%204%20x%204'), 'copy-btn-532')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">title: 報表
+A2: 筆電
+D2 formula: =B2+C2
+size: 4 x 4</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>load_workbook</code> 預設讀回的 <code>D2</code> 是<strong>公式字串</strong> <code>&quot;=B2+C2&quot;</code>，不是計算結果——因為 openpyxl 不是 Excel，它不算公式。若你需要「上次 Excel 算好的值」，要用 <code>load_workbook(out, data_only=True)</code>，但前提是該檔曾被 Excel（或其他試算表軟體）開啟並存檔過快取值；對一個 openpyxl 剛寫出、從未被 Excel 開過的檔，<code>data_only=True</code> 那格會是 <code>None</code>。這是 POI 沒有的坑（POI 有公式求值器），務必心裡有數。</p>
+</div><p>實務上，如果你的資料已經在 pandas，根本不必手刻 openpyxl——<code>df.to_excel(&quot;out.xlsx&quot;, index=False)</code> 一行就好，<strong>它底層就是呼叫 openpyxl</strong>。手寫 openpyxl 的時機是你需要精細控制樣式、公式、多工作表、凍結窗格這類版面細節時。下一節的整合範例會兩種都用上。</p>
+<hr>
+<h2 id="排程任務與系統腳本python-取代-shell-script">排程任務與系統腳本：Python 取代 shell script</h2><p>到這裡你已經有了所有零件。最後一塊拼圖是：把這些零件組成一個<strong>可排程、可維護</strong>的自動化腳本，取代你以前用 bash 寫的那些東西。</p>
+<h3 id="為什麼用-python-取代-bash">為什麼用 Python 取代 bash</h3><p>bash 適合「三行以內的膠水」。一旦腳本要處理錯誤、解析資料、有條件分支，bash 就會變成負債：</p>
+<table>
+<thead>
+<tr>
+<th>面向</th>
+<th>bash</th>
+<th>Python</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>可讀性</td>
+<td>引號、跳脫、<code>$()</code> 地獄</td>
+<td>像虛擬碼</td>
+</tr>
+<tr>
+<td>錯誤處理</td>
+<td><code>set -euo pipefail</code> 也只能到這</td>
+<td><code>try/except</code>、明確例外型別</td>
+</tr>
+<tr>
+<td>資料處理</td>
+<td><code>awk</code>/<code>sed</code>/<code>cut</code> 拼接</td>
+<td>pandas、<code>json</code>、<code>csv</code></td>
+</tr>
+<tr>
+<td>型別</td>
+<td>全是字串</td>
+<td>有型別提示、可 mypy</td>
+</tr>
+<tr>
+<td>可測試</td>
+<td>幾乎不可能</td>
+<td>pytest（第 13 章）</td>
+</tr>
+<tr>
+<td>跨平台</td>
+<td>Windows 直接死</td>
+<td>macOS/Linux/Windows 一致</td>
+</tr>
+</tbody></table>
+<p>Python 腳本能 import、能寫測試、能加型別、有真正的例外——這些對「會長期維護、會出事要追責」的自動化任務是決定性的。承接第 15 章，你已經會用 <code>pathlib</code>（路徑）、<code>subprocess</code>（呼叫外部命令，取代 backtick）、<code>argparse</code>（CLI 參數，取代 <code>$1 $2</code>）；承接第 12 章，你會用 <code>logging</code>（取代 <code>echo</code> 到 stderr）與結構化例外處理。</p>
+<h3 id="排程選項">排程選項</h3><p>寫好腳本後，「怎麼定時跑」有幾條路，對照 Java 生態：</p>
+<table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>適用情境</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ScheduledExecutorService</code></td>
+<td><code>sched</code> / <code>time.sleep</code> 迴圈</td>
+<td>程式內最陽春的延遲/週期</td>
+</tr>
+<tr>
+<td>Spring <code>@Scheduled</code></td>
+<td><code>schedule</code> 套件</td>
+<td>程式內、語法甜的週期任務</td>
+</tr>
+<tr>
+<td>Quartz</td>
+<td><code>APScheduler</code> 套件</td>
+<td>程式內、需 cron 表達式/持久化/錯過補跑</td>
+</tr>
+<tr>
+<td>作業系統 crontab</td>
+<td>作業系統 crontab 呼叫 Python</td>
+<td>最穩、與應用解耦、生產首選</td>
+</tr>
+</tbody></table>
+<p><strong>經驗法則</strong>：生產環境的「每日跑報表」這類任務，<strong>首選作業系統的 cron（Linux）或工作排程器（Windows）去呼叫你的 Python 腳本</strong>，而不是讓 Python 程序常駐。理由是解耦與可靠性：cron 由系統保證觸發，腳本本身保持「跑一次就結束」的單純無狀態形式，崩了重跑也乾淨。<code>schedule</code>/APScheduler 適合「已經有一個常駐服務、想在裡面塞週期任務」的情境（對應你在 Spring Boot 裡用 <code>@Scheduled</code>）。一行 crontab 範例：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">cron</span>
+          <button id="copy-btn-533" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E6%AF%8F%E5%A4%A9%2006%3A30%20%E8%B7%91%E5%A0%B1%E8%A1%A8%E8%85%B3%E6%9C%AC%EF%BC%8Cstdout%2Fstderr%20%E5%B0%8E%E5%88%B0%20log%0A%23%20uv%20%E7%9A%84%E7%B5%95%E5%B0%8D%E8%B7%AF%E5%BE%91%E8%AB%8B%E4%BB%A5%20%60which%20uv%60%20%E7%82%BA%E6%BA%96%EF%BC%88%E5%AE%98%E6%96%B9%E5%AE%89%E8%A3%9D%E8%85%B3%E6%9C%AC%E9%80%9A%E5%B8%B8%E6%94%BE%20~%2F.local%2Fbin%EF%BC%8C%0A%23%20Homebrew%20%E5%9C%A8%20macOS%20%E7%82%BA%20%2Fopt%2Fhomebrew%2Fbin%EF%BC%89%EF%BC%9Bcron%20%E7%9A%84%20PATH%20%E5%BE%88%E7%B2%BE%E7%B0%A1%EF%BC%8C%E5%8B%99%E5%BF%85%E5%AF%AB%E7%B5%95%E5%B0%8D%E8%B7%AF%E5%BE%91%0A30%206%20*%20*%20*%20%20~%2F.local%2Fbin%2Fuv%20run%20%2Fopt%2Fjobs%2Fdaily_report.py%20%3E%3E%20%2Fvar%2Flog%2Fdaily_report.log%202%3E%261'), 'copy-btn-533')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-cron"><code class="language-cron"># 每天 06:30 跑報表腳本，stdout/stderr 導到 log
+# uv 的絕對路徑請以 `which uv` 為準（官方安裝腳本通常放 ~/.local/bin，
+# Homebrew 在 macOS 為 /opt/homebrew/bin）；cron 的 PATH 很精簡，務必寫絕對路徑
+30 6 * * *  ~/.local/bin/uv run /opt/jobs/daily_report.py &gt;&gt; /var/log/daily_report.log 2&gt;&amp;1</code></pre>
+      </div>
+    <h3 id="整合範例抓資料-pandas-整理-出報表">整合範例：抓資料 → pandas 整理 → 出報表</h3><p>把全章串起來。下面是一個可實跑的自動化腳本骨架：抓資料（這裡用內嵌 CSV 字串保證可重現，真實版把 <code>load_raw</code> 換成 <code>requests.get(...).text</code>）、用 pandas 聚合、輸出 Excel 報表、讀回驗證，全程有 logging 與例外處理。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-534" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20__future__%20import%20annotations%0A%0Aimport%20io%0Aimport%20logging%0Aimport%20sys%0Afrom%20pathlib%20import%20Path%0A%0Aimport%20pandas%20as%20pd%0A%0Alogging.basicConfig(%0A%20%20%20%20level%3Dlogging.INFO%2C%0A%20%20%20%20format%3D%22%25(asctime)s%20%25(levelname)s%20%25(name)s%3A%20%25(message)s%22%2C%0A%20%20%20%20datefmt%3D%22%25Y-%25m-%25d%20%25H%3A%25M%3A%25S%22%2C%20%20%23%20%E4%B8%8D%E5%8A%A0%E9%80%99%E8%A1%8C%EF%BC%8Casctime%20%E9%A0%90%E8%A8%AD%E6%9C%83%E5%B8%B6%E6%AF%AB%E7%A7%92%EF%BC%88%E5%A6%82%20...53%2C946%EF%BC%89%0A)%0Alog%20%3D%20logging.getLogger(%22daily_report%22)%0A%0A%23%20%E7%9C%9F%E5%AF%A6%E7%89%88%EF%BC%9ARAW%20%3D%20requests.get(URL%2C%20timeout%3D10).text%20%EF%BC%88%E6%88%96%20httpx%EF%BC%89%0A%23%20%E6%95%99%E5%AD%B8%2F%E6%B8%AC%E8%A9%A6%E7%89%88%EF%BC%9A%E5%85%A7%E5%B5%8C%E5%AD%97%E4%B8%B2%20%E2%86%92%20%E5%8F%AF%E9%87%8D%E7%8F%BE%E3%80%81%E5%8F%AF%E9%80%B2%20CI%0ARAW%20%3D%20%22%22%22date%2Cproduct%2Cregion%2Cunits%2Cprice%0A2026-01-05%2Claptop%2CAPAC%2C3%2C1200%0A2026-01-05%2Cmouse%2CAPAC%2C10%2C25%0A2026-01-06%2Claptop%2CEU%2C2%2C1250%0A2026-01-06%2Cmouse%2CEU%2C5%2C28%0A%22%22%22%0A%0A%0Adef%20load_raw()%20-%3E%20pd.DataFrame%3A%0A%20%20%20%20log.info(%22loading%20raw%20data%22)%0A%20%20%20%20return%20pd.read_csv(io.StringIO(RAW)%2C%20parse_dates%3D%5B%22date%22%5D)%0A%0A%0Adef%20transform(df%3A%20pd.DataFrame)%20-%3E%20pd.DataFrame%3A%0A%20%20%20%20df%20%3D%20df.copy()%0A%20%20%20%20df%5B%22revenue%22%5D%20%3D%20df%5B%22units%22%5D%20*%20df%5B%22price%22%5D%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%90%91%E9%87%8F%E5%8C%96%0A%20%20%20%20summary%20%3D%20(%0A%20%20%20%20%20%20%20%20df.groupby(%22region%22%2C%20as_index%3DFalse)%5B%22revenue%22%5D%20%20%23%20GROUP%20BY%20region%0A%20%20%20%20%20%20%20%20.sum()%0A%20%20%20%20%20%20%20%20.sort_values(%22revenue%22%2C%20ascending%3DFalse)%20%20%20%20%20%20%20%20%20%23%20ORDER%20BY%20revenue%20DESC%0A%20%20%20%20)%0A%20%20%20%20return%20summary%0A%0A%0Adef%20export(df%3A%20pd.DataFrame%2C%20out%3A%20Path)%20-%3E%20None%3A%0A%20%20%20%20df.to_excel(out%2C%20index%3DFalse%2C%20sheet_name%3D%22summary%22)%20%20%23%20%E5%BA%95%E5%B1%A4%E7%94%A8%20openpyxl%0A%20%20%20%20log.info(%22wrote%20%25d%20rows%20to%20%25s%22%2C%20len(df)%2C%20out)%0A%0A%0Adef%20main()%20-%3E%20int%3A%0A%20%20%20%20out%20%3D%20Path(%22%2Ftmp%2Fregion_report.xlsx%22)%0A%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20summary%20%3D%20transform(load_raw())%0A%20%20%20%20%20%20%20%20export(summary%2C%20out)%0A%20%20%20%20%20%20%20%20back%20%3D%20pd.read_excel(out%2C%20sheet_name%3D%22summary%22)%20%20%23%20%E8%AE%80%E5%9B%9E%E9%A9%97%E8%AD%89%0A%20%20%20%20%20%20%20%20log.info(%22verification%3A%5Cn%25s%22%2C%20back.to_string(index%3DFalse))%0A%20%20%20%20except%20Exception%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%9C%9F%E5%AF%A6%E7%89%88%E8%A6%81%E5%88%86%E9%A1%9E%E4%BE%8B%E5%A4%96%0A%20%20%20%20%20%20%20%20log.exception(%22report%20job%20failed%22)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8D%B0%E5%87%BA%20traceback%0A%20%20%20%20%20%20%20%20return%201%0A%20%20%20%20return%200%0A%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20sys.exit(main())%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%9B%9E%E5%82%B3%20exit%20code%20%E7%B5%A6%20cron'), 'copy-btn-534')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from __future__ import annotations
+
+import io
+import logging
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",  # 不加這行，asctime 預設會帶毫秒（如 ...53,946）
+)
+log = logging.getLogger("daily_report")
+
+# 真實版：RAW = requests.get(URL, timeout=10).text （或 httpx）
+# 教學/測試版：內嵌字串 → 可重現、可進 CI
+RAW = """date,product,region,units,price
+2026-01-05,laptop,APAC,3,1200
+2026-01-05,mouse,APAC,10,25
+2026-01-06,laptop,EU,2,1250
+2026-01-06,mouse,EU,5,28
+"""
+
+
+def load_raw() -&gt; pd.DataFrame:
+    log.info("loading raw data")
+    return pd.read_csv(io.StringIO(RAW), parse_dates=["date"])
+
+
+def transform(df: pd.DataFrame) -&gt; pd.DataFrame:
+    df = df.copy()
+    df["revenue"] = df["units"] * df["price"]            # 向量化
+    summary = (
+        df.groupby("region", as_index=False)["revenue"]  # GROUP BY region
+        .sum()
+        .sort_values("revenue", ascending=False)         # ORDER BY revenue DESC
+    )
+    return summary
+
+
+def export(df: pd.DataFrame, out: Path) -&gt; None:
+    df.to_excel(out, index=False, sheet_name="summary")  # 底層用 openpyxl
+    log.info("wrote %d rows to %s", len(df), out)
+
+
+def main() -&gt; int:
+    out = Path("/tmp/region_report.xlsx")
+    try:
+        summary = transform(load_raw())
+        export(summary, out)
+        back = pd.read_excel(out, sheet_name="summary")  # 讀回驗證
+        log.info("verification:\n%s", back.to_string(index=False))
+    except Exception:                                    # 真實版要分類例外
+        log.exception("report job failed")               # 印出 traceback
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())                                     # 回傳 exit code 給 cron</code></pre>
+      </div>
+    <p>實跑這支腳本的輸出：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-535" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('2026-06-15%2000%3A56%3A53%20INFO%20daily_report%3A%20loading%20raw%20data%0A2026-06-15%2000%3A56%3A53%20INFO%20daily_report%3A%20wrote%202%20rows%20to%20%2Ftmp%2Fregion_report.xlsx%0A2026-06-15%2000%3A56%3A53%20INFO%20daily_report%3A%20verification%3A%0Aregion%20%20revenue%0A%20%20APAC%20%20%20%20%203850%0A%20%20%20%20EU%20%20%20%20%202640'), 'copy-btn-535')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">2026-06-15 00:56:53 INFO daily_report: loading raw data
+2026-06-15 00:56:53 INFO daily_report: wrote 2 rows to /tmp/region_report.xlsx
+2026-06-15 00:56:53 INFO daily_report: verification:
+region  revenue
+  APAC     3850
+    EU     2640</code></pre>
+      </div>
+    <p>要跑它，連依賴都不用先裝——<code>uv run --with pandas --with openpyxl daily_report.py</code>（第 1、11 章的 uv）會在隔離環境臨時帶上套件執行。注意幾個工程細節：<code>main()</code> 回傳 exit code 給 <code>sys.exit</code>，讓 cron 能判斷成敗；<code>log.exception</code> 在 <code>except</code> 區塊裡自動附上 traceback（對照 Java 的 <code>logger.error(&quot;...&quot;, e)</code>）；每個階段拆成可單獨測試的函式（<code>load_raw</code>/<code>transform</code>/<code>export</code>），<code>transform</code> 是純函式、不碰 I/O，最好測——這正是第 13 章「把副作用推到邊界」的實踐。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：這支 40 行的腳本，在 Java 等價於一個 Maven 專案 + OkHttp + Jackson + Apache POI + 一個 <code>main</code>，外加打包成 jar 才能讓 cron 呼叫。Python 把它壓縮成一個檔案、一行 <code>uv run</code>。這就是「膠水語言」在自動化場景的壓倒性優勢——不是 Python 哪個功能比 Java 強，而是<strong>從想法到能跑的腳本之間的摩擦力低一個數量級</strong>。</p>
+</div><hr>
+<h2 id="本章小結">本章小結</h2><ol>
+<li><strong>HTTP client</strong>：requests 是同步業界標準，httpx 是 API 近似但多了 async／HTTP/2 的續作。永遠設 <code>timeout</code>、用 <code>raise_for_status()</code> 把非 2xx 轉例外、用 <code>resp.json()</code> 解析、用 <code>Session</code>/<code>Client</code> 重用連線（等同重用 Java <code>HttpClient</code>/<code>OkHttpClient</code>）。</li>
+<li><strong>DataFrame 思維</strong>：把 <code>DataFrame</code> 想成「程式化試算表／記憶體 SQL 表／欄導向資料集」。選取／過濾／<code>groupby</code> 直接對照 SQL 與 Stream，但寫法短得多。</li>
+<li><strong>向量化是最重要的一課</strong>：別在 pandas 裡跑 for-loop 逐列算，用整欄運算、boolean mask、<code>np.where</code>、<code>groupby</code>。底層下放到 C/NumPy，效能差一到兩個數量級——這與 Java Stream「仍在 JVM 跑 lambda」本質不同。</li>
+<li><strong>BeautifulSoup ≈ Jsoup</strong>：<code>find</code>/<code>find_all</code>/<code>select</code>（CSS selector）解析 HTML，<code>get_text()</code> 取文字、<code>[&quot;attr&quot;]</code> 取屬性。<code>class_</code> 要加底線。</li>
+<li><strong>可重現心法</strong>：教學與測試用<strong>本地 HTML 字串／內嵌資料</strong>，不要真的爬線上網站；真實程式碼才換成 <code>resp.text</code>。爬蟲要守禮貌守則：看 <code>robots.txt</code>、誠實 User-Agent、限速、優先用官方 API、遵守法遵。</li>
+<li><strong>openpyxl ≈ Apache POI</strong> 但短得多：座標 1-based，公式以字串寫入但 openpyxl 不求值（讀回是公式字串，除非 <code>data_only=True</code> 且檔案被 Excel 算過）。資料在 pandas 時直接 <code>df.to_excel</code>（底層即 openpyxl）。</li>
+<li><strong>Python 取代 bash</strong>：腳本一旦要錯誤處理／資料解析／分支，就用 Python——可讀、可測、有型別、跨平台。組合 <code>pathlib</code>/<code>subprocess</code>/<code>argparse</code>/<code>logging</code>。</li>
+<li><strong>排程</strong>：生產首選作業系統 cron 呼叫「跑一次就結束」的 Python 腳本；常駐服務內的週期任務才用 <code>schedule</code>/APScheduler（對應 Spring <code>@Scheduled</code>/Quartz）。</li>
+</ol>
+<h2 id="練習">練習</h2><ol>
+<li><p><strong>連線重用驗證</strong>：寫一支腳本，用 <code>requests</code>（無 Session）連抓 <code>https://httpbin.org/get</code> 十次，再用 <code>requests.Session()</code> 抓十次，各自計時並印出總耗時，量化連線重用的差異。（提示：<code>time.perf_counter()</code>；需連網。再加碼把 Session 版改寫成 <code>httpx.AsyncClient</code> + <code>asyncio.gather</code> 併發版對照。）</p>
+</li>
+<li><p><strong>向量化 vs 迴圈</strong>：建一個十萬列的 <code>DataFrame</code>（<code>pd.DataFrame({&quot;x&quot;: range(100_000)})</code>），分別用 (a) <code>for</code> + <code>iloc</code> 逐列、(b) <code>df.apply</code>、(c) 純向量化 <code>df[&quot;x&quot;] * 2 + 1</code> 計算同一個新欄，用 <code>time.perf_counter()</code> 比較三者耗時，解釋為何向量化最快。</p>
+</li>
+<li><p><strong>本地爬蟲</strong>：把本章的書榜 HTML 字串擴充（多加幾本書、再加一個 <code>&lt;table&gt;</code>），用 BeautifulSoup 解析成 <code>list[dict]</code>，再用 <code>pd.DataFrame(...)</code> 轉成 DataFrame，過濾出價格大於 700 的書並依價格排序。（提示：<code>select</code> + list comprehension 組 dict。）</p>
+</li>
+<li><p><strong>報表腳本</strong>：把整合範例改成真正的 CLI 工具：用 <code>argparse</code>（第 15 章）接收 <code>--input</code>（CSV 路徑）與 <code>--output</code>（xlsx 路徑），加上 <code>--group-by</code> 選擇聚合欄位。為 <code>transform</code> 函式寫一個 pytest 測試（第 13 章），餵入小 DataFrame 驗證聚合結果——示範純函式好測的價值。</p>
+</li>
+<li><p><strong>加樣式的報表</strong>：把練習 4 的輸出改用手寫 openpyxl（而非 <code>to_excel</code>），讓表頭加粗上色、數字欄加千分位格式（<code>cell.number_format = &quot;#,##0&quot;</code>）、凍結首列（<code>ws.freeze_panes = &quot;A2&quot;</code>）。讀回驗證樣式是否寫入。（提示：先 <code>df.to_excel</code> 再用 <code>load_workbook</code> 後製，或全程手寫。）</p>
+</li>
+</ol>

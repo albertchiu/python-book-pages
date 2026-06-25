@@ -1,0 +1,560 @@
+<h1 id="第-14-章並行與非同步concurrency-async">第 14 章：並行與非同步（Concurrency & Async）</h1><p>這是全書與 Java 直覺差距最大的一章。你在 Java 裡建立的核心信念——「開幾條 thread 就吃幾顆核」「<code>java.util.concurrent</code> 是萬用工具箱」「並行 = 平行」——到了 CPython 全部要打上問號。原因只有一個名字：<strong>GIL（Global Interpreter Lock，全域直譯器鎖）</strong>。它不會讓你不能用多執行緒，但會徹底改變「什麼時候該用哪種並行模型」的決策。讀完這章，你要能在面對一個任務時，三秒內判斷它是 I/O bound 還是 CPU bound，然後選對 threading、multiprocessing、還是 asyncio——而不是反射性地 <code>new Thread()</code>。</p>
+<hr>
+<h2 id="gil理解-cpython-並行的第一原理">GIL：理解 CPython 並行的第一原理</h2><h3 id="java-的並行心智模型">Java 的並行心智模型</h3><p>在 JVM 上，thread 是「真的」作業系統執行緒，可以同時在多顆核心上跑 Java bytecode。你寫一個 CPU 密集的計算，丟給四條 thread，在四核機器上大約能快四倍（理想狀況）。<code>synchronized</code>、<code>volatile</code>、<code>java.util.concurrent</code> 這整套工具，存在的目的就是協調這些<strong>真正同時執行</strong>的執行緒。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-434" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9A%E5%9B%9B%E6%A2%9D%20thread%20%E7%9C%9F%E7%9A%84%E5%90%8C%E6%99%82%E8%B7%91%EF%BC%8CCPU%20bound%20%E4%B9%9F%E8%83%BD%E5%B9%B3%E8%A1%8C%E5%8A%A0%E9%80%9F%0AExecutorService%20pool%20%3D%20Executors.newFixedThreadPool(4)%3B%0AList%3CFuture%3CLong%3E%3E%20futures%20%3D%20new%20ArrayList%3C%3E()%3B%0Afor%20(int%20i%20%3D%200%3B%20i%20%3C%204%3B%20i%2B%2B)%20%7B%0A%20%20%20%20futures.add(pool.submit(()%20-%3E%20heavyCompute()))%3B%20%20%2F%2F%20%E5%9B%9B%E9%A1%86%E6%A0%B8%E5%90%8C%E6%99%82%E7%AE%97%0A%7D'), 'copy-btn-434')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：四條 thread 真的同時跑，CPU bound 也能平行加速
+ExecutorService pool = Executors.newFixedThreadPool(4);
+List&lt;Future&lt;Long&gt;&gt; futures = new ArrayList&lt;&gt;();
+for (int i = 0; i &lt; 4; i++) {
+    futures.add(pool.submit(() -&gt; heavyCompute()));  // 四顆核同時算
+}</code></pre>
+      </div>
+    <h3 id="cpython-的真相">CPython 的真相</h3><p>CPython 有一把全域鎖：<strong>同一時刻，只有一個 thread 能執行 Python bytecode</strong>。<code>threading.Thread</code> 開出來的確實是真正的 OS thread，但它們必須輪流持有 GIL 才能執行直譯器。所以對純 CPU 的 Python 計算，多開 thread <strong>不會</strong>變快——它們在搶同一把鎖。</p>
+<p>實測勝過千言萬語。下面四份等量的 CPU 工作，序列跑與用四條 thread 跑，時間幾乎一樣（在 Python 3.14、10 核機器上實測）。註解裡的秒數是某次實測的約略值，<strong>實際數字依機器而異，重點看的是兩者的相對比例</strong>，不是絕對秒數：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-435" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20time%0Afrom%20concurrent.futures%20import%20ThreadPoolExecutor%0A%0Adef%20cpu_work(n%3A%20int)%20-%3E%20int%3A%0A%20%20%20%20return%20sum(i%20*%20i%20for%20i%20in%20range(n))%0A%0AN%20%3D%205_000_000%0A%0At0%20%3D%20time.perf_counter()%0A%5Bcpu_work(N)%20for%20_%20in%20range(4)%5D%0Aprint(f%22seq%3A%20%20%20%20%20%7Btime.perf_counter()%20-%20t0%3A.3f%7Ds%22)%20%20%20%23%20seq%3A%20%20%20%20%20~0.5s%0A%0At0%20%3D%20time.perf_counter()%0Awith%20ThreadPoolExecutor(max_workers%3D4)%20as%20ex%3A%0A%20%20%20%20list(ex.map(cpu_work%2C%20%5BN%5D%20*%204))%0Aprint(f%22threads%3A%20%7Btime.perf_counter()%20-%20t0%3A.3f%7Ds%22)%20%20%20%23%20threads%3A%20~0.5s%20%E2%86%90%20%E6%B2%92%E8%AE%8A%E5%BF%AB%EF%BC%81'), 'copy-btn-435')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import time
+from concurrent.futures import ThreadPoolExecutor
+
+def cpu_work(n: int) -&gt; int:
+    return sum(i * i for i in range(n))
+
+N = 5_000_000
+
+t0 = time.perf_counter()
+[cpu_work(N) for _ in range(4)]
+print(f"seq:     {time.perf_counter() - t0:.3f}s")   # seq:     ~0.5s
+
+t0 = time.perf_counter()
+with ThreadPoolExecutor(max_workers=4) as ex:
+    list(ex.map(cpu_work, [N] * 4))
+print(f"threads: {time.perf_counter() - t0:.3f}s")   # threads: ~0.5s ← 沒變快！</code></pre>
+      </div>
+    <p>四條 thread 跟序列一樣慢。在 Java，你會預期接近四倍加速；在 CPython，GIL 把它們序列化了。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：JVM 的 thread 能讓 CPU bound 工作吃滿多核；CPython 的 thread 在 CPU bound 工作上等於沒有平行——它們排隊搶 GIL。</p>
+</div><h3 id="但-gil-在-io-等待時會放手">但 GIL 在 I/O 等待時會放手</h3><p>關鍵轉折：當一個 thread 進入<strong>阻塞式 I/O</strong>（讀檔、<code>time.sleep</code>、socket 等待、資料庫查詢），CPython 會<strong>釋放 GIL</strong>，讓別的 thread 趁這段空檔去執行。所以對 I/O bound 工作，threading 非常有效——大家大部分時間都在等網路/磁碟，根本不需要 CPU。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-436" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20time%0Afrom%20concurrent.futures%20import%20ThreadPoolExecutor%0A%0Adef%20io_work(n%3A%20int)%20-%3E%20int%3A%0A%20%20%20%20time.sleep(0.2)%20%20%20%20%20%20%23%20%E6%A8%A1%E6%93%AC%20I%2FO%20%E7%AD%89%E5%BE%85%EF%BC%8C%E9%80%99%E6%9C%9F%E9%96%93%20GIL%20%E8%A2%AB%E9%87%8B%E6%94%BE%0A%20%20%20%20return%20n%0A%0At0%20%3D%20time.perf_counter()%0A%5Bio_work(i)%20for%20i%20in%20range(5)%5D%0Aprint(f%22seq%20io%3A%20%20%20%20%20%7Btime.perf_counter()%20-%20t0%3A.3f%7Ds%22)%20%20%20%23%20seq%20io%3A%20%20%20%20%20~1.0s%0A%0At0%20%3D%20time.perf_counter()%0Awith%20ThreadPoolExecutor(max_workers%3D5)%20as%20ex%3A%0A%20%20%20%20list(ex.map(io_work%2C%20range(5)))%0Aprint(f%22threads%20io%3A%20%7Btime.perf_counter()%20-%20t0%3A.3f%7Ds%22)%20%20%20%23%20threads%20io%3A%20~0.2s%20%E2%86%90%20%E5%BF%AB%E4%BA%94%E5%80%8D'), 'copy-btn-436')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import time
+from concurrent.futures import ThreadPoolExecutor
+
+def io_work(n: int) -&gt; int:
+    time.sleep(0.2)      # 模擬 I/O 等待，這期間 GIL 被釋放
+    return n
+
+t0 = time.perf_counter()
+[io_work(i) for i in range(5)]
+print(f"seq io:     {time.perf_counter() - t0:.3f}s")   # seq io:     ~1.0s
+
+t0 = time.perf_counter()
+with ThreadPoolExecutor(max_workers=5) as ex:
+    list(ex.map(io_work, range(5)))
+print(f"threads io: {time.perf_counter() - t0:.3f}s")   # threads io: ~0.2s ← 快五倍</code></pre>
+      </div>
+    <p>同樣五條 thread，I/O bound 時間從約 1 秒掉到約 0.2 秒（一樣，數字依機器而異，看的是這個數量級的落差）。秘訣就是「等的時候把 GIL 讓出去」。標準函式庫和大多數 C 擴充（<code>requests</code>、資料庫驅動、檔案 I/O）都會在阻塞前主動釋放 GIL，所以這不是你要手動處理的事——但你要理解<strong>為什麼</strong> threading 對 I/O 有效、對 CPU 無效。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：判斷該不該用 threading，問一句話——「這個工作大部分時間在等東西，還是在算東西？」等東西（I/O bound）→ threading 有效。算東西（CPU bound）→ threading 沒用，要走 multiprocessing。</p>
+</div><h3 id="gil-保護的是直譯器不是你的程式">GIL 保護的是直譯器，不是你的程式</h3><p>最後一個必須釐清的誤解：GIL 讓<strong>單一 bytecode 操作</strong>不被打斷，但它<strong>不會</strong>讓你的多步驟邏輯自動 thread-safe。<code>counter += 1</code> 看起來是一行，實際上是「讀值 → 加一 → 寫回」三個 bytecode，thread 可能在中間被切換走。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-437" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20threading%0A%0Acounter%20%3D%200%0Alock%20%3D%20threading.Lock()%0A%0Adef%20inc()%20-%3E%20None%3A%0A%20%20%20%20global%20counter%0A%20%20%20%20for%20_%20in%20range(100_000)%3A%0A%20%20%20%20%20%20%20%20with%20lock%3A%20%20%20%20%20%20%20%20%20%20%23%20%E6%B2%92%E6%9C%89%E9%80%99%E6%8A%8A%E9%8E%96%EF%BC%8C%E6%9C%80%E5%BE%8C%E7%9A%84%E6%95%B8%E5%AD%97%E6%9C%83%E5%B0%91%E6%96%BC%20400000%0A%20%20%20%20%20%20%20%20%20%20%20%20counter%20%2B%3D%201%0A%0Athreads%20%3D%20%5Bthreading.Thread(target%3Dinc)%20for%20_%20in%20range(4)%5D%0Afor%20t%20in%20threads%3A%0A%20%20%20%20t.start()%0Afor%20t%20in%20threads%3A%0A%20%20%20%20t.join()%0Aprint(counter)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20400000%EF%BC%88%E6%9C%89%E9%8E%96%E6%89%8D%E4%BF%9D%E8%AD%89%EF%BC%9B%E6%8B%BF%E6%8E%89%20with%20lock%20%E5%B0%B1%E6%9C%83%20race%EF%BC%89'), 'copy-btn-437')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import threading
+
+counter = 0
+lock = threading.Lock()
+
+def inc() -&gt; None:
+    global counter
+    for _ in range(100_000):
+        with lock:          # 沒有這把鎖，最後的數字會少於 400000
+            counter += 1
+
+threads = [threading.Thread(target=inc) for _ in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+print(counter)              # 400000（有鎖才保證；拿掉 with lock 就會 race）</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：「有 GIL 所以不用加鎖」是錯的。GIL 保護的是 CPython 直譯器的內部資料結構（reference count、物件記憶體），不是你的應用邏輯。<code>counter += 1</code> 這種 read-modify-write 在多 thread 下照樣 race，該加鎖就得加。Java 工程師在這點上反而有優勢——你本來就知道要加鎖，別因為聽說「Python 有 GIL」就把這個直覺丟掉。</p>
+</div><hr>
+<h2 id="threadingio-bound-的主力">threading：I/O bound 的主力</h2><p><code>threading</code> 模組的 API 跟 <code>java.util.concurrent</code> 高度對應，你會很快上手。重點在於<strong>用對場景</strong>（I/O bound），而不是 API 本身。</p>
+<table>
+<thead>
+<tr>
+<th>你要做的事</th>
+<th>Java</th>
+<th>Python</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>建立並啟動執行緒</td>
+<td><code>new Thread(r).start()</code></td>
+<td><code>threading.Thread(target=f).start()</code></td>
+</tr>
+<tr>
+<td>等待結束</td>
+<td><code>t.join()</code></td>
+<td><code>t.join()</code></td>
+</tr>
+<tr>
+<td>互斥鎖</td>
+<td><code>synchronized</code> / <code>ReentrantLock</code></td>
+<td><code>threading.Lock</code>（搭配 <code>with</code>）</td>
+</tr>
+<tr>
+<td>條件等待/通知</td>
+<td><code>wait()</code> / <code>notify()</code></td>
+<td><code>threading.Condition</code> / <code>Event</code></td>
+</tr>
+<tr>
+<td>執行緒安全佇列</td>
+<td><code>BlockingQueue</code></td>
+<td><code>queue.Queue</code></td>
+</tr>
+<tr>
+<td>原子操作</td>
+<td><code>AtomicInteger</code></td>
+<td>（無直接對應，用 <code>Lock</code>）</td>
+</tr>
+</tbody></table>
+<h3 id="thread-與-lock">Thread 與 Lock</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-438" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20threading%0A%0Aclass%20BankAccount%3A%0A%20%20%20%20def%20__init__(self%2C%20balance%3A%20int%20%3D%200)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self._balance%20%3D%20balance%0A%20%20%20%20%20%20%20%20self._lock%20%3D%20threading.Lock()%0A%0A%20%20%20%20def%20deposit(self%2C%20amount%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20with%20self._lock%3A%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%AD%89%E5%90%8C%20Java%20%E7%9A%84%20synchronized%20%E5%8D%80%E5%A1%8A%0A%20%20%20%20%20%20%20%20%20%20%20%20self._balance%20%2B%3D%20amount%0A%0A%20%20%20%20%40property%0A%20%20%20%20def%20balance(self)%20-%3E%20int%3A%0A%20%20%20%20%20%20%20%20return%20self._balance'), 'copy-btn-438')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import threading
+
+class BankAccount:
+    def __init__(self, balance: int = 0) -&gt; None:
+        self._balance = balance
+        self._lock = threading.Lock()
+
+    def deposit(self, amount: int) -&gt; None:
+        with self._lock:           # 等同 Java 的 synchronized 區塊
+            self._balance += amount
+
+    @property
+    def balance(self) -&gt; int:
+        return self._balance</code></pre>
+      </div>
+    <p><code>with self._lock</code> 就是 Java 的 <code>synchronized (lock) { ... }</code>：進入時取得鎖，離開（含例外）時自動釋放。這是 context manager（詳見第 12 章）的典型用途。</p>
+<h3 id="queue執行緒間溝通的首選">Queue：執行緒間溝通的首選</h3><p>跟 Java 一樣，<strong>用佇列傳遞資料、而不是共享可變狀態</strong>，是最不容易出錯的並行模式。<code>queue.Queue</code> 內建鎖，本身就是 thread-safe 的，對應 Java 的 <code>BlockingQueue</code>。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-439" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20threading%0Aimport%20queue%0A%0Awork_q%3A%20queue.Queue%5Bint%20%7C%20None%5D%20%3D%20queue.Queue()%0A%0Adef%20producer()%20-%3E%20None%3A%0A%20%20%20%20for%20i%20in%20range(3)%3A%0A%20%20%20%20%20%20%20%20work_q.put(i)%0A%20%20%20%20work_q.put(None)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20sentinel%EF%BC%9A%E9%80%9A%E7%9F%A5%E6%B6%88%E8%B2%BB%E8%80%85%E6%94%B6%E5%B7%A5%0A%0Adef%20consumer(results%3A%20list%5Bint%5D)%20-%3E%20None%3A%0A%20%20%20%20while%20True%3A%0A%20%20%20%20%20%20%20%20item%20%3D%20work_q.get()%0A%20%20%20%20%20%20%20%20if%20item%20is%20None%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20break%0A%20%20%20%20%20%20%20%20results.append(item%20*%2010)%0A%20%20%20%20%20%20%20%20work_q.task_done()%20%20%20%20%20%20%20%20%20%23%20%E6%90%AD%E9%85%8D%20work_q.join()%20%E7%94%A8%EF%BC%9B%E8%A6%8B%E4%B8%8B%E6%96%B9%E8%AA%AA%E6%98%8E%0A%0Aresults%3A%20list%5Bint%5D%20%3D%20%5B%5D%0At1%20%3D%20threading.Thread(target%3Dproducer)%0At2%20%3D%20threading.Thread(target%3Dconsumer%2C%20args%3D(results%2C))%0At1.start()%3B%20t2.start()%0At1.join()%3B%20t2.join()%0Aprint(results)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%5B0%2C%2010%2C%2020%5D'), 'copy-btn-439')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import threading
+import queue
+
+work_q: queue.Queue[int | None] = queue.Queue()
+
+def producer() -&gt; None:
+    for i in range(3):
+        work_q.put(i)
+    work_q.put(None)               # sentinel：通知消費者收工
+
+def consumer(results: list[int]) -&gt; None:
+    while True:
+        item = work_q.get()
+        if item is None:
+            break
+        results.append(item * 10)
+        work_q.task_done()         # 搭配 work_q.join() 用；見下方說明
+
+results: list[int] = []
+t1 = threading.Thread(target=producer)
+t2 = threading.Thread(target=consumer, args=(results,))
+t1.start(); t2.start()
+t1.join(); t2.join()
+print(results)                     # [0, 10, 20]</code></pre>
+      </div>
+    <p>這裡有兩種「等所有工作做完」的方式，別搞混：本例用 <code>t.join()</code>（等<strong>執行緒</strong>結束）收尾，所以 <code>work_q.task_done()</code> 其實<strong>不是必要的</strong>——它是搭配 <code>work_q.join()</code>（等<strong>佇列</strong>裡的項目全部被處理完）用的。若你不想靠 sentinel 與 thread join，而是想讓主執行緒「等佇列清空」再往下走，才需要消費端每處理一筆就 <code>task_done()</code>、主執行緒呼叫 <code>work_q.join()</code> 來等。本例保留 <code>task_done()</code> 是為了讓你看到它的存在，但它在這個以 thread join 收尾的版本裡沒有實際作用。</p>
+<p><code>Event</code> 對應一個「一次性/可重設的旗標」，常用來通知一組 thread 該停了，類似你在 Java 用 <code>volatile boolean running</code> 或 <code>CountDownLatch</code> 做的事。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：手寫 <code>Thread</code> + <code>Lock</code> + <code>Queue</code> 能動，但在現代 Python 裡，多數情況你不該手刻——直接跳到下面的 <code>concurrent.futures</code>，讓執行緒池幫你管理生命週期。手寫 thread 留給需要長駐背景執行緒、或要精細控制的場景。</p>
+</div><hr>
+<h2 id="multiprocessingcpu-bound-的解法">multiprocessing：CPU bound 的解法</h2><p>既然 GIL 卡死了多 thread 的 CPU 平行，怎麼真的吃滿多核？答案是<strong>多進程（multiprocessing）</strong>：開多個獨立的 Python 進程，每個進程有<strong>自己的直譯器、自己的 GIL</strong>，於是它們能真正同時在不同核心上跑。這是 Java 工程師最陌生的一招——在 JVM 上你幾乎不會為了 CPU 平行而開多進程。</p>
+<p>代價有三個，都要記住：</p>
+<ol>
+<li><strong>跨進程要序列化</strong>：進程間不共享記憶體，傳參數與回傳值都要用 <code>pickle</code> 序列化再傳。不可 pickle 的東西（lambda、開啟的檔案、某些閉包）傳不過去。</li>
+<li><strong>啟動成本高</strong>：開一個進程比開一條 thread 貴得多，資料量小的工作可能得不償失。</li>
+<li><strong>需要 <code>__name__</code> 守衛</strong>：在預設使用 <code>spawn</code> 的平台（macOS、Windows）上，子進程會<strong>重新 import 你的主模組</strong>，沒有 <code>if __name__ == &quot;__main__&quot;:</code> 保護就會無限遞迴開進程（承接第 11 章的模組執行模型）。</li>
+</ol>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-440" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20time%0Afrom%20concurrent.futures%20import%20ProcessPoolExecutor%0A%0Adef%20cpu_work(n%3A%20int)%20-%3E%20int%3A%0A%20%20%20%20return%20sum(i%20*%20i%20for%20i%20in%20range(n))%0A%0AN%20%3D%205_000_000%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%20%20%20%20%20%20%20%20%20%20%23%20%E2%86%90%20%E5%A4%9A%E9%80%B2%E7%A8%8B%E7%9A%84%E5%BF%85%E5%82%99%E5%AE%88%E8%A1%9B%EF%BC%8C%E5%88%A5%E7%9C%81%E7%95%A5%0A%20%20%20%20t0%20%3D%20time.perf_counter()%0A%20%20%20%20with%20ProcessPoolExecutor(max_workers%3D4)%20as%20ex%3A%0A%20%20%20%20%20%20%20%20list(ex.map(cpu_work%2C%20%5BN%5D%20*%204))%0A%20%20%20%20print(f%22procs%3A%20%7Btime.perf_counter()%20-%20t0%3A.3f%7Ds%22)'), 'copy-btn-440')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import time
+from concurrent.futures import ProcessPoolExecutor
+
+def cpu_work(n: int) -&gt; int:
+    return sum(i * i for i in range(n))
+
+N = 5_000_000
+
+if __name__ == "__main__":          # ← 多進程的必備守衛，別省略
+    t0 = time.perf_counter()
+    with ProcessPoolExecutor(max_workers=4) as ex:
+        list(ex.map(cpu_work, [N] * 4))
+    print(f"procs: {time.perf_counter() - t0:.3f}s")</code></pre>
+      </div>
+    <p>對前面那份 CPU 工作，多進程版本能真正分散到多核（雖然啟動與 pickle 成本讓它對小工作不見得划算，工作越重、攤平成本後加速越明顯）。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：把上面的 <code>if __name__ == &quot;__main__&quot;:</code> 拿掉，在 macOS/Windows 上會出現 <code>RuntimeError</code>，甚至狂開進程把機器卡死。這不是龜毛——是 <code>spawn</code> 啟動方式的必然結果。記住：<strong>任何用到 multiprocessing 的腳本，進入點一定要有 <code>__main__</code> 守衛。</strong></p>
+</div><div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 靠多 thread 就能 CPU 平行，幾乎不需要多進程；CPython 因為 GIL，CPU 平行的標準解是多進程——付出序列化與啟動成本，換真正的多核利用。</p>
+</div><p>實務上還有第三條路常被忽略：<strong>讓 C 擴充去扛 CPU</strong>。<code>numpy</code>、<code>scipy</code>、<code>pandas</code>、<code>Pillow</code> 這些函式庫的熱點是 C/Fortran 寫的，計算時會釋放 GIL。所以「用 numpy 做向量運算」往往比「自己用 multiprocessing 切 Python 迴圈」又快又簡單。CPU bound 不一定要多進程——先問能不能交給釋放 GIL 的 C 擴充。</p>
+<hr>
+<h2 id="concurrentfutures你該優先用的那一層">concurrent.futures：你該優先用的那一層</h2><p><code>concurrent.futures</code> 提供統一的高階介面，把「執行緒池」和「進程池」包成同一組 API。它直接對應 Java 的 <code>ExecutorService</code> / <code>Future</code>，而且<strong>換並行模型只要換一個類別名稱</strong>——這是它最大的價值。</p>
+<table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ExecutorService</code></td>
+<td><code>Executor</code>（<code>ThreadPoolExecutor</code> / <code>ProcessPoolExecutor</code>）</td>
+</tr>
+<tr>
+<td><code>pool.submit(task)</code></td>
+<td><code>executor.submit(fn, *args)</code></td>
+</tr>
+<tr>
+<td><code>Future&lt;T&gt;</code></td>
+<td><code>concurrent.futures.Future</code></td>
+</tr>
+<tr>
+<td><code>future.get()</code></td>
+<td><code>future.result()</code></td>
+</tr>
+<tr>
+<td><code>invokeAll(...)</code></td>
+<td><code>executor.map(fn, iterable)</code></td>
+</tr>
+<tr>
+<td><code>CompletableFuture</code> 組合</td>
+<td><code>as_completed(...)</code> / <code>wait(...)</code></td>
+</tr>
+</tbody></table>
+<p>下面這個範例會發出<strong>真實網路請求</strong>，需連網才能執行；印出的位元組數依當下各網站的內容而定，每次跑不見得一樣：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-441" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20concurrent.futures%20import%20ThreadPoolExecutor%2C%20as_completed%0Aimport%20urllib.request%0A%0AURLS%20%3D%20%5B%22https%3A%2F%2Fexample.com%22%2C%20%22https%3A%2F%2Fwww.python.org%22%2C%20%22https%3A%2F%2Fdocs.python.org%22%5D%0A%0Adef%20fetch(url%3A%20str)%20-%3E%20tuple%5Bstr%2C%20int%5D%3A%0A%20%20%20%20with%20urllib.request.urlopen(url%2C%20timeout%3D10)%20as%20resp%3A%0A%20%20%20%20%20%20%20%20return%20url%2C%20len(resp.read())%0A%0Awith%20ThreadPoolExecutor(max_workers%3D8)%20as%20ex%3A%0A%20%20%20%20%23%20submit%EF%BC%9A%E6%8B%BF%E5%88%B0%20Future%EF%BC%8C%E4%B9%8B%E5%BE%8C%E5%86%8D%E6%94%B6%E7%B5%90%E6%9E%9C%EF%BC%88%E5%B0%8D%E7%85%A7%20CompletableFuture%EF%BC%89%0A%20%20%20%20future_to_url%20%3D%20%7Bex.submit(fetch%2C%20url)%3A%20url%20for%20url%20in%20URLS%7D%0A%20%20%20%20for%20future%20in%20as_completed(future_to_url)%3A%20%20%20%23%20%E8%AA%B0%E5%85%88%E5%A5%BD%E8%AA%B0%E5%85%88%E5%9B%9E%0A%20%20%20%20%20%20%20%20url%2C%20size%20%3D%20future.result()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%AD%90%E5%9F%B7%E8%A1%8C%E7%B7%92%E7%9A%84%E4%BE%8B%E5%A4%96%E6%9C%83%E5%9C%A8%E9%80%99%E8%A3%A1%E9%87%8D%E6%96%B0%E6%8B%8B%E5%87%BA%0A%20%20%20%20%20%20%20%20print(f%22%7Burl%7D%3A%20%7Bsize%7D%20bytes%22)'), 'copy-btn-441')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from concurrent.futures import ThreadPoolExecutor, as_completed
+import urllib.request
+
+URLS = ["https://example.com", "https://www.python.org", "https://docs.python.org"]
+
+def fetch(url: str) -&gt; tuple[str, int]:
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        return url, len(resp.read())
+
+with ThreadPoolExecutor(max_workers=8) as ex:
+    # submit：拿到 Future，之後再收結果（對照 CompletableFuture）
+    future_to_url = {ex.submit(fetch, url): url for url in URLS}
+    for future in as_completed(future_to_url):   # 誰先好誰先回
+        url, size = future.result()              # 子執行緒的例外會在這裡重新拋出
+        print(f"{url}: {size} bytes")</code></pre>
+      </div>
+    <p>兩個要點：</p>
+<ul>
+<li><strong><code>map</code> vs <code>submit</code></strong>：<code>executor.map(fn, iterable)</code> 像並行版的 <code>list(map(...))</code>，<strong>保留輸入順序</strong>回傳結果，最簡單。要更細控制（哪個先完成、個別處理例外）就用 <code>submit</code> 拿 <code>Future</code>，搭配 <code>as_completed</code>。</li>
+<li><strong>例外傳遞</strong>：worker 裡丟出的例外不會憑空消失，會被存在 <code>Future</code> 裡，等你呼叫 <code>.result()</code> 時<strong>在主執行緒重新拋出</strong>。這跟 Java 的 <code>Future.get()</code> 把例外包成 <code>ExecutionException</code> 一樣的精神——別忘了去 <code>result()</code>，否則例外會被默默吞掉。</li>
+</ul>
+<p>切換到 CPU bound？把 <code>ThreadPoolExecutor</code> 換成 <code>ProcessPoolExecutor</code>，加上 <code>__main__</code> 守衛，其餘程式碼幾乎不動：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-442" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20concurrent.futures%20import%20ProcessPoolExecutor%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20with%20ProcessPoolExecutor()%20as%20ex%3A%20%20%20%20%20%20%20%20%23%20%E9%A0%90%E8%A8%AD%20worker%20%E6%95%B8%20%3D%20CPU%20%E6%A0%B8%E6%95%B8%0A%20%20%20%20%20%20%20%20results%20%3D%20list(ex.map(cpu_work%2C%20%5BN%5D%20*%208))'), 'copy-btn-442')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from concurrent.futures import ProcessPoolExecutor
+
+if __name__ == "__main__":
+    with ProcessPoolExecutor() as ex:        # 預設 worker 數 = CPU 核數
+        results = list(ex.map(cpu_work, [N] * 8))</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：除非有特殊需求，<strong>先用 <code>concurrent.futures</code></strong>，不要手寫 <code>Thread</code> / <code>Process</code>。它幫你管池子大小、回收、例外傳遞，而且 thread↔process 一鍵切換。這層就是你熟悉的 <code>ExecutorService</code>，照著用就對了。</p>
+</div><hr>
+<h2 id="asyncio單執行緒的協作式並行">asyncio：單執行緒的協作式並行</h2><p>threading 用作業系統的搶佔式排程（preemptive scheduling）跑大量 I/O；<code>asyncio</code> 給你另一條路——<strong>單一執行緒、單一 GIL，靠協作式排程（cooperative scheduling）在一條 thread 裡並發處理上萬個 I/O</strong>。沒有 thread 切換成本、沒有鎖、記憶體佔用極省。代價是：你要把程式碼改寫成 <code>async</code>/<code>await</code> 的形式。</p>
+<h3 id="核心三件套async-def-await-event-loop">核心三件套：async def / await / event loop</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-443" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20asyncio%0A%0Aasync%20def%20fetch(name%3A%20str%2C%20delay%3A%20float)%20-%3E%20str%3A%20%20%20%23%20%E5%8D%94%E7%A8%8B%E5%87%BD%E5%BC%8F%EF%BC%88coroutine%20function%EF%BC%89%0A%20%20%20%20print(f%22start%20%7Bname%7D%22)%0A%20%20%20%20await%20asyncio.sleep(delay)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%9C%A8%E7%AD%89%E5%BE%85%E9%BB%9E%E4%BA%A4%E5%87%BA%E6%8E%A7%E5%88%B6%E6%AC%8A%0A%20%20%20%20print(f%22done%20%7Bname%7D%22)%0A%20%20%20%20return%20name%0A%0Aasync%20def%20main()%20-%3E%20None%3A%0A%20%20%20%20%23%20gather%EF%BC%9A%E4%BD%B5%E7%99%BC%E8%B7%91%E5%A4%9A%E5%80%8B%E5%8D%94%E7%A8%8B%EF%BC%8C%E5%85%A8%E9%83%A8%E5%AE%8C%E6%88%90%E5%BE%8C%E4%B8%80%E8%B5%B7%E5%9B%9E%E5%82%B3%EF%BC%88%E5%B0%8D%E7%85%A7%20CompletableFuture.allOf%EF%BC%89%0A%20%20%20%20results%20%3D%20await%20asyncio.gather(%0A%20%20%20%20%20%20%20%20fetch(%22a%22%2C%200.3)%2C%0A%20%20%20%20%20%20%20%20fetch(%22b%22%2C%200.3)%2C%0A%20%20%20%20%20%20%20%20fetch(%22c%22%2C%200.3)%2C%0A%20%20%20%20)%0A%20%20%20%20print(results)%20%20%20%20%20%20%20%20%20%20%20%20%23%20%5B%27a%27%2C%20%27b%27%2C%20%27c%27%5D%0A%0Aasyncio.run(main())%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%95%9F%E5%8B%95%20event%20loop%EF%BC%8C%E8%B7%91%E5%88%B0%20main%20%E7%B5%90%E6%9D%9F'), 'copy-btn-443')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import asyncio
+
+async def fetch(name: str, delay: float) -&gt; str:   # 協程函式（coroutine function）
+    print(f"start {name}")
+    await asyncio.sleep(delay)                      # 在等待點交出控制權
+    print(f"done {name}")
+    return name
+
+async def main() -&gt; None:
+    # gather：併發跑多個協程，全部完成後一起回傳（對照 CompletableFuture.allOf）
+    results = await asyncio.gather(
+        fetch("a", 0.3),
+        fetch("b", 0.3),
+        fetch("c", 0.3),
+    )
+    print(results)            # ['a', 'b', 'c']
+
+asyncio.run(main())           # 啟動 event loop，跑到 main 結束</code></pre>
+      </div>
+    <p>執行結果是三個 <code>start</code> 先一起印出來，等 0.3 秒後三個 <code>done</code> 才出現——總耗時約 0.3 秒而非 0.9 秒。它們<strong>並發</strong>執行：在 <code>await asyncio.sleep</code> 的等待點，協程把控制權交還給 <strong>event loop（事件迴圈）</strong>，loop 趁機去跑別的協程。這就是「協作式」——每個協程在 <code>await</code> 處<strong>主動</strong>讓出，沒有 <code>await</code> 就不會被打斷。</p>
+<p><code>asyncio.run</code> 是進入點（對應你只在最外層呼叫一次的「啟動」）。<code>await</code> 是「在這裡暫停、等這個 awaitable 完成、把控制權還給 loop」。</p>
+<h3 id="taskgroup311結構化併發">TaskGroup（3.11+）：結構化併發</h3><p>Python 3.11 引入 <code>asyncio.TaskGroup</code>，是目前<strong>最推薦</strong>的併發寫法，比裸 <code>gather</code> 更安全。它提供「結構化併發（structured concurrency）」：所有任務都綁在 <code>async with</code> 區塊內，區塊結束前保證全部完成或全部取消，而且任一任務失敗會自動取消其他任務。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-444" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20asyncio%0A%0Aasync%20def%20fetch(name%3A%20str%2C%20delay%3A%20float)%20-%3E%20str%3A%0A%20%20%20%20await%20asyncio.sleep(delay)%0A%20%20%20%20return%20name%0A%0Aasync%20def%20main()%20-%3E%20None%3A%0A%20%20%20%20async%20with%20asyncio.TaskGroup()%20as%20tg%3A%0A%20%20%20%20%20%20%20%20t1%20%3D%20tg.create_task(fetch(%22a%22%2C%200.3))%0A%20%20%20%20%20%20%20%20t2%20%3D%20tg.create_task(fetch(%22b%22%2C%200.3))%0A%20%20%20%20%20%20%20%20t3%20%3D%20tg.create_task(fetch(%22c%22%2C%200.3))%0A%20%20%20%20%23%20%E9%9B%A2%E9%96%8B%20async%20with%20%E6%99%82%EF%BC%8C%E4%B8%89%E5%80%8B%20task%20%E9%83%BD%E5%B7%B2%E5%AE%8C%E6%88%90%0A%20%20%20%20print(t1.result()%2C%20t2.result()%2C%20t3.result())%20%20%20%23%20a%20b%20c%0A%0Aasyncio.run(main())'), 'copy-btn-444')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import asyncio
+
+async def fetch(name: str, delay: float) -&gt; str:
+    await asyncio.sleep(delay)
+    return name
+
+async def main() -&gt; None:
+    async with asyncio.TaskGroup() as tg:
+        t1 = tg.create_task(fetch("a", 0.3))
+        t2 = tg.create_task(fetch("b", 0.3))
+        t3 = tg.create_task(fetch("c", 0.3))
+    # 離開 async with 時，三個 task 都已完成
+    print(t1.result(), t2.result(), t3.result())   # a b c
+
+asyncio.run(main())</code></pre>
+      </div>
+    <p>當多個任務同時失敗，<code>TaskGroup</code> 會把它們的例外打包成 <strong><code>ExceptionGroup</code></strong>，用 Python 3.11 的 <code>except*</code> 語法接：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-445" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20asyncio%0A%0Aasync%20def%20boom(name%3A%20str)%20-%3E%20None%3A%0A%20%20%20%20await%20asyncio.sleep(0.1)%0A%20%20%20%20raise%20ValueError(name)%0A%0Aasync%20def%20main()%20-%3E%20None%3A%0A%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20async%20with%20asyncio.TaskGroup()%20as%20tg%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20tg.create_task(boom(%22one%22))%0A%20%20%20%20%20%20%20%20%20%20%20%20tg.create_task(boom(%22two%22))%0A%20%20%20%20except*%20ValueError%20as%20eg%3A%0A%20%20%20%20%20%20%20%20print(f%22caught%20%7Blen(eg.exceptions)%7D%20errors%22)%20%20%20%23%20caught%202%20errors%0A%0Aasyncio.run(main())'), 'copy-btn-445')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import asyncio
+
+async def boom(name: str) -&gt; None:
+    await asyncio.sleep(0.1)
+    raise ValueError(name)
+
+async def main() -&gt; None:
+    try:
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(boom("one"))
+            tg.create_task(boom("two"))
+    except* ValueError as eg:
+        print(f"caught {len(eg.exceptions)} errors")   # caught 2 errors
+
+asyncio.run(main())</code></pre>
+      </div>
+    <h3 id="函式著色asyncio-最大的思維負擔">「函式著色」：asyncio 最大的思維負擔</h3><p>這是 Java 工程師（尤其用過 Java 21 virtual threads 的）最該注意的差異。在 asyncio 裡，函式分成兩種「顏色」：普通函式與 <code>async</code> 函式。<strong><code>async</code> 函式只能被 <code>async</code> 函式 <code>await</code></strong>，這個「顏色」會像傳染病一樣往上蔓延整個 call stack——一旦底層某個函式變 async，沿途呼叫它的全部都得變 async。這就是業界說的「function coloring（函式著色）」問題。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-446" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E9%8C%AF%E8%AA%A4%E7%A4%BA%E7%AF%84%EF%BC%9A%E4%B8%8D%E8%83%BD%E5%9C%A8%E6%99%AE%E9%80%9A%E5%87%BD%E5%BC%8F%E8%A3%A1%20await%EF%BC%8C%E9%80%99%E6%9C%83%E5%87%BA%E9%8C%AF%EF%BC%88SyntaxError%EF%BC%89%0Adef%20caller()%3A%0A%20%20%20%20data%20%3D%20await%20fetch_data()%20%20%20%23%20await%20%E5%8F%AA%E8%83%BD%E5%87%BA%E7%8F%BE%E5%9C%A8%20async%20def%20%E8%A3%A1%E9%9D%A2%0A%0A%23%20%E6%AD%A3%E7%A2%BA%E5%AF%AB%E6%B3%95%EF%BC%9A%E8%A6%81%20await%EF%BC%8C%E6%95%B4%E6%A2%9D%E5%91%BC%E5%8F%AB%E9%8F%88%E9%83%BD%E5%BE%97%E6%98%AF%20async%0Aasync%20def%20caller()%3A%0A%20%20%20%20data%20%3D%20await%20fetch_data()'), 'copy-btn-446')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># 錯誤示範：不能在普通函式裡 await，這會出錯（SyntaxError）
+def caller():
+    data = await fetch_data()   # await 只能出現在 async def 裡面
+
+# 正確寫法：要 await，整條呼叫鏈都得是 async
+async def caller():
+    data = await fetch_data()</code></pre>
+      </div>
+    <p>對比之下，<strong>Java 21 的 virtual threads 走的是完全相反的路線</strong>：你照常寫<strong>阻塞式</strong>程式碼（<code>socket.read()</code>、<code>Thread.sleep()</code>），JVM 在底層自動把阻塞的 virtual thread 從 carrier thread 上卸下，換別的上來跑。沒有 <code>async</code>/<code>await</code> 關鍵字、沒有函式著色、沒有兩種顏色的函式——舊的同步程式碼幾乎免改就能享受高併發。</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Python asyncio</th>
+<th>Java 21 virtual threads</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>風格</td>
+<td>顯式 <code>async</code>/<code>await</code></td>
+<td>隱式、看起來像阻塞同步碼</td>
+</tr>
+<tr>
+<td>函式著色</td>
+<td>有（async 會傳染）</td>
+<td>無</td>
+</tr>
+<tr>
+<td>排程</td>
+<td>協作式（在 <code>await</code> 讓出）</td>
+<td>由 JVM 自動掛載/卸載</td>
+</tr>
+<tr>
+<td>既有同步碼</td>
+<td>需改寫成 async</td>
+<td>幾乎免改</td>
+</tr>
+</tbody></table>
+<p>Python 目前沒有等價於 virtual threads 的東西；asyncio 的顯式模型是它的設計選擇——你永遠看得到 <code>await</code>，就知道哪裡可能切換協程（這對推理併發正確性其實有好處），代價是著色傳染與生態系分裂（同一個函式庫常要出同步與 async 兩個版本）。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<strong>絕對不要</strong>在協程裡呼叫阻塞式同步 I/O 或做 CPU 重活。<code>time.sleep(5)</code>、同步的 <code>requests.get()</code>、跑一個大迴圈——這些<strong>不會讓出控制權</strong>，會把整個 event loop 卡死，所有協程一起停擺。要等就用 <code>await asyncio.sleep(5)</code>；要用 HTTP client 就用 <code>aiohttp</code>/<code>httpx</code> 的 async 版本；非得跑阻塞或 CPU 的東西，用 <code>await asyncio.to_thread(blocking_fn, ...)</code> 丟到執行緒池。</p>
+</div>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-447" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20asyncio%0A%0Adef%20blocking_cpu_or_io()%3A%20%20%20%20%20%23%20%E4%B8%80%E5%80%8B%E6%B2%92%E6%9C%89%20async%20%E7%89%88%E6%9C%AC%E7%9A%84%E9%98%BB%E5%A1%9E%E5%87%BD%E5%BC%8F%0A%20%20%20%20import%20time%3B%20time.sleep(1)%0A%20%20%20%20return%2042%0A%0Aasync%20def%20main()%20-%3E%20None%3A%0A%20%20%20%20%23%20%E6%8A%8A%E9%98%BB%E5%A1%9E%E5%91%BC%E5%8F%AB%E4%B8%9F%E5%88%B0%20thread%EF%BC%8C%E4%B8%8D%E5%8D%A1%E4%BD%8F%20event%20loop%0A%20%20%20%20result%20%3D%20await%20asyncio.to_thread(blocking_cpu_or_io)%0A%20%20%20%20print(result)%20%20%20%20%20%20%20%20%20%20%20%20%20%23%2042%0A%0Aasyncio.run(main())'), 'copy-btn-447')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import asyncio
+
+def blocking_cpu_or_io():     # 一個沒有 async 版本的阻塞函式
+    import time; time.sleep(1)
+    return 42
+
+async def main() -&gt; None:
+    # 把阻塞呼叫丟到 thread，不卡住 event loop
+    result = await asyncio.to_thread(blocking_cpu_or_io)
+    print(result)             # 42
+
+asyncio.run(main())</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>async</code> ≠ 平行。asyncio 全程在<strong>一條</strong> thread、一把 GIL 上跑，它擅長的是「同時等很多 I/O」，而不是「同時算很多東西」。CPU bound 塞進 event loop 只會更慢還卡死別人——那是 multiprocessing 的工作。asyncio 的甜蜜點是：<strong>大量、高併發的網路 I/O</strong>（網路服務、爬蟲、API 閘道、同時打上千個連線）。</p>
+</div><hr>
+<h2 id="決策樹到底該用哪一個">決策樹：到底該用哪一個</h2><p>把整章濃縮成一張可以貼在螢幕旁的表：</p>
+<table>
+<thead>
+<tr>
+<th>工作性質</th>
+<th>規模</th>
+<th>選擇</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>I/O bound</td>
+<td>少量～中等並發</td>
+<td><code>ThreadPoolExecutor</code>（concurrent.futures）</td>
+<td>最簡單，等待時釋放 GIL，免改寫程式碼</td>
+</tr>
+<tr>
+<td>I/O bound</td>
+<td>大量、高併發（上千連線）</td>
+<td><code>asyncio</code></td>
+<td>單執行緒省記憶體與切換成本，為海量 I/O 而生</td>
+</tr>
+<tr>
+<td>CPU bound</td>
+<td>任意</td>
+<td><code>ProcessPoolExecutor</code> / multiprocessing</td>
+<td>多進程各自有 GIL，真正吃多核</td>
+</tr>
+<tr>
+<td>CPU bound（數值）</td>
+<td>任意</td>
+<td>numpy / C 擴充</td>
+<td>熱點在 C，計算時釋放 GIL，常比多進程更省事</td>
+</tr>
+<tr>
+<td>混合（async 流程中有阻塞/CPU 段）</td>
+<td>—</td>
+<td>asyncio + <code>to_thread</code> / <code>run_in_executor</code></td>
+<td>把阻塞/CPU 部分卸載到池子，不卡 loop</td>
+</tr>
+</tbody></table>
+<p>判斷流程，三個問題：</p>
+<ol>
+<li><strong>是 CPU bound 還是 I/O bound？</strong>（在等東西還是在算東西？）<ul>
+<li>CPU bound → 走多進程（<code>ProcessPoolExecutor</code>），或交給 numpy/C 擴充。<strong>到此結束，別碰 threading/asyncio。</strong></li>
+</ul>
+</li>
+<li><strong>I/O bound，那並發量多大？</strong><ul>
+<li>少量～中等（幾十、上百）→ <code>ThreadPoolExecutor</code>，最省腦。</li>
+<li>海量（上千、需要極致效率的網路服務）→ <code>asyncio</code>。</li>
+</ul>
+</li>
+<li><strong>已經在 asyncio 裡，但需要跑阻塞/CPU 的東西？</strong><ul>
+<li>用 <code>asyncio.to_thread()</code>（阻塞 I/O）或 <code>loop.run_in_executor(ProcessPoolExecutor(), ...)</code>（CPU）卸載出去。</li>
+</ul>
+</li>
+</ol>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：在 Java 你大致只需要「丟給 <code>ExecutorService</code>」一招打天下，因為 thread 又能 I/O 又能 CPU 平行。Python 把這件事拆成兩個維度（I/O vs CPU、少量 vs 海量），逼你先分類工作再選工具。多花的這點分類成本，正是 GIL 的存在稅。</p>
+</div><hr>
+<h2 id="free-threadingno-gil的現況">free-threading（no-GIL）的現況</h2><p>最後談談未來。GIL 不是不可動搖的——<strong>PEP 703</strong> 開啟了「自由執行緒（free-threading）」build，目標是讓 CPython <strong>可以在編譯時關掉 GIL</strong>，讓多 thread 真正 CPU 平行，往 Java 的模型收斂。</p>
+<p>狀態（截至本書撰寫，請以你的版本為準）：</p>
+<ul>
+<li><strong>Python 3.13</strong> 首次提供<strong>實驗性</strong>的 free-threaded build（俗稱 <code>3.13t</code>），需要特別編譯、預設不啟用。</li>
+<li><strong>Python 3.14</strong> 起 free-threaded build 進入<strong>官方支援</strong>階段（不再標記為實驗性）——依 <strong>PEP 779</strong>，free-threaded build 自 3.14 起轉為官方支援的第二階段（Phase II）；但仍非預設，生態系（C 擴充、第三方套件）對它的支援還在補齊中。</li>
+<li>你日常下載的標準 CPython <strong>預設仍帶 GIL</strong>。要關掉得用 free-threaded build，並可能付出單執行緒效能的代價。</li>
+</ul>
+<p>怎麼確認自己手上的直譯器？</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-448" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20sys%0A%3E%3E%3E%20sys.version%0A%273.14.4%20(main%2C%20Apr%20%207%202026%2C%2013%3A13%3A20)%20%5BClang%2021.0.0%20(clang-2100.0.123.102)%5D%27%0A%3E%3E%3E%20sys._is_gil_enabled()%20%20%20%20%20%20%20%20%23%203.13%2B%20%E6%89%8D%E6%9C%89%E9%80%99%E5%80%8B%E5%87%BD%E5%BC%8F%0ATrue%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20True%20%3D%20GIL%20%E9%82%84%E5%9C%A8%EF%BC%9Bfree-threaded%20build%20%E6%9C%83%E6%98%AF%20False'), 'copy-btn-448')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import sys
+&gt;&gt;&gt; sys.version
+'3.14.4 (main, Apr  7 2026, 13:13:20) [Clang 21.0.0 (clang-2100.0.123.102)]'
+&gt;&gt;&gt; sys._is_gil_enabled()        # 3.13+ 才有這個函式
+True                             # True = GIL 還在；free-threaded build 會是 False</code></pre>
+      </div>
+    <p>也可以從建置設定看：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-449" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20sysconfig%0A%3E%3E%3E%20sysconfig.get_config_var(%22Py_GIL_DISABLED%22)%0A0%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%200%20%3D%20%E4%B8%80%E8%88%AC%20build%EF%BC%9B1%20%3D%20free-threaded%20build'), 'copy-btn-449')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import sysconfig
+&gt;&gt;&gt; sysconfig.get_config_var("Py_GIL_DISABLED")
+0                                # 0 = 一般 build；1 = free-threaded build</code></pre>
+      </div>
+    <p>命令列上 <code>python3 -VV</code> 會顯示完整 build 資訊；free-threaded build 通常會帶 <code>free-threading</code> 字樣或 <code>t</code> 後綴。</p>
+<p>意義在哪？如果 free-threading 成熟、生態系跟上，那麼「CPython 多 thread 也能 CPU 平行」會成真，本章「CPU bound 必須走多進程」的鐵則就會鬆動——你可以像在 Java 那樣，用一個執行緒池同時處理 I/O 與 CPU 工作，不必再為了繞過 GIL 而忍受 multiprocessing 的序列化與啟動成本。Python 的並行模型會與你熟悉的 Java 模型收斂。</p>
+<p>但要保守看待：這仍在演進中，預設 build 還是有 GIL，C 擴充相容性與單執行緒效能都還在權衡。<strong>在可預見的未來，假設你的生產環境帶 GIL 仍是安全的預設</strong>——也就是說，本章的決策樹現在依然完全適用。等你真的部署在 free-threaded build 上，前面那條「threading 不能 CPU 平行」才需要重新評估。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：別把 free-threading 當成「現在就能依賴」的東西。它是方向，不是現狀。今天寫程式，仍照本章決策樹走；同時讓自己的並行碼<strong>本來就 thread-safe</strong>（該加鎖加鎖、優先用 Queue 傳資料）——這樣哪天搬到 no-GIL build，你的程式才不會因為失去「GIL 順手提供的序列化錯覺」而炸開。</p>
+</div><hr>
+<h2 id="本章小結">本章小結</h2><ul>
+<li><strong>GIL 不等於「不能用多執行緒」</strong>。它讓同一時刻只有一個 thread 執行 Python bytecode，所以多 thread 對 <strong>CPU bound 無法平行加速</strong>；但 I/O 等待時 GIL 會釋放，故 threading 對 <strong>I/O bound 仍然有效</strong>。</li>
+<li><strong>GIL 保護的是直譯器內部狀態，不是你的程式</strong>。<code>counter += 1</code> 這種 read-modify-write 在多 thread 下照樣 race，該加鎖就加鎖——別丟掉 Java 帶來的鎖直覺。</li>
+<li><strong>CPU bound 走多進程</strong>：每個進程有自己的直譯器與 GIL，能真正吃多核，代價是 pickle 序列化、啟動成本、以及必備的 <code>if __name__ == &quot;__main__&quot;:</code> 守衛。數值運算優先考慮交給釋放 GIL 的 numpy/C 擴充。</li>
+<li><strong>優先用 <code>concurrent.futures</code></strong>：<code>ThreadPoolExecutor</code> / <code>ProcessPoolExecutor</code> 是你熟悉的 <code>ExecutorService</code>，例外會在 <code>.result()</code> 重新拋出，I/O↔CPU 一鍵切換，不要手刻 Thread/Process。</li>
+<li><strong>asyncio 是單執行緒協作式並行</strong>，為<strong>海量並發 I/O</strong> 而生。<code>async</code>/<code>await</code> 顯式讓出控制權；注意「函式著色」會往上傳染，且 <strong>async ≠ 平行</strong>，CPU bound 與阻塞呼叫絕不能塞進 event loop。</li>
+<li><strong>與 Java 21 virtual threads 的根本差異</strong>：asyncio 是顯式 <code>await</code>、有函式著色；virtual threads 是隱式、寫成阻塞同步碼、無著色。Python 目前沒有等價物。</li>
+<li><strong>決策樹</strong>：CPU bound → 多進程/numpy；I/O 少量 → ThreadPoolExecutor；I/O 海量 → asyncio。先分類工作（I/O vs CPU、少量 vs 海量）再選工具。</li>
+<li><strong>free-threading（PEP 703）是方向不是現狀</strong>：3.13 實驗性、3.14 起官方支援但非預設（依 PEP 779 進入第二階段）。用 <code>sys._is_gil_enabled()</code> 確認。今天仍照決策樹走，但讓並行碼本來就 thread-safe，為 no-GIL 未來鋪路。</li>
+</ul>
+<h2 id="練習">練習</h2><ol>
+<li><p><strong>分類與選型</strong>：給定四個任務——(a) 同時下載 2000 個網頁、(b) 對一張大圖做像素級濾鏡運算、(c) 同時查詢 8 個資料庫並彙整、(d) 計算一個 50 位數的質因數分解——分別判斷 I/O bound 還是 CPU bound，並從決策樹選出工具。提示：先問「在等還是在算」，CPU bound 別選 threading/asyncio。</p>
+</li>
+<li><p><strong>證明 GIL</strong>：寫一段程式，對同一份純 Python 的 CPU 工作分別用「序列」「4 條 thread」「4 個 process」計時，印出三者耗時。觀察 thread 版為何沒比序列快、process 版為何能快。提示：用 <code>concurrent.futures</code> 的兩種 Executor 切換，process 版記得加 <code>__main__</code> 守衛。</p>
+</li>
+<li><p><strong>抓 race condition</strong>：把本章 <code>counter += 1</code> 的例子拿掉 <code>with lock</code>，跑 10 次看最終數字是否每次都不同、且小於預期。然後改用 <code>queue.Queue</code> 收集各 thread 的結果、最後在主執行緒加總，做到完全不需要鎖。提示：用 Queue 傳資料取代共享可變狀態，是並行最不易出錯的模式。</p>
+</li>
+<li><p><strong>同步轉 async</strong>：把一段用 <code>ThreadPoolExecutor</code> + 同步 <code>urllib</code> 抓多個 URL 的程式，改寫成 <code>asyncio</code> + <code>httpx</code>（async client）版本，用 <code>TaskGroup</code> 併發、用 <code>except*</code> 處理可能的 <code>ExceptionGroup</code>。可用 <code>uv run --with httpx python your_script.py</code> 執行。提示：注意「函式著色」會讓 <code>fetch</code> 與 <code>main</code> 都得是 <code>async def</code>。</p>
+</li>
+<li><p><strong>別卡住 event loop</strong>：寫一個 asyncio 程式，故意在某個協程裡呼叫 <code>time.sleep(2)</code>（阻塞），觀察其他協程是否也被卡住；接著改成 <code>await asyncio.to_thread(time.sleep, 2)</code>，確認其他協程恢復併發。提示：在協程裡放阻塞呼叫會凍結整個 loop，這是 asyncio 最常見的 bug。</p>
+</li>
+</ol>

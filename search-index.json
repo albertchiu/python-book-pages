@@ -1,0 +1,1444 @@
+[
+  {
+    "file": "README.md",
+    "chapterTitle": "Python 教材（為資深 Java 工程師設計）",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "以 Java ↔ Python 對照 切入，重點放在思維轉換（mindset shift）與 Pythonic 寫法。 完整課程規劃見 curriculum.mdcurriculum.md；本書範例以 Python 3.12+ 為準。 > 心法：不要把 Java 的寫法直接翻譯成 Python——先學會「Python 怎麼想」， > 再利用你的工程經驗（測試、架構、型別）讓 Python 程式碼比一般人寫得更穩。"
+  },
+  {
+    "file": "README.md",
+    "chapterTitle": "Python 教材（為資深 Java 工程師設計）",
+    "sectionTitle": "進度",
+    "sectionId": "進度",
+    "content": "部分  狀態 ------ 第一部分：快速上手與思維轉換（第 1–3 章）  ✅ 已完成 第二部分：資料結構與 Pythonic 寫法（第 4–6 章）  ✅ 已完成 第三部分：物件導向與型別系統（第 7–10 章）  ✅ 已完成 第四部分：工程實務（第 11–15 章）  ✅ 已完成 第五部分：實戰應用（第 16–18 章）  ✅ 已完成 附錄 A／B／C（速查表、陷阱清單、學習資源）  ✅ 已完成"
+  },
+  {
+    "file": "README.md",
+    "chapterTitle": "Python 教材（為資深 Java 工程師設計）",
+    "sectionTitle": "第一部分：快速上手與思維轉換",
+    "sectionId": "第一部分快速上手與思維轉換",
+    "content": "- 第 1 章：Python 生態系與開發環境ch01-ecosystem-and-tooling.md — CPython / bytecode / PVM 對照 JVM、venv 與 uv、pyproject.toml、ruff 與 mypy、REPL 互動式開發。 - 第 2 章：語法速覽——從 Java 翻譯到 Pythonch02-syntax-overview.md — 縮排即區塊、name binding、一切皆物件（int 不溢位）、is vs ==、None、truthiness。 - 第 3 章：函式——Python 的一等公民ch03-functions.md — 函式即物件、args/kwargs、可變預設參數陷阱、closure 與 nonlocal、type hints、docstring 與 PEP 257（對照 JavaDoc）。"
+  },
+  {
+    "file": "README.md",
+    "chapterTitle": "Python 教材（為資深 Java 工程師設計）",
+    "sectionTitle": "第二部分：資料結構與 Pythonic 寫法",
+    "sectionId": "第二部分資料結構與-pythonic-寫法",
+    "content": "- 第 4 章：核心資料結構深入ch04-data-structures.md — list/tuple/dict/set 內部實作與複雜度、可變性、切片、解包、collections、深淺拷貝。 - 第 5 章：Pythonic 慣用法ch05-pythonic-idioms.md — comprehension 對照 Stream、惰性求值、enumerate/zip/sorted、EAFP、duck typing、with、海象運算子與 f-string。 - 第 6 章：迭代器與產生器ch06-iterators-and-generators.md — 迭代協定、yield 與 generator、itertools、generator pipeline、yield from。"
+  },
+  {
+    "file": "README.md",
+    "chapterTitle": "Python 教材（為資深 Java 工程師設計）",
+    "sectionTitle": "第三部分：物件導向與型別系統",
+    "sectionId": "第三部分物件導向與型別系統",
+    "content": "- 第 7 章：Python 的類別與物件ch07-classes-and-objects.md — class/init/self、name mangling、類別 vs 實例屬性、@property、@classmethod/@staticmethod、@dataclass、repr/eq/hash。 - 第 8 章：繼承、協定與魔術方法ch08-inheritance-protocols-magic-methods.md — super、多重繼承與 MRO、abc.ABC、Protocol（結構型別）vs ABC（名義型別）、魔術方法、mixin、組合優於繼承。 - 第 9 章：型別提示與靜態檢查ch09-type-hints-and-static-checking.md — 現代 typing 寫法、泛型（3.12 T 語法）與型別抹除、Protocol、mypy/pyright 與 CI、pydantic 執行期驗證、漸進式型別。 - 第 10 章：裝飾器與元程式設計ch10-decorators-and-metaprogramming.md — 裝飾器與 functools.wraps、帶參數裝飾器、類別裝飾器、描述器（descriptor）、getattr/getattribute、metaclass 與 initsubclass。"
+  },
+  {
+    "file": "README.md",
+    "chapterTitle": "Python 教材（為資深 Java 工程師設計）",
+    "sectionTitle": "第四部分：工程實務",
+    "sectionId": "第四部分工程實務",
+    "content": "- 第 11 章：模組、套件與專案結構ch11-modules-packages-project-structure.md — import 機制與 sys.path、套件與 init.py、main.py、src layout、pyproject.toml 與 entry points、uv 相依管理。 - 第 12 章：例外處理與防禦性程式設計ch12-exceptions-and-defensive-programming.md — 例外階層、EAFP、try/except/else/finally、自訂例外、例外鏈（raise from）、contextlib、防禦性設計與 logging。 - 第 13 章：測試ch13-testing.md — pytest、assert rewriting、fixture 與 conftest.py、參數化、unittest.mock 與 @patch、coverage、property-based testing（hypothesis）。 - 第 14 章：並行與非同步ch14-concurrency-and-async.md — GIL 與 free-threading（PEP 703/779）、threading vs multiprocessing、concurrent.futures、async/await 與函式著色、asyncio、Queue。 - 第 15 章：檔案、I/O 與標準函式庫巡禮ch15-files-io-stdlib.md — pathlib、文字/二進位 I/O 與編碼、json/csv、datetime、tempfile、subprocess、常用標準函式庫地圖。"
+  },
+  {
+    "file": "README.md",
+    "chapterTitle": "Python 教材（為資深 Java 工程師設計）",
+    "sectionTitle": "第五部分：實戰應用（依興趣選修）",
+    "sectionId": "第五部分實戰應用依興趣選修",
+    "content": "- 第 16 章：Web 開發ch16-web-development.md — FastAPI（型別驅動驗證 + 自動 OpenAPI）對照 Spring Boot、Depends 函式式 DI 與 dependencyoverrides、SQLAlchemy 2.0（Mapped/mappedcolumn/select、identity map）對照 JPA/Hibernate、ASGI vs WSGI、uvicorn/gunicorn worker 與 Docker 部署。 - 第 17 章：資料處理與自動化腳本ch17-data-processing-automation.md — requests vs httpx（連線池與 async）、pandas DataFrame 與向量化思維、BeautifulSoup（本地 HTML 可重現解析）對照 Jsoup、openpyxl 報表自動化對照 Apache POI、排程與系統腳本取代 shell script。 - 第 18 章：總整專案（Capstone）ch18-capstone-project.md — src layout 分層（API/service/持久層）、型別三分（pydantic 邊界／SQLAlchemy 持久／dataclass 內部）、FastAPI + click 雙入口共用 service、pytest + TestClient + in-memory DB 測試、ruff + mypy + coverage 全綠、GitHub Actions CI、uv build 打包。"
+  },
+  {
+    "file": "README.md",
+    "chapterTitle": "Python 教材（為資深 Java 工程師設計）",
+    "sectionTitle": "附錄",
+    "sectionId": "附錄",
+    "content": "- 附錄 A：Java ↔ Python 速查對照表appendix-a-java-python-cheatsheet.md — 分 10 大類（語法運算子、型別、集合、控制流程與迭代、OOP、函式式、例外與資源、並行、工具鏈）的對照速查表，每列附章節連結與思維差異，結尾「最關鍵的 10 個思維轉換」。 - 附錄 B：常見陷阱清單（Java 工程師專屬）appendix-b-pitfalls.md — 19 個高頻坑（可變預設參數、is/== 與整數快取、closure 延遲綁定、GIL、循環匯入、x in list 為 On、requests 無預設 timeout、mock/patch 打使用端…），每個附可重現程式碼、真實輸出、為什麼與正解，結尾自我檢查清單。 - 附錄 C：建議學習資源appendix-c-resources.md — 官方文件與重點 PEP、給資深工程師的書單（Fluent Python、Effective Python、Robust Python…）、線上資源與練習平台、工具文件、社群，以及一條「給 Java 工程師的閱讀路線圖」。"
+  },
+  {
+    "file": "README.md",
+    "chapterTitle": "Python 教材（為資深 Java 工程師設計）",
+    "sectionTitle": "閱讀方式",
+    "sectionId": "閱讀方式",
+    "content": "每章獨立成檔，結構一致： 1. 引言——從 Java 工程師視角點出本章會顛覆的直覺。 2. Java ↔ Python 三段式對照——「Java 怎麼做 → Python 怎麼做 → 思維差異」。 3. 陷阱框（⚠️）／Pythonic 重點框（💡）／Java 對照框（🔁）。 4. 本章小結 + 練習。 所有 Python 範例皆經 python3 實際執行驗證，型別提示範例經 mypy 檢查。"
+  },
+  {
+    "file": "ch01-ecosystem-and-tooling.md",
+    "chapterTitle": "第 1 章：Python 生態系與開發環境",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "身為資深 Java 工程師，你對「編譯、依賴管理、IDE、建置工具」這條工具鏈早已駕輕就熟——javac、Maven、Gradle、JUnit 各司其職，邊界清晰。進到 Python，你會發現規則重新洗牌：有人說「Python 是直譯語言所以不用編譯」（其實不對）、依賴管理的歷史包袱讓初學者一頭霧水（pip、venv、poetry、conda 到底用哪個）、而型別檢查竟然是「選用的」。本章要做的，是把 Python 的執行模型與現代工具鏈一次講清楚，並用你熟悉的 JVM 與 Maven/Gradle 當座標，讓你在第一天就建立正確的心智模型，避免踩進那些「Java 沒有、Python 才有」的坑。 ---"
+  },
+  {
+    "file": "ch01-ecosystem-and-tooling.md",
+    "chapterTitle": "第 1 章：Python 生態系與開發環境",
+    "sectionTitle": "1.1 執行模型：CPython、bytecode 與虛擬機",
+    "sectionId": "11-執行模型cpythonbytecode-與虛擬機",
+    "content": "Java 怎麼做 Java 的執行流程你閉著眼睛都能畫出來： .java  --javac-->  .class bytecode  --classloader-->  JVM 解譯 + JIT 編譯 --> 機器碼 關鍵是編譯與執行是兩個明確分開的步驟。你先跑 javac，把原始碼轉成平台無關的 .class bytecode；執行期 JVM（HotSpot）載入 bytecode，先解譯，熱點程式碼再由 JIT 編譯成原生機器碼。 Python 怎麼做 很多人說「Python 是直譯語言（interpreted language）」，這句話會誤導你。真相是：Python 也會編譯成 bytecode，只是這個步驟是隱形且即時的。 .py  --compile-->  bytecode .pyc / pycache  -->  PVM Python Virtual Machine 逐條執行 當你執行 python foo.py，CPython（Python 的官方參考實作，用 C 寫成）做了這些事： 1. 詞法/語法分析：把 .py 解析成抽象語法樹（AST）。 2. 編譯：把 AST 編譯成 bytecode（一串虛擬機指令）。 3. 執行：由 PVM（一個基於堆疊的虛擬機，本質是一個巨大的 C 語言 evaluation loop）逐條解譯 bytecode。 你可以親眼看到 bytecode。dis 模組就是 Python 版的 javap -c： >>> import dis >>> def adda, b: ...     return a + b ... >>> dis.disadd 1           0 RESUME                   0 2           2 LOADFAST                0 a 4 LOAD"
+  },
+  {
+    "file": "ch01-ecosystem-and-tooling.md",
+    "chapterTitle": "第 1 章：Python 生態系與開發環境",
+    "sectionTitle": "1.2 虛擬環境（venv）：一個 Java 工程師沒有的痛點",
+    "sectionId": "12-虛擬環境venv一個-java-工程師沒有的痛點",
+    "content": "為什麼需要隔離 先理解 Java 為什麼沒有這個問題。在 Maven/Gradle 世界，依賴是每專案獨立的：jar 放在本地 /.m2 倉庫，但每個專案的 classpath 由它自己的 pom.xml/build.gradle 決定。專案 A 用 Guava 31、專案 B 用 Guava 32，彼此井水不犯河水——因為依賴解析是專案層級的。 Python 預設不是這樣。pip install requests 預設裝到全域 site-packages，全機所有 Python 程式共用。後果： - 專案 A 需要 django==3.2，專案 B 需要 django==4.2——全域只能裝一個版本，直接衝突。 - 你裝的套件污染了系統 Python，某天系統工具因為版本被你升級而壞掉。 這就是「相依地獄（dependency hell）」。虛擬環境（virtual environment, venv） 就是解法：為每個專案建立一個獨立的、隔離的 Python 環境與其專屬的 site-packages。 > ⚠️ 陷阱：現代發行版（含 Homebrew 安裝的 Python）多依 PEP 668 把系統 Python 標記為 externally-managed（在其標準函式庫目錄放一個 EXTERNALLY-MANAGED 檔）。此時直接對系統 Python 跑 pip install 會被擋下，並提示你改用 venv 或 pipx。這從另一個角度強化了 venv 的必要性——連 Python 自己都不希望你污染全域。 > 🔁 Java 對照：venv 提供的隔離 ≈ Maven/Gradle「每專案獨立 classpath」這件你本來就免費享有的事。差別是 Java 自動做到，Python 要你顯式建立並啟用一個 venv。 建立與使用 python3 -m ve"
+  },
+  {
+    "file": "ch01-ecosystem-and-tooling.md",
+    "chapterTitle": "第 1 章：Python 生態系與開發環境",
+    "sectionTitle": "1.3 套件與專案設定：從 pip 到 pyproject.toml",
+    "sectionId": "13-套件與專案設定從-pip-到-pyprojecttoml",
+    "content": "pip 與 requirements.txt 的不足 pip 是 Python 的套件安裝器（≈ 你直接呼叫 Maven 的依賴下載功能）。最傳統的依賴宣告方式是 requirements.txt： requests==2.32.3 flask>=3.0 pip install -r requirements.txt pip freeze > requirements.txt    把當前環境凍結成清單 這套老方法有幾個 Java 工程師一眼能看穿的問題： 1. 沒有專案元資料：requirements.txt 只是一串套件，沒有專案名稱、版本、進入點、建置設定。它不是 pom.xml，比較像光禿禿的 dependency 區段。 2. 直接依賴與間接依賴混在一起：pip freeze 把所有安裝的東西（含遞移依賴）攤平列出，你看不出哪些是你真正想要的、哪些是被拖進來的。對照 Maven 你能清楚區分 direct 與 transitive dependency。 3. 不可重現（non-reproducible）：flask>=3.0 這種範圍宣告，今天解析到 3.0.3、下個月可能解析到 3.1.0，導致「在我機器上能跑」。 現代標準：pyproject.toml（PEP 621） pyproject.toml 是現在 Python 專案設定的單一事實來源（single source of truth），地位等同 pom.xml / build.gradle。PEP 621 標準化了 project 區段： project name = \"greeter\" version = \"0.1.0\" description = \"A friendly greeting service\" readme = \"README.md\" requires-python = \">=3.12"
+  },
+  {
+    "file": "ch01-ecosystem-and-tooling.md",
+    "chapterTitle": "第 1 章：Python 生態系與開發環境",
+    "sectionTitle": "1.4 uv：現代一體化工具",
+    "sectionId": "14-uv現代一體化工具",
+    "content": "過去 Python 工具鏈是「拼裝車」：venv 管環境、pip 裝套件、pip-tools/poetry 管 lock、pyenv 管 Python 版本……每個工具一個指令、一套心智模型。uv（用 Rust 寫成）把這些全部整合進一個指令，而且極快——依賴解析與安裝常比 pip 快一到兩個數量級。 > 🔁 Java 對照：uv 之於 Python，就像 Gradle wrapper 給你的「一個入口管全部」體驗：建環境、解依賴、裝套件、跑程式、鎖版本，全在一個工具裡——只是它快到讓你懷疑人生。 安裝（macOS/Linux）： curl -LsSf https://astral.sh/uv/install.sh  sh 核心指令： uv 指令  作用  Maven/Gradle 類比 --------- uv init  初始化新專案（建 pyproject.toml、git、範本）  mvn archetype:generate / gradle init uv add <pkg>  加依賴並安裝、同步更新 lock  編輯 pom.xml + 下載 uv remove <pkg>  移除依賴  反向操作 uv sync  依 lock 檔重建環境  mvn dependency:resolve（鎖定版本） uv run <cmd>  在專案環境中執行命令（自動確保環境同步）  gradle run / ./gradlew <task> uv lock  重新解析並寫出 lock 檔  更新 lockfile uv python install 3.12  安裝指定 Python 版本  ≈ 管理 toolchain（pyenv 的活） uv 還有個殺手級體驗：你幾乎不用手動啟用 venv。uv run 會自動建立並使用 .venv、確保依賴與 lock 一致，然後"
+  },
+  {
+    "file": "ch01-ecosystem-and-tooling.md",
+    "chapterTitle": "第 1 章：Python 生態系與開發環境",
+    "sectionTitle": "1.5 工具鏈：ruff 與 mypy",
+    "sectionId": "15-工具鏈ruff-與-mypy",
+    "content": "ruff：linter + formatter 一體（且快上百倍） Java 端你大概用過一整套：Checkstyle（風格）、SpotBugs/PMD（找 bug）、google-java-format / Spotless（排版）。每個工具獨立設定、各跑各的。 ruff（同樣 Rust 寫成）把 linter 與 formatter 合而為一，涵蓋數百條規則（吸收了 Flake8、isort、pyupgrade、pydocstyle 等老工具的能力），而且快到誇張——大型專案的檢查常在毫秒級完成。 uv run ruff check .           檢查（≈ Checkstyle + SpotBugs + isort） uv run ruff check --fix .     自動修可修的問題 uv run ruff format .          排版（≈ google-java-format） 實際抓出問題的樣子（對一段刻意寫爛的程式碼）： $ ruff check bad.py F401  os imported but unused --> bad.py:1:8 1  import os ^^ 2 3  def f: help: Remove unused import: os F841 Local variable y is assigned to but never used --> bad.py:4:5 3  def f: 4      y = 1 ^ 5      return 2 help: Remove assignment to unused variable y Found 2 errors. 1 fixable with the --fix option 1 hidden fix can be enabled with the -"
+  },
+  {
+    "file": "ch01-ecosystem-and-tooling.md",
+    "chapterTitle": "第 1 章：Python 生態系與開發環境",
+    "sectionTitle": "1.6 REPL 與互動式開發：Java 工程師相對陌生的工作流",
+    "sectionId": "16-repl-與互動式開發java-工程師相對陌生的工作流",
+    "content": "Java 直到 9 才有 jshell，而且用的人不多——你的肌肉記憶是「改 code → 編譯 → 跑」的批次循環。Python 的核心工作流之一是 REPL（Read-Eval-Print Loop）：開一個直譯器，逐行輸入、立即看結果，探索式地試 API、驗證想法。 $ python3 >>> import datetime >>> datetime.date.today datetime.date2026, 6, 14 >>> x2 for x in range5 0, 1, 4, 9, 16 >>> helpstr.split    直接在 REPL 查文件 這種「想到就試、試了就知道」的即時回饋，是 Python 探索性極強的原因。不確定某個函式回傳什麼？貼進 REPL 跑一下，比翻文件快。 進階選項： - IPython：增強版 REPL。tab 補全、語法高亮、? 查物件（str.split?）、%timeit 微基準、shell 整合（!ls）。互動開發的標配。 - Jupyter Notebook/Lab：把 REPL 變成可儲存的「筆記本」，程式碼、輸出、圖表、文字混排。資料科學與教學的主流；對需要「邊算邊看圖」的探索工作極強大。 uv run --with ipython ipython      不污染專案，臨時拉 ipython 起來玩 > 💡 Pythonic 重點：把 REPL 當成你的第二雙手。寫複雜的 comprehension 或 regex 前，先在 REPL 拆小步驗證，遠比寫完整支程式再 debug 有效率。uv run --with <pkg> 能臨時引入工具而不動到專案依賴，很適合一次性探索。 > 🔁 Java 對照：REPL ≈ jshell，但 Python 的 REPL 是生態系的一級公民，從教學到生產除錯無所不在，"
+  },
+  {
+    "file": "ch01-ecosystem-and-tooling.md",
+    "chapterTitle": "第 1 章：Python 生態系與開發環境",
+    "sectionTitle": "1.7 完整走查：從零建立一個最小專案",
+    "sectionId": "17-完整走查從零建立一個最小專案",
+    "content": "把上面所有概念串起來。我們用 uv 從零做一個會打招呼的小工具，跑完依賴、lint、型別檢查、執行的完整循環。 步驟 1：初始化專案 $ uv init --name greeter demo-greeter Initialized project greeter at /path/to/demo-greeter $ cd demo-greeter $ ls -A .git  .gitignore  .python-version  main.py  pyproject.toml  README.md uv init 一次給你：git 倉庫、.gitignore（已包含 .venv、pycache）、鎖定 Python 版本的 .python-version、範本 main.py、以及 pyproject.toml： project name = \"greeter\" version = \"0.1.0\" description = \"Add your description here\" readme = \"README.md\" requires-python = \">=3.12\" dependencies = 步驟 2：寫一支小程式 把 main.py 改成用 httpx 抓資料、用型別提示寫清楚： import httpx def fetchusernameuserid: int -> str: \"\"\"從 JSONPlaceholder 取得使用者名稱。\"\"\" resp = httpx.getf\"https://jsonplaceholder.typicode.com/users/{userid}\" resp.raiseforstatus data: dictstr, object = resp.json return strdata\"name\" def main -> N"
+  },
+  {
+    "file": "ch01-ecosystem-and-tooling.md",
+    "chapterTitle": "第 1 章：Python 生態系與開發環境",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "1. Python 不是「純直譯」：CPython 會把 .py 編譯成 bytecode（快取於 pycache/.pyc），再由 PVM 解譯執行——模型上與 Java 的 javac → .class → JVM 高度相似，最大差別是 CPython 預設無 JIT。 2. CPython 是事實標準：PyPy（帶 JIT）、Jython、GraalPy 各有定位，但因為 C 擴充生態系，實務上「Python」≈「CPython」。GIL 的影響留待第 14 章。 3. venv 解決 Java 工程師沒遇過的痛：Python 預設裝到全域 site-packages，必須用虛擬環境做每專案隔離（Java 的 per-project classpath 是免費的）。.venv 不進版控。 4. pyproject.toml 是新標準：它是 pom.xml/build.gradle 的對應物，統管依賴與工具設定；requirements.txt 的攤平、不可重現問題由 lock 檔解決。 5. uv 一統江湖：環境、依賴解析、lock、執行、Python 版本管理全整合，且極快。記住 uv init / uv add / uv run / uv sync 四個動詞就能走完全流程。 6. ruff = linter + formatter 合一（≈ Checkstyle + SpotBugs + format，但快上百倍）；mypy/pyright 是選用、漸進式的型別檢查——把它當成你帶進 Python 的工程紀律。 7. 型別提示執行期不強制：標了 name: str 不代表執行期會擋下 int，要靠 mypy/pyright 在 CI 把關，或用 pydantic 做執行期驗證（第 9 章）。 8. REPL 是一級工作流：python / ipython / Ju"
+  },
+  {
+    "file": "ch01-ecosystem-and-tooling.md",
+    "chapterTitle": "第 1 章：Python 生態系與開發環境",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "1. 看穿 bytecode：在 REPL 用 dis.dis 反組譯一個含 if/else 的函式，找出對應的條件跳轉 opcode。再寫一個等價的三元運算式 x if cond else y（Python 沒有 ?:，見第 2 章），比較兩者 bytecode 差異。 - 提示：import dis; dis.disyourfunc，留意 POPJUMPIFFALSE 之類的指令。 2. 製造並理解相依衝突：建兩個 uv 專案，一個 uv add \"httpx<0.27\"、另一個 uv add \"httpx>=0.28\"，確認兩者的 .venv 互不影響。思考：若沒有 venv，這兩個版本要如何共存於同一台機器？ - 提示：分別在各專案 uv run python -c \"import httpx; printhttpx.version\"。 3. 把 requirements.txt 升級成 pyproject.toml：給定一份 requirements.txt（含 requests、flask、pytest），用 uv init 起新專案，把正式依賴用 uv add、測試依賴用 uv add --dev 分別加入，產生 pyproject.toml 與 uv.lock。對照思考它與 Maven compile/test scope 的關係。 4. 讓 mypy 抓到一個真實 bug：寫一個函式 def averagenums: listint -> float，但內部故意回傳 sumnums（漏了除以長度，回傳 int）。先確認直譯器照跑不報錯，再用 uv run mypy 觀察它是否抓到回傳型別不符；接著修正並讓 mypy 通過。 - 提示：int 是 float 的相容子型別，這題可能比你想的微妙——試試把回傳改成明顯錯誤的 str 看 mypy 反應。 5. "
+  },
+  {
+    "file": "ch02-syntax-overview.md",
+    "chapterTitle": "第 2 章：語法速覽——從 Java 翻譯到 Python",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "身為 Java 工程師，你看 Python 的第一眼通常會有兩種反應：「沒有大括號跟分號，這樣怎麼讀？」以及「x = 5 連型別都不寫，編譯器怎麼幫我抓錯？」這章的目的不是教你 if、for 怎麼寫——你早就會了——而是要拆掉幾個被 Java 訓練了十幾年的直覺：縮排是有語意的、變數不是一塊有型別的記憶體、int 永遠不會溢位、None 不是 null。先把心智模型（mental model）換掉，後面所有章節才不會卡住。"
+  },
+  {
+    "file": "ch02-syntax-overview.md",
+    "chapterTitle": "第 2 章：語法速覽——從 Java 翻譯到 Python",
+    "sectionTitle": "縮排即區塊：沒有大括號，沒有分號",
+    "sectionId": "縮排即區塊沒有大括號沒有分號",
+    "content": "Java 用 {} 界定區塊，用 ; 結束陳述式，縮排只是給人看的排版，編譯器完全無視。Python 反過來：縮排本身就是語法，編譯器靠它判斷區塊邊界。 // Java：大括號決定區塊，縮排可有可無 public int classifyint n { if n > 0 { return 1; } else if n < 0 { return -1; } else { return 0; } } def classifyn: if n > 0: return 1 elif n < 0: return -1 else: return 0 注意三個變化： 1. 冒號 : 是「以下進入一個新區塊」的宣告。if、elif、else、for、while、def、class、with、try 後面都要冒號。少一個冒號就是 SyntaxError。 2. 縮排層級取代 {}。同一層級的陳述式必須對齊；縮排變深代表進入子區塊，縮排變淺代表離開。 3. 不需要分號。一行一個陳述式，換行就是結束。分號在 Python 合法但只用來把多個短陳述式塞在一行（a = 1; b = 2），PEP 8 不鼓勵，實務上幾乎看不到。 > 🔁 Java 對照：Java 的 } 在 Python 是「縮排退回上一層」；Java 的 ; 在 Python 是「換行」。 4 空格、別碰 tab PEP 8（Python 官方風格指南，地位等同你心中的 Google Java Style）規定縮排用 4 個空格，且不要用 tab。原因很實際：tab 在不同編輯器寬度不一，而 Python 3 直接禁止在同一份檔案混用 tab 和空格做縮排——混用會丟出 TabError，不是警告，是直接掛掉。 def f: x = 1       4 個空格 y = 2       這行用 tab → TabError: inco"
+  },
+  {
+    "file": "ch02-syntax-overview.md",
+    "chapterTitle": "第 2 章：語法速覽——從 Java 翻譯到 Python",
+    "sectionTitle": "動態型別與 name binding：變數只是名字",
+    "sectionId": "動態型別與-name-binding變數只是名字",
+    "content": "這是 Java 工程師最需要重新接線的觀念。在 Java，int x = 5; 的意思是：「配置一塊標記為 int 的記憶體，把 5 這個值放進去。」變數有型別，值住在變數裡。 int x = 5;       // x 是一個 int 型別的盒子，裝著 5 x = 10;          // 把盒子裡的內容換成 10 // x = \"hi\";     // 編譯錯誤：型別不符 Python 的 x = 5 是完全不同的機制：它建立一個 int 物件 5，然後把名字 x 綁定（bind）到那個物件上。名字沒有型別，物件才有型別。名字只是一個指向物件的標籤。 x = 5             建立 int 物件 5，名字 x 指向它 x = 10            名字 x 改指向另一個 int 物件 10（原本的 5 沒被「改寫」） x = \"hi\"          名字 x 改指向一個 str 物件，完全合法 心智模型這樣畫： Java：   x ┌─────────┐ │ int: 5  │      變數 = 有型別的盒子，值在裡面 └─────────┘ Python:  x ──────────▶  int 物件: 5 ▲ y ───────────────┘            名字 = 標籤，可以多個指向同一物件 「賦值」在 Python 從來不是「把值搬進變數」，而是「讓名字指向某個物件」。一旦接受這點，很多現象就順了： >>> a = 1, 2, 3 >>> b = a             b 不是「複製 a」，而是「b 也指向同一個 list 物件」 >>> b.append4 >>> a 1, 2, 3, 4          透過 b 改動，a 看得到，因為它們是同一個物件 如果你以 Java 的「值在變數裡」直覺看上面這段，會覺得"
+  },
+  {
+    "file": "ch02-syntax-overview.md",
+    "chapterTitle": "第 2 章：語法速覽——從 Java 翻譯到 Python",
+    "sectionTitle": "一切皆物件：沒有 primitive，int 不會溢位",
+    "sectionId": "一切皆物件沒有-primitiveint-不會溢位",
+    "content": "Java 有 8 種 primitive type（int、long、double、boolean…），它們不是物件、沒有方法，要當物件用得靠 autoboxing 包成 Integer、Double。Python 沒有 primitive——int、float、bool、str 全都是貨真價實的物件，有自己的方法。 >>> 5.bitlength        int 有方法，5 在二進位需要 3 個位元 3 >>> 255.bitlength 8 >>> 3.0.isinteger      float 也有方法 True >>> \"hello\".upper         str 當然有方法 'HELLO' （5.bitlength 會語法錯誤，因為 5. 被當成 float 的開頭，所以加括號 5。） 連型別本身也是物件。每個物件都有 class，而每個類別最終都繼承自 object： >>> type5.mro         int 的繼承鏈：int → object <class 'int'>, <class 'object'> >>> isinstance5, object True int 任意精度，永不溢位 這是會讓 Java 工程師鬆一口氣的一點。Java 的 int 是 32-bit，超過 2^31 - 1 就靜默溢位（silent overflow）成負數，這是無數金融與計時 bug 的源頭；要算大數得換 long（64-bit，一樣會溢位）或 BigInteger（笨重）。 int x = Integer.MAXVALUE;   // 2147483647 x = x + 1;                   // -2147483648，溢位且不報錯！ // 大數要用 BigInteger，語法囉嗦 BigInteger big = Big"
+  },
+  {
+    "file": "ch02-syntax-overview.md",
+    "chapterTitle": "第 2 章：語法速覽——從 Java 翻譯到 Python",
+    "sectionTitle": "基本型別對照表",
+    "sectionId": "基本型別對照表",
+    "content": "下表是 Java 集合/字串到 Python 的速查。內部實作與時間複雜度留到第 4 章深入，這裡先建立對應關係。 Java  Python  可變?  一句話特性 ------------ String  str  不可變  兩者都 immutable；Python 用單引號或雙引號皆可 ArrayList<T>  list  可變  動態陣列；1, 2, 3，異質元素 OK HashMap<K,V>  dict  可變  雜湊表；{\"a\": 1}；Python 3.7+ 保證插入順序 HashSet<T>  set  可變  不重複元素的雜湊集合；{1, 2, 3} （無直接對應）  tuple  不可變  固定長度、不可變序列；1, \"a\", True Integer/int  int  不可變  任意精度 Double/double  float  不可變  IEEE 754 雙精度 Boolean/boolean  bool  不可變  True/False（首字大寫！） null  None  —  單例物件，不是關鍵字常數 s = \"immutable\"              str nums = 1, 2, 3             list（≈ ArrayList） user = {\"id\": 1, \"name\": \"Ann\"}    dict（≈ HashMap） tags = {\"py\", \"java\"}       set（≈ HashSet） point = 3, 4              tuple，無 Java 對應 tuple 是 Java 沒有的型別，可以把它想成「不可變、固定長度的輕量級值物件」，常用於回傳多個值（return name, age）和當 dict 的 key（因為它 immutable 所以可雜湊）。它就是你常想"
+  },
+  {
+    "file": "ch02-syntax-overview.md",
+    "chapterTitle": "第 2 章：語法速覽——從 Java 翻譯到 Python",
+    "sectionTitle": "運算子差異：別把 C/Java 習慣帶進來",
+    "sectionId": "運算子差異別把-cjava-習慣帶進來",
+    "content": "沒有 ++ / -- Python 沒有 ++ 和 --。沒有。原因之一是「名字綁定」模型下「自增」語意不清，之二是 Python 設計哲學偏好明確。請用 += 1： i++;          // Java count--; i += 1         Python；沒有 i++，寫了是語法錯誤 count -= 1 沒有 C 式三元，用 if-else 運算式 Java 的 cond ? a : b 在 Python 寫成 a if cond else b——把「正常情況的值」放前面，讀起來像英文。 String label = n > 0 ? \"positive\" : \"non-positive\"; label = \"positive\" if n > 0 else \"non-positive\" 除法：/ 是真除法，// 是整除 這是另一個容易出錯的點。Java 的 / 對兩個 int 做整數除法（7 / 2 == 3）。Python 的 / 永遠是真除法（true division），回傳 float；要整數除法得用 //。 System.out.println7 / 2;    // 3   （int 整除） System.out.println7 / 2.0;  // 3.5 >>> 7 / 2         真除法，永遠回傳 float 3.5 >>> 7 // 2        整除（floor division），向下取整 3 >>> 7 % 2         取餘 1 >>> 2  10       次方，不用 Math.pow 1024 注意 // 是 floor division（向下取整），對負數的行為和 Java 的「向零取整」不同： >>> -7 // 2       向下取整到 -4，不是 -3 -4 >>> -7 % 2       "
+  },
+  {
+    "file": "ch02-syntax-overview.md",
+    "chapterTitle": "第 2 章：語法速覽——從 Java 翻譯到 Python",
+    "sectionTitle": "None vs null、is vs ==",
+    "sectionId": "none-vs-nullis-vs-",
+    "content": "None 是單例物件，不是關鍵字 Java 的 null 是一個型別系統層級的特殊字面量，代表「沒有指向任何物件的參考」。Python 的 None 是一個真正的物件——NoneType 這個型別的唯一實例（singleton）。整個直譯器生命週期中，None 只有一個，所有 None 都是同一個物件。 >>> typeNone <class 'NoneType'> >>> None is None     永遠是同一個物件 True 正因為它是單例，判斷「是不是 None」的慣用法是用 is（比較身份），不是 ==（比較值）。 is 比身份，== 比值 這組對照直接對應你熟悉的 Java： 概念  Java  Python  比較什麼 ------------ 同一個物件?  a == b（參考相等）  a is b  記憶體身份（identity，id 相同） 值相等?  a.equalsb  a == b  值相等（呼叫 eq） String a = new String\"hi\"; String b = new String\"hi\"; System.out.printlna == b;        // false：不同物件 System.out.printlna.equalsb;   // true：值相同 >>> a = 1, 2, 3 >>> b = 1, 2, 3 >>> a == b         值相等（內容一樣）→ 呼叫 eq True >>> a is b         身份不同（兩個獨立的 list 物件） False >>> a is a True 所以判斷 None 永遠寫 x is None / x is not None，而不是 x == None。原因有二：1 語意正確——你問的就是「是不是那個唯一的 None 物件」；2 安全——="
+  },
+  {
+    "file": "ch02-syntax-overview.md",
+    "chapterTitle": "第 2 章：語法速覽——從 Java 翻譯到 Python",
+    "sectionTitle": "真值判斷（truthiness）：不只 boolean 能進條件",
+    "sectionId": "真值判斷truthiness不只-boolean-能進條件",
+    "content": "Java 的條件式只接受 boolean。if list、if str、if 5 在 Java 全是編譯錯誤——你得明確寫 if list.isEmpty、if str != null && !str.isEmpty。 Python 反過來：任何物件都能放進條件式，直譯器會問它「你是真還是假？」（呼叫 bool，沒有則看 len）。內建型別的 falsy 規則很好記——「空的、零的、None 的」都是假： Falsy（視為 False）  Truthy（視為 True） ------ None  任何非空容器 False  任何非零數字 0、0.0、0j  非空字串 \"x\" 空字串 \"\"  字串 \"0\"、\"False\"（非空就是真！） 空容器 、{}、、set  自訂物件預設為真 >>> bool, bool\"\", bool0, boolNone False, False, False, False >>> bool\"0\", bool0, bool\" \"     注意：內容是 0 或空白，但容器/字串非空 → 真 True, True, True 這帶來兩個極常見的慣用法： items = getitems if items:                       而不是 if lenitems > 0: processitems if not name:                    而不是 if name == \"\" or name is None: name = \"anonymous\" 對照 Java，你會驚覺省了多少樣板： // Java：要明確檢查 null 和 empty if items != null && !items.isEmpty { processitems; } if name == null  name.isEmpty { name"
+  },
+  {
+    "file": "ch02-syntax-overview.md",
+    "chapterTitle": "第 2 章：語法速覽——從 Java 翻譯到 Python",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "- 縮排即語法：冒號 : 開區塊、4 空格縮排取代 {}、換行取代 ;。禁止混用 tab/space，縮排錯了就是邏輯錯了。 - 變數是名字不是盒子：x = 5 是「名字 x 綁定到 int 物件 5」，不是「把 5 裝進有型別的盒子」。賦值只是換指向，這是理解第 4 章可變性的根。 - 一切皆物件，沒有 primitive：int/float/bool/str 都有方法；int 任意精度永不溢位（≈ Java BigInteger 但有原生語法）。bool 是 int 的子類別。 - 運算子差異：用 += 1（無 ++）、a if cond else b（無 ?:）、/ 是真除法 // 是整除  是次方、支援連鎖比較 0 < x < 10。 - and/or 回傳運算元：短路求值且回傳運算元本身，x or default 是慣用法但小心 falsy 值誤觸。 - None 是單例，用 is 判斷：x is None 是唯一正解；is 比身份（≈ Java ==），== 比值（≈ Java .equals）。 - 整數快取（-5..256）是實作細節：is 只用於 None/True/False 與刻意的身份比較，數值與字串一律用 ==。 - truthiness：空容器、空字串、0、None 皆 falsy；if items: / if not name: 很 Pythonic，但別把「falsy」和「是 None」混為一談——這是最毒的隱蔽 bug。"
+  },
+  {
+    "file": "ch02-syntax-overview.md",
+    "chapterTitle": "第 2 章：語法速覽——從 Java 翻譯到 Python",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "1. 除法翻譯：下面這段 Java 計算平均後取中間索引，直譯成 Python 會在哪裡出錯，為什麼？請寫出正確的 Pythonic 版本。 java int mid = list.size / 2; Object item = list.getmid; > 提示：/ 在 Python 回傳 float，list 索引不收 float。 2. None vs falsy：寫一個函式 applydiscountprice, discount，當呼叫者沒有提供 discount（沒傳這個參數）時不打折，但允許呼叫者明確傳入 0（代表「就是不打折，但我有意識地指定了」）並正確記錄。想想 if not discount: 為什麼會出事，該怎麼寫。 > 提示：預設值用 None，用 is None 區分「沒給」和「給了 0」。 3. 改掉 Java 口音：把下面這段「帶 Java 口音的 Python」改寫成 Pythonic。 python if lenerrors > 0: return False if name == None: name = \"guest\" flag = True if count > 0 else False > 提示：三處都有更短的寫法；flag 那行其實 count > 0 本身就是 bool。 4. 快取偵探：在 REPL 試 a = 256; b = 256; a is b 與用 a = int\"257\"; b = int\"257\"; a is b（用 intstr... 避免常數摺疊），解釋兩者結果不同的原因，並說明為什麼絕不該在程式裡依賴這個行為。 > 提示：CPython 對 -5..256 有小整數快取。 5. 連鎖比較：用一行 Python 判斷三個變數 a, b, c 是否「嚴格遞增且都落在 0 到 100 之間」。對比你會怎麼用 Ja"
+  },
+  {
+    "file": "ch03-functions.md",
+    "chapterTitle": "第 3 章：函式——Python 的一等公民",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "在 Java 裡，「函式」從來不是獨立存在的東西——它得依附在類別上，叫做方法（method）。你想把一段行為當資料傳遞，得先發明一個介面、塞進匿名類別，直到 Java 8 才有 lambda 與 method reference 把這件事變得勉強優雅。Python 的世界完全相反：函式從第一天起就是一等物件（first-class object），跟 int、str、list 平起平坐。這個差異看似小，卻會徹底改變你組織程式碼的方式——許多你習慣用設計模式（design pattern）解決的問題，在 Python 裡只是「把函式放進變數」這麼簡單。本章還會帶你踩兩個 Java 工程師幾乎 100% 會踩的坑：可變預設參數與 closure 的延遲綁定。 ---"
+  },
+  {
+    "file": "ch03-functions.md",
+    "chapterTitle": "第 3 章：函式——Python 的一等公民",
+    "sectionTitle": "函式是一等物件",
+    "sectionId": "函式是一等物件",
+    "content": "「一等物件」的意思很具體：函式可以被賦值給變數、放進資料結構、當參數傳入、當回傳值傳出。在 Python 裡，def 並不是宣告語法，而是一個會在執行期建立函式物件、並把它綁定到某個名字的陳述式。 >>> def greetname: ...     \"\"\"say hi\"\"\" ...     return f\"Hi {name}\" ... >>> typegreet <class 'function'> >>> greet.name 'greet' >>> greet.doc 'say hi' >>> sayhello = greet       把函式賦值給另一個名字 >>> sayhello\"Albert\" 'Hi Albert' greet 只是一個指向函式物件的名字（name），跟 x = 5 裡的 x 在語意上沒有本質差別（變數即名字綁定的觀念詳見第 2 章）。它甚至有屬性、有型別，是個如假包換的物件。 Java 的演進史，就是在補這一課 // Java 8 之前：要傳遞行為，得發明介面 + 匿名類別 Comparator<String> byLength = new Comparator<String> { public int compareString a, String b { return a.length - b.length; } }; // Java 8+：lambda 與 method reference 終於把它變短 Comparator<String> byLen = a, b -> a.length - b.length; Function<String, Integer> len = String::length; Java 的 lambda 與 :: 本質上仍是「介面的單一方法實作」的語法糖——byLen 的型別是 Comparator"
+  },
+  {
+    "file": "ch03-functions.md",
+    "chapterTitle": "第 3 章：函式——Python 的一等公民",
+    "sectionTitle": "參數機制",
+    "sectionId": "參數機制",
+    "content": "Python 的參數系統比 Java 靈活得多，但也因此有更多細節要掌握。核心觀念：Python 沒有方法多載（overloading）。Java 靠多個同名、不同簽章的方法來提供彈性；Python 靠的是預設值、可變參數與關鍵字參數，把所有彈性塞進一個函式定義裡。 位置參數、關鍵字參數、預設值 def connecthost: str, port: int = 5432, timeout: float = 30.0 -> str: return f\"{host}:{port} timeout={timeout}\" printconnect\"db.local\"                        db.local:5432 timeout=30.0 printconnect\"db.local\", 6379                  用位置傳 port printconnect\"db.local\", timeout=5.0           用關鍵字跳過 port printconnectport=3306, host=\"db.local\"        全用關鍵字，順序隨意 任何參數都可以用「位置」或「關鍵字」兩種方式傳遞。關鍵字傳參在 Java 沒有對應物（Java 只能靠位置），它讓呼叫端更具自我說明性——connect\"db.local\", timeout=5.0 比 connect\"db.local\", 5432, 5.0 清楚得多。 > 🔁 Java 對照：Java 用多載 connectString、connectString, int、connectString, int, double 提供彈性；Python 一個帶預設值的函式就涵蓋全部組合。 args 與 kwargs：可變參數 def reportargs, kwargs: ret"
+  },
+  {
+    "file": "ch03-functions.md",
+    "chapterTitle": "第 3 章：函式——Python 的一等公民",
+    "sectionTitle": "預設參數的可變物件陷阱",
+    "sectionId": "預設參數的可變物件陷阱",
+    "content": "這是 Java 工程師踩坑機率最高的一題，務必看透。 先看這段「看起來很正常」的程式碼： def additemitem, items=:    這會出現意料外的行為 items.appenditem return items 你的 Java 直覺會說：「每次呼叫沒傳 items 時，就給一個新的空 list 嘛。」錯。實際行為是： >>> additem\"a\" 'a' >>> additem\"b\"      你以為會是 'b' 'a', 'b'             結果是這樣！ >>> additem\"c\" 'a', 'b', 'c' 為什麼？預設值在「定義時」只算一次 關鍵在於：預設值是在函式「定義」的那一刻求值一次，而不是每次呼叫時重新求值。 那個  在 def 執行時就被建立成一個list 物件，並存進函式物件的 defaults。之後每次呼叫沒傳 items，用的都是同一個 list。 你可以直接看到這個共用的物件： >>> def gitems=: ...     items.append1 ...     return items ... >>> g.defaults        預設值就掛在這裡，是個物件 , >>> g 1 >>> g.defaults        同一個 list 被改了 1, 對照 Java：Java 根本沒有預設參數這個語言特性（你得靠多載），所以也不會有這個坑——但這正是為什麼 Java 工程師第一次看到會完全沒有防備。 標準解法：用 None 當哨兵 def additemitem, items: list  None = None -> list: if items is None:         每次呼叫都判斷，需要時才建新 list items = items.appenditem return items pri"
+  },
+  {
+    "file": "ch03-functions.md",
+    "chapterTitle": "第 3 章：函式——Python 的一等公民",
+    "sectionTitle": "lambda 的限制",
+    "sectionId": "lambda-的限制",
+    "content": "Python 有 lambda，但它跟 Java 的 lambda 不是同一個量級的工具。 Python 的 lambda 只能是「單一運算式（expression）」，不能包含任何陳述式（statement）：不能賦值、不能 if/else 區塊、不能迴圈、不能 try、不能 return（運算式的值就是回傳值）。 square = lambda x: x  x printsquare5    25 classify = lambda n: \"even\" if n % 2 == 0 else \"odd\" printclassify4    even 對照 Java 的 lambda——它可以有完整的程式區塊： // Java lambda 可以塞一整個 block Function<Integer, String> f = n -> { String result; if n % 2 == 0 result = \"even\"; else result = \"odd\"; return result;   // 可以有陳述式、可以 return }; Python 的 lambda 故意被設計得這麼弱，是一種語言哲學的表態：Guido 認為如果你的邏輯複雜到需要多行，那它就值得有一個名字。硬塞進 lambda 只會犧牲可讀性。 process = lambda data: x  2 for x in data if x > 0    能跑，但何必？ def processdata: listint -> listint: return x  2 for x in data if x > 0 lambda 的正確用途：即用即丟的 key 函式 lambda 真正發光的地方是當「臨時的、一行的、用完即丟」的回呼，最經典的就是 sorted、min、max、filter 的 key"
+  },
+  {
+    "file": "ch03-functions.md",
+    "chapterTitle": "第 3 章：函式——Python 的一等公民",
+    "sectionTitle": "closure 與 nonlocal",
+    "sectionId": "closure-與-nonlocal",
+    "content": "巢狀函式（nested function）可以捕捉外層函式的區域變數，形成 closure（閉包）。這跟 Java 的 lambda 捕捉變數很像，但有一個關鍵差異。 基本 closure def makemultiplierfactor: int: def multiplyx: int -> int: return x  factor       捕捉外層的 factor return multiply double = makemultiplier2 triple = makemultiplier3 printdouble10    20 printtriple10    30 factor 在 makemultiplier 回傳後本該消失，但 multiply 仍記得它。你甚至能透過函式物件看到被捕捉的變數： >>> double.closure0.cellcontents 2 修改外層變數需要 nonlocal 預設情況下，內層函式只能讀取外層變數。一旦你在內層對它賦值，Python 會把它當成一個新的區域變數，而不是修改外層的那個。要明確表達「我要改外層的」，得用 nonlocal： def makecounter: count = 0 def increment -> int: nonlocal count        沒有這行，下一行的 count += 1 會報 UnboundLocalError count += 1 return count return increment c = makecounter printc, c, c    1 2 3 如果拿掉 nonlocal count，Python 看到 count += 1（等同 count = count + 1，含賦值）就認定 count 是 increment 的區域變數，於是在「讀取尚未賦"
+  },
+  {
+    "file": "ch03-functions.md",
+    "chapterTitle": "第 3 章：函式——Python 的一等公民",
+    "sectionTitle": "型別提示（type hints）",
+    "sectionId": "型別提示type-hints",
+    "content": "身為 Java 工程師，你大概一路看到這裡都在懷念那個「編譯器幫我擋型別錯誤」的安全感。好消息：Python 從 3.5 起有了型別提示（type hints，PEP 484），讓你把那份安全感找回來一大半。 基本語法 def greetname: str, times: int = 1 -> str: return f\"Hi {name}! \"  times def finduseruid: int -> str  None:     X  None 等同 Optionalstr return None - 參數標注：name: str、times: int - 回傳標注：-> str - 可空型別：str  None（Python 3.10+ 的寫法，取代舊的 Optionalstr） 容器型別直接用內建泛型（Python 3.9+），不要再 from typing import List： def totalprices: listfloat -> float: return sumprices, 0.0    給 start=0.0，空 list 也回傳 float（sum 會是 int 0） def indexbyidusers: listdictstr, int -> dictint, dictstr, int: return {u\"id\": u for u in users} > 🔁 Java 對照：Map<String, Integer> 對應 dictstr, int；List<Double> 對應 listfloat；Optional<T> 對應 T  None。對照速查表見附錄 A。 函式型別：Callable 要標注「一個接受 int、回傳 str 的函式」這種高階參數，用 Callable——這正是 Java 的 Function<Integer"
+  },
+  {
+    "file": "ch03-functions.md",
+    "chapterTitle": "第 3 章：函式——Python 的一等公民",
+    "sectionTitle": "Docstring：給人看的文件字串",
+    "sectionId": "docstring給人看的文件字串",
+    "content": "型別提示是寫給工具的契約；docstring（文件字串）則是寫給人的文件。兩者一搭一唱：型別提示說「這個參數是 str」，docstring 說「這個 str 代表什麼、為什麼、什麼情況會出錯」。 身為 Java 工程師，你寫過無數 JavaDoc。但這裡有一個本質差異要先扭轉：JavaDoc 是註解，docstring 是物件。 / Return a greeting for the given name. /   // 註解：編譯後（預設）就消失了 String greetString name { return \"Hi \" + name; } JavaDoc 的 / ... / 是一段註解，編譯成 bytecode 後預設不保留，只能靠 javadoc 工具在原始碼階段抽出來產生 HTML。Python 的 docstring 不是註解，而是函式（或模組、類別）的第一個陳述式——一個字串字面值，直譯器會把它存進 doc 屬性，在執行期就能讀到。 >>> def greetname: str -> str: ...     \"\"\"Return a greeting for the given name.\"\"\" ...     return f\"Hi {name}\" ... >>> greet.doc 'Return a greeting for the given name.' >>> helpgreet         docstring 就是 help 的原料 Help on function greet in module main: greetname: str -> str Return a greeting for the given name. help、IDE 的滑鼠懸停提示、Sphinx 自動產文件、甚至 doctest（第 13 章）能把 docst"
+  },
+  {
+    "file": "ch03-functions.md",
+    "chapterTitle": "第 3 章：函式——Python 的一等公民",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "1. 函式是一等物件：可賦值、可放進容器、可當參數與回傳值。def 是執行期建立函式物件並綁名字的陳述式，不是宣告。 2. dispatch table 取代 strategy pattern：當策略只是純函式時，把函式塞進 dict 就好，不需要介面與類別階層。 3. Python 沒有多載：用預設值、args/kwargs、keyword-only（ 後）、positional-only（/ 前）把所有彈性塞進一個函式定義。 4. 可變預設參數是大坑：預設值在「定義時」只算一次並被所有呼叫共用。永遠用 None 當哨兵，函式內判斷後再建可變物件。 5. lambda 只能是單一運算式：不能有陳述式。它只適合「一行、即用即丟」的 key 函式；複雜邏輯給它一個名字，或用 comprehension。 6. closure 預設只讀外層變數：要修改得用 nonlocal（改外層函式變數）或 global（改模組變數），不必像 Java 那樣用陣列 hack。 7. late binding 陷阱：迴圈中建立的 closure 捕捉的是「變數」而非當下的值，呼叫時才查找。用 lambda x=x: ... 在定義時鎖定值。 8. 型別提示給工具看，不在執行期強制：搭配 mypy/pyright 把 Java 編譯器的型別檢查以可選方式裝回來，享受漸進式型別的彈性。 9. docstring 是給人看的執行期文件：函式/類別/模組的第一個字串字面值，存進 doc，是 help、IDE、Sphinx、doctest 的原料（不像 JavaDoc 編譯後消失）。遵 PEP 257：三引號、祈使句摘要；用 Google/NumPy/reST 任一風格但全專案統一；別重抄型別提示已表達的型別，只講語意。 ---"
+  },
+  {
+    "file": "ch03-functions.md",
+    "chapterTitle": "第 3 章：函式——Python 的一等公民",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "練習 1（dispatch table） 你有一段 Java 風格的 switch／if-else，依 command 字串（\"start\"、\"stop\"、\"restart\"）呼叫不同方法。把它改寫成 Python 的 dispatch table，要求：用 dict 把字串對應到函式，並提供一個 dispatchcommand 函式；當 command 不存在時回傳預設行為（提示：dict.getcommand, defaultfn）。 練習 2（修掉可變預設參數） 下面的函式有兩個獨立的 bug，請各用一句話說明成因並修正： def appendlogmsg, log=: log.appendmsg return log （提示：成因在「預設值何時求值」；解法用 None 哨兵。額外挑戰：解釋為什麼把預設值改成 tuple  雖然不會累積，但 log.append 會直接報錯。） 練習 3（late binding） 以下程式碼想建立三個「分別印出 0、1、2」的函式，但實際全印 2。請說明原因，並提供兩種以上的修法（提示：一種用預設參數綁定；想想還能不能用 functools.partial）。 printers = lambda: printi for i in range3 for p in printers: p 練習 4（keyword-only API 設計） 設計一個 createaccountname, , isadmin=False, sendemail=True。說明為什麼把 isadmin、sendemail 設計成 keyword-only 比讓它們能用位置傳更安全，並寫出一個會被 Python 擋下來的錯誤呼叫範例。 練習 5（型別提示 + Callable） 把練習 1 的 dispatch table 加上完整型別提示，包含 dict 的型"
+  },
+  {
+    "file": "ch04-data-structures.md",
+    "chapterTitle": "第 4 章：核心資料結構深入",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "身為 Java 工程師，你對 ArrayList、HashMap、HashSet 的內部實作、攤還複雜度與並行陷阱瞭若指掌。本章不會教你「list 是什麼」，而是帶你把這份直覺重新校準到 Python 上：哪些假設依然成立（list 就是動態陣列）、哪些會反咬你一口（033 不是你以為的二維陣列、賦值永遠是共享參考）。更重要的是，Python 把切片、解包、collections 模組這些「語法糖」做到了 Java 望塵莫及的密度——學會它們，你寫的程式碼會短一半而且更清楚。"
+  },
+  {
+    "file": "ch04-data-structures.md",
+    "chapterTitle": "第 4 章：核心資料結構深入",
+    "sectionTitle": "四大結構與內部實作",
+    "sectionId": "四大結構與內部實作",
+    "content": "Python 的內建容器只有四個核心成員：list、tuple、dict、set。先把它們對應回你熟悉的 Java 世界，再深入內部。 Python  最接近的 Java  底層結構  關鍵差異 ------------ list  ArrayList  動態陣列（指標陣列）  異質、可放任何物件 tuple  record / 唯讀陣列  不可變定長陣列  可當 dict key、無 Java 直接對應 dict  LinkedHashMap  開放定址雜湊表  3.7+ 保證插入順序 set  HashSet  開放定址雜湊表（無值）  內建集合運算子 \\ & - ^ list：動態陣列，但裝的是指標 list 跟 ArrayList 一樣是動態陣列，背後是一塊連續記憶體，滿了就重新配置一塊更大的（CPython 的成長因子約 1.125 倍，比 Java 的 1.5 倍保守）。因此 append 是攤還（amortized）O1，隨機存取 ai 是 O1。 關鍵差異在於：Java 的 ArrayList<Integer> 雖然也是裝參考，但有泛型約束；Python 的 list 是一塊 PyObject 指標陣列，完全異質——同一個 list 可以混放 int、str、另一個 list。 // Java：型別齊一，元素是 boxed Integer 的參考 List<Integer> nums = new ArrayList<>List.of1, 2, 3; nums.add4; > 🔁 Java 對照：Java 的同質性來自編譯期泛型檢查；因型別抹除（type erasure），執行期其實底層也是 Object，但編譯器不讓你混放。Python 則是執行期就真的異質，本質差異在此。 items = 1, \"two\", 3.0, 4, 5 items.appendo"
+  },
+  {
+    "file": "ch04-data-structures.md",
+    "chapterTitle": "第 4 章：核心資料結構深入",
+    "sectionTitle": "可變 vs 不可變",
+    "sectionId": "可變-vs-不可變",
+    "content": "這是 Python 型別系統最重要的二分法，也是 Java 工程師最常踩坑的地方。 不可變（immutable）  可變（mutable） ------ int、float、bool、complex  list str、bytes  dict tuple、frozenset  set None  大多數自訂物件 對照 Java：String 不可變你很熟；record 是 shallow immutability（欄位參考不可變，但指向的物件可變）；Collections.unmodifiableList 是包一層唯讀視圖。Python 的不可變型別更徹底——它們連身份（identity）都可能被直譯器共享重用（小整數快取，詳見第 2 章）。 為什麼「不可變」才能當 key dict 的 key 與 set 的元素必須是 hashable：物件要有穩定的 hash，且在生命週期內雜湊值不變。可變物件若能改變內容，雜湊值就會漂移，放進雜湊表後就再也找不到——所以 Python 直接禁止可變物件當 key。 >>> {1, 2: \"ok\"}           tuple 不可變，可當 key {1, 2: 'ok'} >>> {1, 2: \"boom\"}         這會出錯：list 可變，不可雜湊 Traceback most recent call last: ... TypeError: unhashable type: 'list' > 註：Python 3.14 起此訊息擴充為 cannot use 'list' as a dict key unhashable type: 'list'，語意相同。 // Java 沒有強制這條規則——你可以拿可變的 ArrayList 當 HashMap 的 key， // 但一旦改動它的內容，hashCode 變了，就再也"
+  },
+  {
+    "file": "ch04-data-structures.md",
+    "chapterTitle": "第 4 章：核心資料結構深入",
+    "sectionTitle": "切片（slicing）",
+    "sectionId": "切片slicing",
+    "content": "切片是 Python 序列的殺手級語法，語法是 seqstart:stop:step，三個都可省略。對照 Java 的 subList、Arrays.copyOfRange、StringBuilder.reverse，你會立刻感受到密度差距。 >>> a = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 >>> a2:5       索引 2 到 4（stop 不含） 2, 3, 4 >>> a:3        開頭到索引 2 0, 1, 2 >>> a7:        索引 7 到結尾 7, 8, 9 >>> a-3:       負索引：倒數三個 7, 8, 9 >>> a::2       step=2，每隔一個 0, 2, 4, 6, 8 >>> a::-1      step=-1，反轉整個序列 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 >>> a5:1:-1    反向切片 5, 4, 3, 2 // Java：每個都要不同的 API，反轉還得 Collections.reverse（且會改動原 list） List<Integer> sub = a.subList2, 5;          // 而且是 view，不是新 list int copy = Arrays.copyOfRangearr, 2, 5;   // 陣列版 切片回傳新物件——a: 是淺拷貝慣用法 對 list 而言，切片永遠回傳一個新的 list（淺拷貝），不像 Java subList 回傳的是會連動原 list 的 view。a: 因此成為複製整個 list 的經典慣用法： >>> a = 1, 2, 3 >>> b = a:         淺拷貝：新 list，但元素仍是共享參考 >>> b0 = 99 >>> a                原"
+  },
+  {
+    "file": "ch04-data-structures.md",
+    "chapterTitle": "第 4 章：核心資料結構深入",
+    "sectionTitle": "解包（unpacking）",
+    "sectionId": "解包unpacking",
+    "content": "解包是 Python 把「結構拆解到變數」做到極致的語法糖，Java 至今沒有對等物。 多重賦值與交換 >>> a, b = 1, 2 >>> a, b = b, a       交換，不需 temp 變數 >>> a, b 2, 1 右側先求值成一個 tuple b, a，再拆解綁定到左側——所以交換是原子的、無需中介變數。Java 得寫 int t = a; a = b; b = t;。 星號解包：抓取剩餘 >>> first, rest = 1, 2, 3, 4 >>> first, rest 1, 2, 3, 4 >>> init, last = 1, 2, 3, 4 >>> init, last 1, 2, 3, 4 >>> head, mid, tail = 1, 2, 3, 4, 5 >>> head, mid, tail 1, 2, 3, 4, 5 name 會貪婪地吞掉「其餘」元素變成一個 list，且一次賦值只能有一個星號目標。這在處理「頭尾固定、中間不定」的資料時極為順手。 巢狀解包 解包可以對應任意巢狀結構，直接拆到位： >>> a, b, c, d = 1, 2, 3, 4 >>> a, b, c, d 1, 2, 3, 4 >>> for name, lo, hi in \"x\", 0, 10, \"y\", 5, 20: ...     printname, lo, hi ... x 0 10 y 5 20 在函式呼叫時展開： 與 解包也用於把序列/字典「攤平」成參數，對照第 3 章的 args、kwargs： >>> def linex1, y1, x2, y2: ...     return f\"{x1},{y1} -> {x2},{y2}\" ... >>> p1 = 0, 0 >>> p2 = 3, 4 >>> linep1, p2      "
+  },
+  {
+    "file": "ch04-data-structures.md",
+    "chapterTitle": "第 4 章：核心資料結構深入",
+    "sectionTitle": "collections 模組",
+    "sectionId": "collections-模組",
+    "content": "內建四大結構是地基，collections 模組則是你每天該用、卻常被 Java 工程師忽略的「上層工具箱」。它們能消滅大量樣板程式碼。 defaultdict：消滅 getOrDefault / computeIfAbsent 樣板 分組（grouping）是最常見的場景。Java 你會寫 map.computeIfAbsentkey, k -> new ArrayList<>.addv；Python 的 defaultdict 讓你連這行都省了： >>> from collections import defaultdict >>> groups = defaultdictlist            缺 key 時自動建一個空 list >>> for word in \"apple\", \"banana\", \"avocado\", \"cherry\": ...     groupsword0.appendword ... >>> dictgroups {'a': 'apple', 'avocado', 'b': 'banana', 'c': 'cherry'} defaultdictint 可做計數、defaultdictset 可做去重分組。建構子接受一個「無參工廠函式」，缺 key 時呼叫它產生預設值。 > ⚠️ 陷阱：對 defaultdict 做讀取也會觸發建立！groups\"zzz\" 即使只是想查，也會憑空插入一個空 list。要純查詢請用 groups.get\"zzz\" 或先 in 測試。 Counter：計數神器 需要統計次數時，別再手刻 Map<K, Integer> 配 mergek, 1, Integer::sum 了： >>> from collections import Counter >>> c = Counter\"abracadabra\" >"
+  },
+  {
+    "file": "ch04-data-structures.md",
+    "chapterTitle": "第 4 章：核心資料結構深入",
+    "sectionTitle": "淺拷貝 vs 深拷貝",
+    "sectionId": "淺拷貝-vs-深拷貝",
+    "content": "這是本章最容易出血的主題。Java 工程師都吃過 clone 是淺拷貝的虧——複製了外層，內層物件卻還是共享參考。Python 的規則一致，但因為到處都是參考、又有  重複運算子，坑更深。 copy.copy vs copy.deepcopy >>> import copy >>> original = 1, 2, 3, 4 >>> shallow = copy.copyoriginal         淺拷貝：新外層，內層 list 共享 >>> deep = copy.deepcopyoriginal        深拷貝：遞迴複製所有層 >>> original00 = 99 >>> shallow 99, 2, 3, 4                         被連動！內層是同一個 list >>> deep 1, 2, 3, 4                          完全獨立 copy.copy（等同 original: 或 listoriginal）只複製最外層容器，裡面的元素仍是共享參考。只有 copy.deepcopy 會遞迴複製整棵物件樹（它還能正確處理循環參考）。 > 🔁 Java 對照：copy.copy ≈ ArrayList 的 copy 建構子或 clone（淺）；copy.deepcopy ≈ 你得自己手刻、或靠序列化往返（serialize round-trip）才能達成的深拷貝。Python 一行就有。 經典陷阱：033 的共享 row 這是面試與線上事故的常客。你想建一個 3×3 全零矩陣，直覺寫成 033——結果改一格，整欄一起變： >>> grid = 0  3  3 >>> grid 0, 0, 0, 0, 0, 0, 0, 0, 0         看起來沒問題 >>> grid00 = 1 >>> grid"
+  },
+  {
+    "file": "ch04-data-structures.md",
+    "chapterTitle": "第 4 章：核心資料結構深入",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "- 四大結構各有底層：list 是動態陣列（append 攤還 O1、中段操作 On）；dict/set 是開放定址雜湊表（平均 O1）；tuple 是不可變序列，Java 無直接對應。 - dict 保證插入順序（3.7+ 規格保證），等於免費的 LinkedHashMap，不必為了有序另尋型別。 - x in alist 是 On——成員測試請改用 set/dict，這是 Java 工程師最常見的效能盲點。 - 可變 vs 不可變是核心二分法：只有不可變（int/str/tuple/frozenset）才 hashable，才能當 dict key / set 元素。賦值永遠是共享參考，不複製。 - 切片回傳新 list：a: 是淺拷貝慣用法、a::-1 反轉、切片賦值能就地改長度——比 Java 的 subList/copyOfRange 強大太多。 - 解包是 Java 沒有的語法糖：a, b = b, a 交換、first, rest 抓剩餘、/ 在呼叫時展開、{d1, d2} 合併 dict。 - collections 消滅樣板：defaultdict 取代 computeIfAbsent、Counter 取代手動計數、deque 提供真 O1 雙端佇列、namedtuple 是輕量唯讀紀錄。 - copy.copy 是淺、copy.deepcopy 是深；033 會讓三列共享同一個物件，建巢狀結構一律用 comprehension。"
+  },
+  {
+    "file": "ch04-data-structures.md",
+    "chapterTitle": "第 4 章：核心資料結構深入",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "1. 把 list 查重改 Pythonic：你接手一段 Java 風格的程式碼，對一個長度上萬的 list 反覆做 if x in biglist。請改寫成 O1 成員測試，並說明資料結構的選擇與複雜度變化。 提示：哪個結構的 in 是平均 O1？建立它的一次性成本是多少？ 2. 反轉與抽樣：給定 a = listrange20，只用切片寫出：a 反轉整個 list、b 取出所有奇數索引的元素、c 取最後 5 個元素的反向序列。不要用迴圈或 reversed。 提示：astart:stop:step，負 step 代表反向。 3. 分組統計：給一串 部門, 薪資 tuple，請用 defaultdict 把每個部門的薪資收集成 list，再用一行算出各部門平均。接著改用 Counter 統計每個部門的人數。 提示：defaultdictlist 收集、Counter 計數；解包 for dept, salary in data。 4. 手動踩坑再修復：用 None44 建一個 4×4 棋盤並把 board11 設成 \"Q\"，觀察輸出。解釋為什麼壞掉，再用 comprehension 寫出正確版本，並用 is 驗證各 row 是不同物件。 提示：grid0 is grid1 應為 False。 5. 淺拷貝失靈：有一個巢狀設定 config = {\"db\": {\"host\": \"localhost\", \"ports\": 5432}}。用 copy.copy 複製後修改副本的 \"db\"\"ports\"，觀察原 config 是否被波及。改用 copy.deepcopy 再試一次，並說明何時該用哪一個。 提示：淺拷貝只複製最外層 dict，內層 dict 與 list 仍共享參考。"
+  },
+  {
+    "file": "ch05-pythonic-idioms.md",
+    "chapterTitle": "第 5 章：Pythonic 慣用法（Idiomatic Python）",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "你已經會用 Python 寫出能跑的程式碼了。但「能跑」和「Pythonic」是兩回事。一個 Java 工程師剛轉 Python 時，最容易寫出的就是「用 Python 語法表達 Java 思維」的程式碼——for i in rangelenitems、先 if key in d 再取值、滿坑滿谷的 .stream.map.filter.collect 等價物。這些都能跑，但 Python 老手看了會皺眉。本章的目標只有一個：把你腦中那套「Java 直譯」的反射，替換成 Python 社群真正在用的慣用法。學會這些，你的程式碼會更短、更快、也更不容易出錯。 ---"
+  },
+  {
+    "file": "ch05-pythonic-idioms.md",
+    "chapterTitle": "第 5 章：Pythonic 慣用法（Idiomatic Python）",
+    "sectionTitle": "5.1 comprehension：取代 Stream 樣板的核心武器",
+    "sectionId": "51-comprehension取代-stream-樣板的核心武器",
+    "content": "如果只能學一個 Pythonic 慣用法，那就是 comprehension（綜合運算式，或譯「推導式」）。它是 Python 處理「從一個序列產生另一個序列」的標準答案，地位等同於 Java 8 之後的 Stream API——但語法上更直接。 5.1.1 list comprehension：map + filter 的合體 先看一個典型任務：取出一串數字裡的偶數，各自平方。 // Java：Stream API List<Integer> nums = List.of1, 2, 3, 4, 5, 6; List<Integer> result = nums.stream .filtern -> n % 2 == 0 .mapn -> n  n .collectCollectors.toList; // 4, 16, 36 nums = 1, 2, 3, 4, 5, 6 result = n  n for n in nums if n % 2 == 0 對比一下 Java 工程師最初會寫的「直譯版本」： result = for n in nums: if n % 2 == 0: result.appendn  n comprehension 把這三行壓成一行，而且讀法跟英文一樣自然：運算式 for 變數 in 來源 if 條件。注意它的順序——先寫輸出運算式，再寫迴圈，最後寫過濾。這跟 Stream 的「資料流由左往右」順序相反，是 Java 工程師要適應的第一個點。 > 🔁 Java 對照：.stream.filter....map....collecttoList ≈ map運算式 for x in 來源 if filter條件。comprehension 不需要 .stream 開頭，也不需要 .collect 收尾——容器型別由外層括號決定。 Stream "
+  },
+  {
+    "file": "ch05-pythonic-idioms.md",
+    "chapterTitle": "第 5 章：Pythonic 慣用法（Idiomatic Python）",
+    "sectionTitle": "5.2 generator expression 與惰性求值",
+    "sectionId": "52-generator-expression-與惰性求值",
+    "content": "list comprehension 會立刻把所有元素算出來、塞進記憶體。但很多時候你只是要「一個一個處理」，不需要整份結果同時存在。這時候就輪到 generator expression（產生器運算式）登場。 5.2.1 語法只差一個括號，行為天差地別 squareslist = x  x for x in range1000000 squaresgen = x  x for x in range1000000 >>> import sys >>> sys.getsizeofx for x in range10000    list：實打實佔記憶體 85176 >>> sys.getsizeofx for x in range10000     generator：固定大小 200 generator 不會預先算好任何東西，它只記得「下一步要做什麼」，每次跟它要一個元素，它才算一個： >>> g = x  x for x in range5 >>> g <generator object <genexpr> at 0x107751cb0> >>> nextg 0 >>> nextg 1 > 🔁 Java 對照：generator expression 對應 Stream 的惰性特性——中間操作（map/filter）不會立刻執行，要等終端操作（collect/forEach）才觸發。差別是 Java 的 Stream 用過即丟（不能重複迭代），Python 的 generator 也是一樣——迭代到底就空了。 >>> g = x for x in range3 >>> listg 0, 1, 2 >>> listg    第二次：空的，generator 已耗盡 5.2.2 何時省下來的不只是記憶體 當下游操作會「短路」時，惰性求值連 CPU 都省下。比方說只想知道「有"
+  },
+  {
+    "file": "ch05-pythonic-idioms.md",
+    "chapterTitle": "第 5 章：Pythonic 慣用法（Idiomatic Python）",
+    "sectionTitle": "5.3 內建高階工具：別再寫 C 風格迴圈",
+    "sectionId": "53-內建高階工具別再寫-c-風格迴圈",
+    "content": "Python 的內建函式（builtins）提供了一整套「跟 index 說再見」的工具。Java 工程師寫迴圈時還帶著 for int i = 0; ... 的肌肉記憶，這裡要徹底改掉。 5.3.1 enumerate：要 index 也要 element // Java for int i = 0; i < words.size; i++ { System.out.printlni + \": \" + words.geti; } for i in rangelenwords: printf\"{i}: {wordsi}\" for i, word in enumeratewords: printf\"{i}: {word}\" enumerate 還能指定起始值（例如做 1-based 編號）： >>> for rank, name in enumerate\"金\", \"銀\", \"銅\", start=1: ...     printrank, name 1 金 2 銀 3 銅 5.3.2 zip：平行迭代（Java 沒有的對應） 要同時走訪兩個（以上）序列，Java 得用 index 手動對齊；Python 用 zip 一次搞定： names = \"Alice\", \"Bob\", \"Carol\" scores = 90, 85, 95 for name, score in zipnames, scores: printf\"{name}: {score}\" zip 配 dict comprehension，是把兩個平行 list 併成 dict 的標準招式： >>> dictzip\"a\", \"b\", \"c\", 1, 2, 3 {'a': 1, 'b': 2, 'c': 3} > ⚠️ 陷阱：zip 以最短的序列為準，多的會被默默丟掉。Python 3.10+ 加了 zip..., st"
+  },
+  {
+    "file": "ch05-pythonic-idioms.md",
+    "chapterTitle": "第 5 章：Pythonic 慣用法（Idiomatic Python）",
+    "sectionTitle": "5.4 EAFP vs LBYL：先做再說，出錯再接",
+    "sectionId": "54-eafp-vs-lbyl先做再說出錯再接",
+    "content": "這是 Java 與 Python 文化差異最深的一處。Java 受 checked exception 影響，養成了「先檢查、再行動（Look Before You Leap，LBYL）」的習慣。Python 社群信奉的卻是相反的「先做、錯了再道歉（Easier to Ask Forgiveness than Permission，EAFP）」。 5.4.1 兩種風格的對照 任務：從 dict 取值，不存在就給預設。 if \"name\" in config: name = config\"name\" else: name = \"anonymous\" try: name = config\"name\" except KeyError: name = \"anonymous\" 當然，這個特定例子用 config.get\"name\", \"anonymous\" 最乾淨——但重點是理解兩種哲學。再看一個無法用 .get 簡化的例子：解析一個可能格式不對的字串。 def parseordefaults, default=0: if s.lstrip\"-\".isdigit:    還沒處理 '+', 空白, 底線分隔... return ints return default def parseordefaults, default=0: try: return ints except ValueError: return default > 💡 Pythonic 重點：EAFP 不是「鼓勵濫用例外」，而是「不要重複驗證一件函式本身已經會驗證的事」。LBYL 的檢查往往無法窮舉所有失敗情況，還會跟真正的操作邏輯重複，形成兩處要同步維護的真相來源。 5.4.2 並行下的關鍵理由：避免 race condition EAFP 還有一個 Java 工程師會立刻 buy-in 的硬道理：LBYL 的"
+  },
+  {
+    "file": "ch05-pythonic-idioms.md",
+    "chapterTitle": "第 5 章：Pythonic 慣用法（Idiomatic Python）",
+    "sectionTitle": "5.5 duck typing：會叫的就是鴨子",
+    "sectionId": "55-duck-typing會叫的就是鴨子",
+    "content": "> 「如果牠走路像鴨子、叫起來像鴨子，那牠就是鴨子。」 Java 是名義型別（nominal typing）：一個物件能不能傳進某方法，取決於它有沒有 implements 那個介面、是不是那個類別的子型。Python 是鴨子型別（duck typing）：只看物件有沒有那個行為，不看它的型別名稱或繼承關係。 5.5.1 對照：介面 vs 行為 // Java：呼叫端要求一個「具名」的型別契約 interface Readable { String read; } String firstLineReadable source { return source.read.split\"\\n\"0; } // 只有 implements Readable 的類別才能傳進來 def firstlinesource: return source.read.split\"\\n\"0 這個 firstline 可以吃任何有 .read 方法的物件——檔案、io.StringIO、io.BytesIO、網路 response、你自己寫的類別……它們之間沒有任何共同基底類別或介面： >>> import io >>> firstlineio.StringIO\"hello\\nworld\" 'hello' >>> class FakeFile: ...     def readself: ...         return \"fake line 1\\nfake line 2\" >>> firstlineFakeFile    跟 StringIO 八竿子打不著，照樣能用 'fake line 1' 在 Java 你得讓 FakeFile 去 implements Readable（或繼承某個共同基底），編譯器才放行。Python 不用——這也是為什麼 Python 寫測試替身（test double"
+  },
+  {
+    "file": "ch05-pythonic-idioms.md",
+    "chapterTitle": "第 5 章：Pythonic 慣用法（Idiomatic Python）",
+    "sectionTitle": "5.6 with 與 context manager：try-with-resources 的進階版",
+    "sectionId": "56-with-與-context-managertry-with-resources-的進階版",
+    "content": "資源（檔案、連線、鎖）用完要釋放，這你太熟了。Java 7 的 try-with-resources 解決了手動 finally 的繁瑣；Python 的對應物是 with 陳述式，而且機制更通用——它能管理的不只是「資源」，而是任何「需要成對進入/離開」的狀態。 5.6.1 基本對照 // Java：try-with-resources，要求 AutoCloseable try var reader = Files.newBufferedReaderpath { return reader.readLine; }   // reader.close 自動呼叫，即使丟例外 with openpath as f: return f.readline f = openpath try: return f.readline finally: f.close with 保證 exit 一定執行——不管區塊正常結束、return、還是拋例外。一次管理多個資源時，用逗號分隔（取代 Java 的 ;）： with open\"in.txt\" as src, open\"out.txt\", \"w\" as dst: dst.writesrc.read 5.6.2 協定：enter 與 exit 任何實作了 enter 和 exit 的物件都能用在 with，這就是 context manager 協定——對應 Java 的 AutoCloseable，但更強：enter 可以回傳值（給 as 用），exit 收到例外資訊、還能決定要不要吞掉例外。 寫一個計時器，示範「進入時記錄、離開時結算」這種非資源用途： import time class Timer: def initself, label: self.label = label def enterself: self.start = ti"
+  },
+  {
+    "file": "ch05-pythonic-idioms.md",
+    "chapterTitle": "第 5 章：Pythonic 慣用法（Idiomatic Python）",
+    "sectionTitle": "5.7 海象運算子 := 與 f-string",
+    "sectionId": "57-海象運算子-與-f-string",
+    "content": "最後兩個語法糖，都是讓「Java 直譯寫法」變短的利器。 5.7.1 walrus operator :=：賦值兼運算式 Python 的 = 是陳述式（statement），不回傳值——所以你不能在 if、while 的條件裡賦值（這也避免了 Java/C 裡 if x = 5 誤寫成賦值的經典 bug）。但有時你真的需要「賦值並馬上用」，3.8 引入的海象運算子 :=（長得像海象的眼睛和獠牙）就是為此而生。 最常見的場景是讀取迴圈。對照 Java 的慣用寫法： // Java：在 while 條件裡賦值並判斷 String line; while line = reader.readLine != null { processline; } while True: line = f.readline if not line: break processline while line := f.readline: processline walrus 在 comprehension 裡也很有用——當「過濾條件」需要用到「一個算起來很貴的中間值」，又不想算兩次時： data = 1, 2, 3, 4, 5, 6 result = y for x in data if y := x  x > 10 這裡 y := x  x 把平方算出來綁到 y，過濾用 y、輸出也用 y，只算一次。沒有 walrus 的話你得在運算式和條件裡各算一次 x  x。 > ⚠️ 陷阱：別過度使用 :=。它的價值在「避免重複計算」或「簡化讀取迴圈」。如果只是普通賦值，用一般的 = 在前一行，可讀性更好。把它當成精準的手術刀，不是日常菜刀。 5.7.2 f-string：格式化的最終答案 字串格式化請永遠用 f-string（formatted string literal，3.6+）。忘掉 % 和 ."
+  },
+  {
+    "file": "ch05-pythonic-idioms.md",
+    "chapterTitle": "第 5 章：Pythonic 慣用法（Idiomatic Python）",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "1. comprehension 是 Stream API 的直接替身：fx for x in xs if px 一行表達 map+filter，外層括號決定 list/set/dict，不需 .stream...collect 樣板。但巢狀過深或帶副作用時，請退回普通迴圈。 2.   是惰性的 generator expression：省記憶體、配合 any/sum/islice 還能短路省 CPU，是處理大資料與無限序列的基礎（詳見第 6 章）。 3. 跟 rangelen... 說再見：enumerate 取 index、zip 平行迭代（記得 strict=True）、any/all 做短路判斷、sortedkey=... 取代 Comparator（多鍵就回傳 tuple）。 4. EAFP 優於 LBYL：先做、出錯再用精準的 except 接住，避免重複驗證，也消除並行下「檢查與使用之間」的 race condition。 5. duck typing 看行為不看型別：函式只依賴「有沒有那個方法」，天然解耦、好測試；Protocol 能補回靜態檢查（第 8 章）。 6. with 比 try-with-resources 更通用：靠 enter/exit 協定管理任何「成對進入/離開」的狀態，contextlib.contextmanager 讓你用一個 generator 加 try/finally 快速自訂。 7. := 賦值兼運算式：簡化讀取迴圈與「避免重複計算」的 comprehension，但別濫用。 8. f-string 是格式化的唯一正解：內嵌運算式、豐富的對齊/補零/進位格式規格，加上 {x=} debug 語法，效能與可讀性雙贏。"
+  },
+  {
+    "file": "ch05-pythonic-idioms.md",
+    "chapterTitle": "第 5 章：Pythonic 慣用法（Idiomatic Python）",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "1. 改寫 Stream 樣板：下面這段「Java 直譯」程式碼把每個訂單金額打八折、過濾掉低於 100 的、加總，請改成一行 Pythonic 寫法。 python total = 0 for order in orders: discounted = order\"amount\"  0.8 if discounted >= 100: total += discounted 提示：sum... 吃 generator expression；用 walrus 避免算兩次折扣。 2. multi-key 排序：給一份 {\"name\": ..., \"dept\": ..., \"salary\": ...}, ...，請用 sorted 排成「先按部門字母序、同部門按薪資由高到低」。 提示：key 回傳 tuple，數值欄位要降冪可取負號。 3. EAFP 改寫：把這段 LBYL 改成 EAFP，並說明在多執行緒共享 cache 時，原寫法有什麼隱患。 python if userid in cache: return cacheuserid else: return fetchfromdbuserid 提示：用 try/except KeyError，或思考 dict 還有什麼更 Pythonic 的方法。注意「檢查」與「取值」之間的空窗。 4. 自訂 context manager：用 @contextlib.contextmanager 寫一個 suppressstdout，在 with 區塊內把 print 的輸出靜音，離開後自動恢復。 提示：暫存 sys.stdout，yield 之間把它換成 io.StringIO，記得用 try/finally 還原。 5. duck typing 思考題：寫一個 totalsizesources，接受一個序列，其中每個元素只要有 .si"
+  },
+  {
+    "file": "ch06-iterators-and-generators.md",
+    "chapterTitle": "第 6 章：迭代器與產生器（Iterator & Generator）",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "在 Java 裡，Iterator 是一個你偶爾會手刻、但多半交給 for-each 或 Stream 隱藏起來的協定。到了 Python，迭代不只是「走訪集合」的工具，而是整個語言的核心抽象——for、解包、in、comprehension、甚至 args 展開，底層全部建立在同一套迭代協定上。更關鍵的是「惰性（laziness）」：Python 的 generator 讓你把一個函式變成「可暫停、可續行的狀態機」，用幾乎為零的記憶體處理無限序列或 GB 級的檔案。這章要顛覆的直覺是：你不需要先把資料全部準備好，再開始處理它。"
+  },
+  {
+    "file": "ch06-iterators-and-generators.md",
+    "chapterTitle": "第 6 章：迭代器與產生器（Iterator & Generator）",
+    "sectionTitle": "迭代協定：for 迴圈底下發生了什麼",
+    "sectionId": "迭代協定for-迴圈底下發生了什麼",
+    "content": "Java 的 Iterable / Iterator Java 的迭代靠兩個介面：Iterable<T> 提供 iterator，Iterator<T> 提供 hasNext 與 next。for-each 是語法糖，編譯器會幫你展開。 List<Integer> nums = List.of1, 2, 3; Iterator<Integer> it = nums.iterator; while it.hasNext {        // 先問有沒有下一個 Integer x = it.next;    // 再拿下一個 System.out.printlnx; } 注意這個「先問再拿」的兩步驟：hasNext 不會推進游標，next 才推進。 Python 的迭代協定 Python 用兩個 dunder 方法與一個例外： 角色  Java  Python --------- 可被迭代的東西  Iterable.iterator  iter 回傳 iterator 取下一個  Iterator.next  next 回傳下一個值 判斷結束  Iterator.hasNext  沒有！丟出 StopIteration 最大的思維差異：Python 沒有 hasNext。 迭代器不知道自己還有沒有下一個，它只管「給下一個，或在沒得給時丟 StopIteration 例外」。這是 EAFP（詳見第 5 章）哲學在迭代上的體現——不事先檢查，直接嘗試，撞牆了用例外收尾。 nums = 1, 2, 3 it = iternums           等同呼叫 nums.iter printnextit           1，等同 it.next printnextit           2 printnextit           3 printnextit         "
+  },
+  {
+    "file": "ch06-iterators-and-generators.md",
+    "chapterTitle": "第 6 章：迭代器與產生器（Iterator & Generator）",
+    "sectionTitle": "yield 與 generator：可暫停的函式",
+    "sectionId": "yield-與-generator可暫停的函式",
+    "content": "Java 沒有原生的 yield 如果在 Java 要產生一個「1, 2, 3...」的惰性序列，你得手刻一個 Iterator，把所有局部狀態（目前算到哪、累積了什麼）都搬成欄位： // Java：費式數列的 Iterator，狀態必須手動外顯成欄位 class FibIterator implements Iterator<Long> { private long a = 0, b = 1; public boolean hasNext { return true; }   // 無限 public Long next { long current = a; long next = a + b; a = b; b = next; return current; } } 這很繁瑣：函式的「執行流程」被你硬拆成「資料欄位 + 一次一步的 next」。 Python 的 generator function 只要函式裡有 yield，呼叫它不會執行函式本體，而是回傳一個 generator 物件（它是 iterator）。每次 next 才推進到下一個 yield，產出值後暫停在原地，連局部變數都原封不動保留。 def fib: a, b = 0, 1 while True:            無限產生 yield a a, b = b, a + b import itertools printlistitertools.islicefib, 10 同樣的邏輯，Python 只要 4 行，而且讀起來就是「正常的迴圈」。yield 把你的局部變數變成了隱形的狀態欄位，續行時自動恢復——這就是 Java 工程師要建立的核心心智模型： > 💡 Pythonic 重點：把 generator function 想成「一個可以按下暫停鍵的函式」。yield 是暫停鍵，產出一個值並"
+  },
+  {
+    "file": "ch06-iterators-and-generators.md",
+    "chapterTitle": "第 6 章：迭代器與產生器（Iterator & Generator）",
+    "sectionTitle": "itertools 模組：迭代器的瑞士刀",
+    "sectionId": "itertools-模組迭代器的瑞士刀",
+    "content": "itertools 提供一組高度優化（C 實作）的迭代器構件。它們全都是惰性的，可以串接。以下分類介紹，並對照 Java Stream。 無限迭代器 import itertools as it counter = it.count10, 2 printlistit.islicecounter, 5       10, 12, 14, 16, 18 colors = it.cycle\"red\", \"green\", \"blue\" printnextcolors for  in range5  'red', 'green', 'blue', 'red', 'green' printlistit.repeat\"=\", 3           '=', '=', '=' count 對應 Stream.iterate，但 cycle 與 repeat 在 Java Stream 沒有乾淨的對應物，你得自己刻。 串接與切片 printlistit.chain1, 2, 3, 4, 5       1, 2, 3, 4, 5 nested = 1, 2, 3, 4, 5 printlistit.chain.fromiterablenested      1, 2, 3, 4, 5 printlistit.islicerange100, 2, 10, 3     2, 5, 8 > ⚠️ 陷阱：你不能對 generator 寫 g2:10——iterator 沒有 getitem。需要切片時用 islice，它同樣是惰性的，不會把前面的元素物化。 分組：groupby groupby 把相鄰且 key 相同的元素分成一組。關鍵字是「相鄰」——它不像 SQL GROUP BY 會全域聚合，所以通常要先排序。 data = \"eng\", \"Alice\", \"eng\", \"Bob\", \"sal"
+  },
+  {
+    "file": "ch06-iterators-and-generators.md",
+    "chapterTitle": "第 6 章：迭代器與產生器（Iterator & Generator）",
+    "sectionTitle": "用 generator 組裝資料處理管線（pipeline）",
+    "sectionId": "用-generator-組裝資料處理管線pipeline",
+    "content": "這是 generator 真正的殺手級應用，也是它和 Java Stream 最值得對照的地方。把「讀 → 過濾 → 轉換 → 聚合」每一步都寫成 generator，串接起來形成一條惰性管線：資料像水流一樣一筆一筆流過所有階段，任何時刻記憶體裡只有一筆。 Java Stream 的對照 // Java：Stream 的中間操作也是惰性的 long count = Files.linesPath.of\"access.log\" .filterline -> line.contains\"POST\" .mapline -> line.split\" \"6      // 取出 URL 路徑 .filterpath -> path.startsWith\"/api\" .count; Stream 的中間操作（filter、map）惰性、終端操作（count）才觸發。這個模型 Java 工程師很熟，遷移到 generator 幾乎無痛。 Python generator pipeline 每個階段是一個吃 iterator、吐 iterator 的 generator： from collections.abc import Iterator def readlinespath: str -> Iteratorstr: with openpath, encoding=\"utf-8\" as f: yield from f                                   逐行惰性產出（此處刻意保留換行字元， 後續階段不在意；若要去換行可改用前面 readlines 的 line.rstrip\"\\n\" 版本） def onlypostlines: Iteratorstr -> Iteratorstr: for line in lines: if \"POST\" in line"
+  },
+  {
+    "file": "ch06-iterators-and-generators.md",
+    "chapterTitle": "第 6 章：迭代器與產生器（Iterator & Generator）",
+    "sectionTitle": "yield from 與委派",
+    "sectionId": "yield-from-與委派",
+    "content": "從手動轉發到 yield from 當一個 generator 想把工作「外包」給另一個 iterable，最笨的寫法是手動 for 轉發： def chainmanualiterables: for it in iterables: for item in it: yield item               手動把每個值轉發出去 yield from 是這段樣板的語法糖： def chaincleaniterables: for it in iterables: yield from it                委派：把 it 的所有值代理出去 printlistchainclean1, 2, 3, 4, \"ab\" 但 yield from 不只是少寫一層迴圈。它建立了一條透明通道，把子產生器（subgenerator）和外層的呼叫者直接連起來： 1. 子產生器 yield 的值，直接傳給最外層的消費者。 2. 消費者用 .sendx 送進來的值，直接轉交給子產生器。 3. 子產生器拋出的例外、.throw 進來的例外，正確地穿透。 4. 子產生器 return v 的回傳值，會成為 yield from 運算式的值。 第 4 點是手動 for 迴圈做不到的：普通迭代會丟棄 generator 的 return 值，yield from 卻能接住它。 攤平巢狀結構 yield from 配遞迴，是攤平任意深度巢狀結構的標準寫法，簡潔到不可思議： def flattenitems: for x in items: if isinstancex, list: yield from flattenx       遞迴委派給自己 else: yield x printlistflatten1, 2, 3, 4, 5, 6 每碰到一個子 list，就把攤平它的工作委派"
+  },
+  {
+    "file": "ch06-iterators-and-generators.md",
+    "chapterTitle": "第 6 章：迭代器與產生器（Iterator & Generator）",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "- 迭代協定 = iter（拿 iterator）+ next（取下一個）+ StopIteration（結束）。Python 用例外結束迭代，沒有 Java 的 hasNext。 - iterable 不會耗盡，iterator 會。 for 之所以能對同一個 list 重跑，是因為每次都重新 iter 拿新 iterator。generator 是 iterator，所以只能跑一次——這是無數隱性 bug 的根源。 - generator function = 可暫停的函式。 有 yield 的函式呼叫回傳 generator；yield 暫停並產出值、保留所有局部狀態，next 從暫停處續行。別手動 raise StopIteration，函式自然結束即可。 - 惰性是核心思維。 generator 與 generator expression 要才算，能用幾乎為零的記憶體處理 GB 級檔案，甚至無限序列。 - itertools 是迭代器瑞士刀：count/cycle/repeat（無限）、chain/islice、groupby（注意要先排序、組是相鄰的）、product/permutations/combinations、takewhile/dropwhile/accumulate、pairwise（3.10+）、batched（3.12+）。 - generator pipeline 把「讀→濾→轉→聚」串成全程惰性的水流，記憶體用量與資料規模解耦，比 Java Stream 更輕量且可處理無限串流。 - yield from 委派給子產生器，建立透明通道（傳值、傳例外、接住 return 值），是攤平巢狀結構的利器，也是 async/await 的歷史前身（詳見第 14 章）。"
+  },
+  {
+    "file": "ch06-iterators-and-generators.md",
+    "chapterTitle": "第 6 章：迭代器與產生器（Iterator & Generator）",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "1. 改寫成 Pythonic：以下 Java 風格的程式碼先把全部行讀進 list，再過濾、再轉大寫、再取前 5 筆。請改寫成一條惰性 generator pipeline，確保任何時刻記憶體只有一筆，且在取到 5 筆後就停止讀檔。 python lines = open\"data.txt\".readlines filtered = l for l in lines if l.strip upper = l.upper for l in filtered first5 = upper:5 提示：用 generator expression 串接，最後用 itertools.islice..., 5 取前 5 筆，避免物化整份檔案。 2. 手寫迭代協定：實作一個 Window 類別，接受一個序列與視窗大小 n，迭代時產出所有長度為 n 的滑動視窗（如 1,2,3,4、n=2 → 1,2, 2,3, 3,4）。要求 Window 是 iterable（可重複迭代），且每次 iter 回傳新的、彼此獨立的 iterator。 提示：把 iterator 邏輯拆成獨立類別，或讓 iter 本身是個 generator function（def iterself: ... yield ...）——後者更 Pythonic。 3. 無限序列 + islice：用 generator 寫一個產生質數的無限序列 primes，並用它取出前 20 個質數。 提示：def primes 內用 itertools.count2 當候選來源，維護一個已知質數 list 做試除；產出時用 yield，外部用 itertools.isliceprimes, 20。 4. groupby 的陷阱：給定 events = \"login\", 9, \"login\", 9, \"logout\", 10, \"lo"
+  },
+  {
+    "file": "ch07-classes-and-objects.md",
+    "chapterTitle": "第 7 章：Python 的類別與物件",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "你已經是 OOP 老手——封裝、繼承、多型這些觀念不用人教。但 Python 的 class 雖然長得跟 Java 很像，骨子裡的哲學卻完全相反：它沒有 private、沒有 final、沒有編譯器幫你把關，封裝靠的是慣例與信任（Python 社群的名言是「我們都是成年人」we're all consenting adults）。同時它又給了你 Java 求之不得的工具——@property 讓你能先寫最簡單的公開屬性、需要時再無痛加上驗證；@dataclass 一行幹掉 record／Lombok 的所有樣板。本章帶你把 Java 的 class 直覺重新校準成 Python 的寫法。 ---"
+  },
+  {
+    "file": "ch07-classes-and-objects.md",
+    "chapterTitle": "第 7 章：Python 的類別與物件",
+    "sectionTitle": "class 語法、`__init__` 與 `self`",
+    "sectionId": "class-語法init-與-self",
+    "content": "先看最小的對照。Java 的類別： public class Account { private String owner; private int balance; public AccountString owner, int balance { this.owner = owner; this.balance = balance; } public void depositint amount { this.balance += amount; } } Python 的等價物： class Account: def initself, owner: str, balance: int = 0 -> None: self.owner = owner self.balance = balance def depositself, amount: int -> None: self.balance += amount 差異一眼可見，但每一個都值得停下來想： - 沒有欄位宣告區。Java 要先宣告 private String owner;，Python 沒有這一段——實例屬性是在 init 裡「第一次賦值」時才誕生的。self.owner = owner 同時是宣告也是賦值。 - init 不是建構子。它是初始化器（initializer）：物件其實是由 new 先建立好、再交給 init 填內容。99% 的時候你只需要 init，但要知道「建立」與「初始化」是兩個階段，這跟 Java 把 new 與建構子綁在一起不同。 - self 是明寫的。Java 的 this 是隱形的；Python 規定每個實例方法的第一個參數就是實例本身，慣例命名 self。它不是關鍵字，只是慣例——但請永遠叫它 self。 > 🔁 Java 對照：obj.deposit100 在 Pytho"
+  },
+  {
+    "file": "ch07-classes-and-objects.md",
+    "chapterTitle": "第 7 章：Python 的類別與物件",
+    "sectionTitle": "沒有 access modifier：`_protected` 與 `__private` 的名稱改編",
+    "sectionId": "沒有-access-modifierprotected-與-private-的名稱改編",
+    "content": "這是 Java 工程師最不習慣的一點：Python 沒有 public／protected／private。所有屬性與方法都是公開的。封裝靠兩個慣例： 寫法  意義  強制力 --------- name  公開 API  無 name（單底線）  「內部用，外人別碰」  純慣例，直譯器不管 name（雙底線）  觸發名稱改編（name mangling）  半強制：改了名字，但仍可存取 單底線 balance 就是一句口頭約定：「這是實作細節，你要碰我攔不住，但出事自負」。linter 與 IDE 會提醒，僅此而已。 雙底線 balance 比較特別，它會觸發name mangling：在類別內寫 self.balance，Python 會把它偷偷改名成 ClassNamebalance。 class Account: def initself -> None: self.balance = 100       實際存成 Accountbalance acc = Account printacc.Accountbalance      100 —— 改了名字，但根本沒擋住你 > ⚠️ 陷阱：別把 name 當成 Java 的 private。它不是為了防止存取，而是為了避免子類別不小心覆蓋父類別的屬性（兩個類別各自的 cache 不會打架，因為被改成 Acache 和 Bcache）。把它當 access control 用，只會讓你的程式更難測試、更難 debug。 > 💡 Pythonic 重點：預設用公開屬性。需要「告訴別人這是內部用」時用單底線 。雙底線  留給「真的會在繼承階層中撞名」的少數情況——實務上很少用到。封裝在 Python 裡是設計溝通，不是執行期警察。 ---"
+  },
+  {
+    "file": "ch07-classes-and-objects.md",
+    "chapterTitle": "第 7 章：Python 的類別與物件",
+    "sectionTitle": "類別屬性 vs 實例屬性",
+    "sectionId": "類別屬性-vs-實例屬性",
+    "content": "Java 的 static 欄位與實例欄位界線分明，宣告時就決定了。Python 兩者都是「在某個物件上的屬性」，差別在掛在哪裡： class Dog: species = \"Canis familiaris\"      類別屬性：所有實例共享 def initself, name: str -> None: self.name = name              實例屬性：每個實例各自一份 存取時 Python 走一條查找鏈：先找實例自己的 dict，找不到再往類別找。 >>> a = Dog\"Rex\" >>> b = Dog\"Momo\" >>> a.species             實例沒有，往類別找 'Canis familiaris' >>> Dog.species = \"Canis lupus\"    改類別屬性，所有實例同步看到 >>> a.species, b.species 'Canis lupus', 'Canis lupus' 到這裡都很像 Java 的 static。但有一個微妙且關鍵的差異——透過實例賦值： >>> a.species = \"Wolf\"    不是改類別屬性！是在 a 上「新建」一個實例屬性 >>> a.species             實例的遮蔽（shadow）了類別的 'Wolf' >>> b.species             b 沒被動到 'Canis lupus' >>> Dog.species           類別屬性也沒被動到 'Canis lupus' 在 Java 裡 a.species = \"Wolf\"（若 species 是 static）會修改那個唯一的 static 欄位（而且 IDE 會警告你別用實例存取 static）。在 Python 裡，指派給 instance.attr 永遠"
+  },
+  {
+    "file": "ch07-classes-and-objects.md",
+    "chapterTitle": "第 7 章：Python 的類別與物件",
+    "sectionTitle": "`@property`：取代 getter/setter",
+    "sectionId": "property取代-gettersetter",
+    "content": "Java 文化是「欄位一律 private + 配一組 getter/setter」，多半是為了「未來可能要加驗證或計算」而預先付出的樣板稅。Python 反過來：先把屬性公開，等真的需要邏輯時，再用 @property 把它升級成有 getter/setter 的屬性——而且呼叫端一個字都不用改。 先看沒有 property 的起手式，簡單到不行： class Circle: def initself, radius: float -> None: self.radius = radius         就是個公開屬性 c = Circle5 c.radius = 10                        直接存取，沒有 getRadius/setRadius 哪天需求變了——半徑不准是負數、而且想提供一個「算出來」的 area。在 Java 你得把 radius 改 private、加 getRadius/setRadius，然後所有寫過 c.radius 的呼叫端全部要改成方法呼叫。Python 不用： class Circle: def initself, radius: float -> None: self.radius = radius         注意：這行會「觸發」下面的 setter @property def radiusself -> float:            getter return self.radius @radius.setter def radiusself, value: float -> None:    setter：把驗證放這 if value < 0: raise ValueError\"半徑不能為負\" self.radius = value @property def areaself -> float"
+  },
+  {
+    "file": "ch07-classes-and-objects.md",
+    "chapterTitle": "第 7 章：Python 的類別與物件",
+    "sectionTitle": "`@classmethod` 與 `@staticmethod`",
+    "sectionId": "classmethod-與-staticmethod",
+    "content": "這兩個 decorator 對應 Java 的 static method，但 @classmethod 多了一個 Java 沒有的殺手級特性。 class Pizza: def initself, toppings: liststr -> None: self.toppings = toppings @classmethod def margheritacls -> \"Pizza\":           第一參數是 cls（類別本身） return cls\"mozzarella\", \"tomato\" @staticmethod def isvegetariantoppings: liststr -> bool:    沒有 self/cls return \"pepperoni\" not in toppings - @classmethod 的第一參數是 cls（類別本身，不是實例）。最常見的用途是替代建構子（alternative constructor）／工廠方法：Python 一個類別只能有一個 init，所以「用不同方式建立物件」就靠 classmethod。 - @staticmethod 既不收 self 也不收 cls，純粹是「放在類別命名空間裡的普通函式」——邏輯上跟這個類別有關，但不需要碰實例或類別狀態。 >>> p = Pizza.margherita        不必先有實例就能呼叫 >>> p.toppings 'mozzarella', 'tomato' >>> Pizza.isvegetarian\"mozzarella\" True cls 的多型，才是重點 為什麼 classmethod 工廠要寫 return cls... 而不是 return Pizza...？因為 cls 會隨著實際呼叫的類別變動——子類別呼叫時，cls 就是子類別。 c"
+  },
+  {
+    "file": "ch07-classes-and-objects.md",
+    "chapterTitle": "第 7 章：Python 的類別與物件",
+    "sectionTitle": "`@dataclass`：對照 Java record / Lombok",
+    "sectionId": "dataclass對照-java-record-lombok",
+    "content": "寫一個只是用來「裝資料」的類別，手刻 init、repr、eq 很煩。Java 的解法是 Lombok @Data 或 Java 16 的 record。Python 的解法是標準函式庫的 @dataclass： from dataclasses import dataclass @dataclass class Point: x: int y: int 這短短幾行，@dataclass 自動幫你生出 init、repr、eq： >>> p = Point1, 2 >>> p                        自動 repr Pointx=1, y=2 >>> p == Point1, 2         自動 eq：依「值」比較，不是依身份 True >>> p.x 1 注意那些 x: int 是型別提示（第 3、9 章）——@dataclass 靠讀取類別的型別標注來決定有哪些欄位。沒標型別的就不算欄位。 常用選項，對照 record 的能力 @dataclassfrozen=True, order=True, slots=True class Money: amount: int currency: str = \"TWD\"            有預設值的欄位（要放在無預設的後面） 選項  效果  Java 對照 --------- frozen=True  不可變，建立後不能改欄位（且變成 hashable）  record 的 final 欄位 order=True  自動生 <、<=、>、>=（依欄位順序比較）  自己實作 Comparable slots=True（3.10+）  用 slots 省記憶體、禁止亂加屬性  一般物件配置 kwonly=True（3.10+）  所有欄位變 keyword-only  — >>> m = Money10"
+  },
+  {
+    "file": "ch07-classes-and-objects.md",
+    "chapterTitle": "第 7 章：Python 的類別與物件",
+    "sectionTitle": "`__repr__`、`__eq__`、`__hash__`",
+    "sectionId": "repreqhash",
+    "content": "這三個 dunder（雙底線方法，dunder = double underscore）直接對應 Java 的 toString／equals／hashCode。用 @dataclass 時它們自動生成；手刻類別時你得自己處理，而且 Python 有一條 Java 沒有的強制規則。 repr：對照 toString（但分兩種） Python 區分兩個「轉字串」的方法： - repr：給開發者看的，目標是明確、最好能 eval 還原。reprobj、在 REPL 直接打變數、容器內的元素都用它。 - str：給使用者看的，目標是可讀。printobj、strobj 用它。沒定義 str 時會 fallback 到 repr。 class Point: def initself, x: int, y: int -> None: self.x = x self.y = y def reprself -> str: return f\"Pointx={self.x}, y={self.y}\"    慣例：長得像建構呼叫 >>> p = Point1, 2 >>> p                   REPL 用 repr Pointx=1, y=2 >>> printp            沒有 str，fallback 到 repr Pointx=1, y=2 >>> p, p              容器內也用 repr Pointx=1, y=2, Pointx=1, y=2 > 💡 Pythonic 重點：至少實作 repr。一個好的 repr 在 debug、log、測試失敗訊息裡價值連城。預設的 <main.Point object at 0x10a...> 對你毫無幫助。str 只在「給終端使用者看的格式」跟 debug 格式不同時才另外寫。 eq 與 has"
+  },
+  {
+    "file": "ch07-classes-and-objects.md",
+    "chapterTitle": "第 7 章：Python 的類別與物件",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "1. init 是初始化器不是建構子，self 是明寫的第一參數。obj.mx 等價於 Class.mobj, x——理解這點，bound method 與 classmethod 都好懂。 2. Python 沒有 access modifier。封裝靠慣例：name 是「內部用」的口頭約定，name 是 name mangling（防繼承撞名，不是 private）。別拿雙底線當存取控制。 3. 實例屬性讀取會穿透到類別、寫入不會穿透。instance.attr = x 永遠在實例上建屬性，絕不回頭改類別——這跟 Java static 欄位的行為不同。 4. 可變類別屬性會被所有實例共享，是可變預設參數的近親坑。每個實例該獨立持有的可變狀態，一律在 init 裡建立。 5. @property 讓你先公開屬性、事後再無痛加上 getter/setter 與驗證，呼叫端語法不變。因此 Python 不需要 Java 那種「預防性 getter/setter」。 6. @classmethod 收 cls，是替代建構子的首選；cls 參與多型，子類別呼叫工廠會拿到子類別實例。@staticmethod 純粹是命名空間裡的函式。 7. @dataclass 一行取代 record／Lombok：自動生 init／repr／eq，frozen=True 給你不可變且可雜湊的值物件。可變預設值要用 fielddefaultfactory=...；衍生欄位／驗證用 postinit（frozen 下要 object.setattr，對應 record 的 compact constructor）；slots=True 省記憶體但實例沒有 dict，無法事後動態加屬性（測試 mock 時要注意）。固定的具名常數集合則用 enum.Enum／IntEnum／StrEnum，是 Jav"
+  },
+  {
+    "file": "ch07-classes-and-objects.md",
+    "chapterTitle": "第 7 章：Python 的類別與物件",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "練習 1（封裝慣例） 下面這段「Java 直譯」的 Python，把每個欄位都加了 getter/setter。請改寫成 Pythonic 版本：name 直接公開；age 用 @property 加上「不能為負」的驗證。說明改寫後呼叫端 u.age = 30 為什麼不用改。 class User: def initself, name, age: self.name = name self.age = age def getnameself: return self.name def setnameself, v: self.name = v def getageself: return self.age def setageself, v: self.age = v 練習 2（找出共享陷阱） 以下類別想讓每個 ShoppingCart 有自己的商品清單，但實際上所有購物車共用一份。請指出 bug 行、用一句話說明成因（提示：查找鏈與「修改 vs 指派」），並修正。 class ShoppingCart: items = def addself, item: self.items.appenditem 練習 3（classmethod 工廠 + 多型） 為一個 Temperature 類別（initself, celsius: float）加上 @classmethod fromfahrenheitcls, f，內部換算成攝氏後建立物件。接著定義一個子類別 PreciseTemperatureTemperature，呼叫 PreciseTemperature.fromfahrenheit98.6，並解釋為什麼回傳的是 PreciseTemperature 而不是 Temperature——以及如果把工廠裡的 cls... 寫死成 Temperature... 會發生什麼事"
+  },
+  {
+    "file": "ch08-inheritance-protocols-magic-methods.md",
+    "chapterTitle": "第 8 章：繼承、協定與魔術方法",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "繼承你太熟了，但 Python 在這塊有兩個 Java 沒有的領域要重新學：一是多重繼承與它背後的 MRO（方法解析順序），Java 用「單一繼承 + 介面」繞開的問題，Python 正面迎擊；二是結構型別（structural typing）的 Protocol，讓你能享受 duck typing 的彈性又拿回靜態檢查。再加上 Python 真正的超能力——魔術方法（magic / dunder methods），讓你的物件能用 len、、+、 這些內建語法。本章也會講為什麼在 Python 裡「組合優於繼承」這句老話更容易落實。 ---"
+  },
+  {
+    "file": "ch08-inheritance-protocols-magic-methods.md",
+    "chapterTitle": "第 8 章：繼承、協定與魔術方法",
+    "sectionTitle": "繼承與 `super()`",
+    "sectionId": "繼承與-super",
+    "content": "基本繼承跟 Java 幾乎一樣，差別在語法細節： class Animal: def initself, name: str -> None: self.name = name def speakself -> str: return \"...\" class DogAnimal:                        class DogAnimal ≈ class Dog extends Animal def initself, name: str, breed: str -> None: super.initname            呼叫父類別的 init self.breed = breed def speakself -> str:               override，不需要 @Override 標注 return \"Woof\" 幾個對照重點： - super.initname 對應 Java 的 supername。但 Python 3 的 super 不用帶參數（Python 2 要寫 superDog, self，現在看到那種寫法就知道是舊碼）。 - override 不需要 @Override。Python 沒有這個標注；子類別定義同名方法就覆蓋了。代價是「拼錯方法名變成新方法而非覆蓋」這種錯誤，編譯器不會幫你抓——這正是型別檢查工具（第 9 章）的價值之一。 - 沒有 final。任何類別都能被繼承、任何方法都能被覆蓋。 > 🔁 Java 對照：super 在單一繼承下就等於 Java 的 super。但下一節你會看到，在多重繼承裡 super 的意義會超出「父類別」——它其實是「MRO 中的下一個」。 ---"
+  },
+  {
+    "file": "ch08-inheritance-protocols-magic-methods.md",
+    "chapterTitle": "第 8 章：繼承、協定與魔術方法",
+    "sectionTitle": "多重繼承與 MRO",
+    "sectionId": "多重繼承與-mro",
+    "content": "Java 嚴禁多重類別繼承（只能 extends 一個類別，但能 implements 多個介面），就是為了躲開「菱形繼承」（diamond problem）的歧義。Python 允許多重繼承，並用 MRO（Method Resolution Order，方法解析順序） 明確定義「該找哪個父類別」。 MRO 由 C3 線性化演算法算出，存在 mro： class A: def greetself -> None: print\"A\" class BA: def greetself -> None: print\"B\" super.greet class CA: def greetself -> None: print\"C\" super.greet class DB, C:                   菱形：D 繼承 B、C，兩者都繼承 A def greetself -> None: print\"D\" super.greet >>> cls.name for cls in D.mro 'D', 'B', 'C', 'A', 'object' >>> D.greet D B C A 停下來看這個輸出的驚人之處：B.greet 裡的 super.greet 呼叫的是 C.greet，不是 A.greet——即使 B 的程式碼裡 C 連影子都沒有。這就是 Java 工程師最容易誤解的地方： > ⚠️ 陷阱：super 不是「我的父類別」，而是「MRO 裡排在我後面的下一個類別」。在多重繼承中，super 的目標取決於最終實例的 MRO，而不是定義 super 那行所在的類別。把 super 讀成「parent」會在菱形繼承裡完全猜錯。 這套機制叫協作式多重繼承（cooperative multiple inheritance）：每個類別都呼叫 super，MRO 保證每個類別"
+  },
+  {
+    "file": "ch08-inheritance-protocols-magic-methods.md",
+    "chapterTitle": "第 8 章：繼承、協定與魔術方法",
+    "sectionTitle": "抽象類別：`abc.ABC` 與 `@abstractmethod`",
+    "sectionId": "抽象類別abcabc-與-abstractmethod",
+    "content": "對照 Java 的 abstract class：定義介面契約、強迫子類別實作、自己不能被實例化。Python 用 abc 模組： from abc import ABC, abstractmethod class ShapeABC:                         繼承 ABC 使它成為抽象基底類別 @abstractmethod def areaself -> float: ...                               沒有實作，子類別必須提供 def describeself -> str:            抽象類別可以有具體方法 return f\"這個形狀面積是 {self.area:.2f}\" class CircleShape: def initself, radius: float -> None: self.radius = radius def areaself -> float:              必須實作 area，否則 Circle 也是抽象的 return 3.141592653589793  self.radius  2 >>> Shape                               不能實例化抽象類別 Traceback most recent call last: ... TypeError: Can't instantiate abstract class Shape without an implementation for abstract method 'area' >>> c = Circle5 >>> c.describe '這個形狀面積是 78.54' 跟 Java abstract 行為一致：少實作一個抽象方法，連子類別都不能被實例化。差別只在 Python "
+  },
+  {
+    "file": "ch08-inheritance-protocols-magic-methods.md",
+    "chapterTitle": "第 8 章：繼承、協定與魔術方法",
+    "sectionTitle": "`Protocol`（結構型別）vs ABC（名義型別）",
+    "sectionId": "protocol結構型別vs-abc名義型別",
+    "content": "這是 Python 型別世界裡跟 Java 差最多、也最值得學的觀念。先把兩種「型別相容」的哲學講清楚： - 名義型別（nominal typing）：型別相容看「名字／宣告」。Java 的 class Dog implements Comparable 必須明寫 implements，編譯器才認。ABC 也是名義的——你得 class CircleShape 或用 Shape.register...。 - 結構型別（structural typing）：型別相容看「結構／有沒有對的方法」。只要長得對就算數，不需要宣告任何繼承關係。這正是 duck typing（第 5 章）的靜態版本。 Python 用 typing.Protocol 提供結構型別： from typing import Protocol class ReadableProtocol:                 定義「結構」：有 read -> str 就算 def readself -> str: ... def dumpsource: Readable -> None:       只要傳進來的東西有 read，型別檢查就過 printsource.read class File:                               注意：File 沒有繼承 Readable！ def readself -> str: return \"file content\" class Socket:                             同樣沒繼承，但結構符合 def readself -> str: return \"socket bytes\" dumpFile         ✅ mypy 接受 dumpSocket       ✅ mypy 接受 File 與 Socket "
+  },
+  {
+    "file": "ch08-inheritance-protocols-magic-methods.md",
+    "chapterTitle": "第 8 章：繼承、協定與魔術方法",
+    "sectionTitle": "魔術方法（dunder methods）",
+    "sectionId": "魔術方法dunder-methods",
+    "content": "魔術方法（magic methods，因前後雙底線又叫 dunder methods）是 Python 的運算子重載與協定機制：實作對應的 dunder，你的物件就能用內建語法。第 7 章的 init、repr、eq、hash 都是。這裡再補幾個高頻的，並做成一個完整範例。 你想用的語法  要實作的 dunder  Java 對照 --------- lenobj  len  size（但 Java 不能讓 length 變語法） objkey  getitem / setitem  geti / seti, v，無索引語法 obj  call  Function.apply / Runnable.run a + b  add  無運算子重載 a < b  lt  Comparable.compareTo x in obj  contains  containsx for x in obj  iter  Iterable.iterator（詳見第 6 章） 一個能用「+、len、索引、==、repr」的二維向量： from future import annotations class Vector: def initself, components: float -> None: self.values = listcomponents def reprself -> str: inner = \", \".joinstrv for v in self.values return f\"Vector{inner}\" def lenself -> int:                        lenv return lenself.values def getitemself, index: int -> float:      v0 return self.value"
+  },
+  {
+    "file": "ch08-inheritance-protocols-magic-methods.md",
+    "chapterTitle": "第 8 章：繼承、協定與魔術方法",
+    "sectionTitle": "mixin 模式",
+    "sectionId": "mixin-模式",
+    "content": "mixin 是「用多重繼承疊加能力」的乾淨用法：一個 mixin 是小而專一、通常不帶自己的 init 狀態的類別，只提供一組方法，被「混入」其他類別。慣例命名以 Mixin 結尾。 import json from typing import Any class AsDictMixin: def asdictself -> dictstr, Any: return self.dict                假設子類別的狀態都在實例 dict class JSONMixin: def tojsonself -> str: 依賴「混入的對象也提供了 asdict」——這是 mixin 之間的隱性契約 return json.dumpsself.asdict   type: ignoreattr-defined class UserAsDictMixin, JSONMixin:         混入兩種能力 def initself, name: str, age: int -> None: self.name = name self.age = age >>> u = User\"Albert\", 42 >>> u.tojson '{\"name\": \"Albert\", \"age\": 42}' User 自己只管「我有什麼資料」，序列化能力靠 mixin 疊上去。對照 Java：Java 8 之後 interface 的 default method 提供了類似「混入行為」的能力（介面帶實作），是最接近 mixin 的對應物——但 Java 的 default method 不能持有狀態，而 Python mixin 可以（雖然慣例上盡量不要）。 > 💡 Pythonic 重點：mixin 要遵守幾條紀律：1 名字以 Mixin 結尾、職責單一；2 盡量別有自己的 in"
+  },
+  {
+    "file": "ch08-inheritance-protocols-magic-methods.md",
+    "chapterTitle": "第 8 章：繼承、協定與魔術方法",
+    "sectionTitle": "組合優於繼承在 Python 中的實踐",
+    "sectionId": "組合優於繼承在-python-中的實踐",
+    "content": "「組合優於繼承」（composition over inheritance）是 OOP 共識，但 Python 的動態特性讓委派（delegation）特別好寫，所以更容易落實。基本款就是「持有一個物件、把工作轉發給它」： class Engine: def startself -> str: return \"引擎啟動\" class Car: def initself -> None: self.engine = Engine           持有，而非繼承 def startself -> str: return self.engine.start       委派 當要轉發的方法很多、不想一個個手寫時，Python 可以用 getattr 做自動委派——它在「正常屬性查找失敗」時被呼叫： from typing import Any class Logger: def infoself, msg: str -> None: printf\"INFO {msg}\" def errorself, msg: str -> None: printf\"ERROR {msg}\" class Service: def initself -> None: self.logger = Logger def getattrself, name: str -> Any:     委派目標型別不定，標 Any 通過 mypy --strict 只有當 Service 自己找不到該屬性時才會進來，自動轉發給 logger return getattrself.logger, name >>> s = Service >>> s.info\"started\"         Service 沒有 info，getattr 轉發給 logger INFO started >>> s.error\"oo"
+  },
+  {
+    "file": "ch08-inheritance-protocols-magic-methods.md",
+    "chapterTitle": "第 8 章：繼承、協定與魔術方法",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "1. super 在 Python 3 不帶參數，override 不需 @Override，沒有 final——彈性更大，但拼錯方法名這類錯誤要靠型別檢查工具補。 2. 多重繼承靠 MRO（C3 線性化）解決菱形問題。super 的真正意義是「MRO 中的下一個」，不是「我的父類別」——這是多重繼承最大的認知陷阱。 3. abc.ABC + @abstractmethod 對應 Java abstract class：定義契約、強迫實作、抽象類別不能實例化（執行期報錯）。 4. ABC 是名義型別、Protocol 是結構型別。ABC 要明寫繼承；Protocol 只看「有沒有對的方法」，能事後為第三方類別定契約——Java 介面做不到。@runtimecheckable 的 isinstance 只查方法名是否存在、不查簽章，不是 Java instanceof 的等價物，安全保證來自靜態 mypy。 5. 魔術方法讓自訂物件融入內建語法：len、getitem、call、add 等對應 len、、、+。Java 沒有運算子重載。重載要語意清楚、克制使用。運算子 dunder 對不認得的型別要 return NotImplemented（讓 Python 改試對方的反向方法如 radd），比較運算子可用 functools.totalordering 由 eq + lt 自動補齊；另記得自訂 eq 而不定 hash 會讓實例變不可雜湊。 6. mixin 是多重繼承的乾淨用法：小而專一、命名以 Mixin 結尾、職責單一，最接近 Java 8 介面的 default method（但 mixin 可帶狀態）。 7. 組合優於繼承在 Python 更易落實：getattr 讓自動委派幾乎零樣板，duck typing 讓你不必為「能被當某型別用」而強行繼承。 ---"
+  },
+  {
+    "file": "ch08-inheritance-protocols-magic-methods.md",
+    "chapterTitle": "第 8 章：繼承、協定與魔術方法",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "練習 1（看穿 MRO） 不要執行，先用紙筆推出下面 D.m 的輸出與 D.mro，再執行驗證。說明 B.m 裡的 super.m 為什麼會跑到 C.m。 class A: def mself: print\"A\" class BA: def mself: print\"B\"; super.m class CA: def mself: print\"C\"; super.m class DB, C: def mself: print\"D\"; super.m 練習 2（ABC 強制契約） 用 abc.ABC 定義一個 Repository 抽象類別，含抽象方法 getid: int 與 saveitem，並提供一個具體方法 getorraiseid（找不到就 raise）。寫一個只實作了 get 卻忘了 save 的子類別，觀察實例化時的錯誤訊息，並修好它。 練習 3（ABC 換成 Protocol） 把練習 2 的 Repository 改寫成 Protocol，並寫一個函式 backuprepo: Repository。接著寫一個沒有繼承 Repository 但結構符合的 InMemoryRepo，把它傳進 backup。說明這跟練習 2 的 ABC 版在「相容性如何判定」上的本質差別。 練習 4（魔術方法做一個區間型別） 實作一個 Rangestart, end，支援：lenr（長度）、x in r（contains，判斷是否落在區間）、r == Range...（eq）、reprr（顯示成 Range1, 5）。寫幾行驗證每個語法。 練習 5（組合 + 自動委派） 你有一個第三方的 dict，想做一個 TrackedDict：每次 setitem 都印出「set key=...」，但其餘所有 dict 操作（len、in、get、keys…）照常運作。用「持有一個 dict"
+  },
+  {
+    "file": "ch09-type-hints-and-static-checking.md",
+    "chapterTitle": "第 9 章：型別提示與靜態檢查（Java 工程師的舒適圈）",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "這一章是你的主場。第 3 章已經點過型別提示，這裡要把它變成完整的工程能力：用 typing 找回你習慣的型別詞彙、用泛型寫出型別安全的容器、用 mypy/pyright 把「編譯期型別檢查」以可選的方式裝回 Python、再用 pydantic 補上型別提示不做的那件事——執行期驗證。最後談「漸進式型別」（gradual typing）的取捨：不是型別標越多越好，而是標在刀口上。 ---"
+  },
+  {
+    "file": "ch09-type-hints-and-static-checking.md",
+    "chapterTitle": "第 9 章：型別提示與靜態檢查（Java 工程師的舒適圈）",
+    "sectionTitle": "`typing` 模組：找回靜態型別的詞彙",
+    "sectionId": "typing-模組找回靜態型別的詞彙",
+    "content": "現代 Python（3.10+）的型別語法已經很接近你要的樣子。先建立詞彙對照： 你想表達  Python（現代寫法）  Java  備註 ------------ 整數串列  listint  List<Integer>  用內建 list，不是 typing.List 字串對整數的對應  dictstr, int  Map<String, Integer> 可有可無  str \\ None  Optional<String>  Optionalstr 是同義舊寫法 多種型別之一  int \\ str  （無直接對應）  Unionint, str 是舊寫法 函式型別  Callableint, str, bool  BiFunction<Integer,String,Boolean>  從 collections.abc 匯入 固定長度異質  tupleint, str, float  （record / 多型別）  跟 tupleint, ...（任意長度）不同 放棄型別  Any  （Object 但更鬆）  逃生出口，會關閉檢查 def lookuptable: dictstr, int, key: str -> int  None: return table.getkey           找不到回 None，所以回傳型別是 int  None 幾個 Java 工程師要記住的轉換： - 不要用 typing.List／Dict／Optional／Union 的舊寫法。Python 3.9 起內建容器可直接當泛型（listint），3.10 起用 X  Y 取代 Union、X  None 取代 Optional。看到 from typing import List 就知道是舊碼。 - str  None 不是 Java 的 Optional。它沒有 .map/"
+  },
+  {
+    "file": "ch09-type-hints-and-static-checking.md",
+    "chapterTitle": "第 9 章：型別提示與靜態檢查（Java 工程師的舒適圈）",
+    "sectionTitle": "泛型：`TypeVar`、`Generic`，與型別抹除的另一面",
+    "sectionId": "泛型typevargeneric與型別抹除的另一面",
+    "content": "寫「對任何型別都成立、且能保留型別資訊」的函式或容器，就要泛型。Python 3.12（PEP 695）給了跟 Java 很像的簡潔語法： def firstTitems: listT -> T: return items0 class StackT: def initself -> None: self.items: listT = def pushself, item: T -> None: self.items.appenditem def popself -> T: return self.items.pop >>> s: Stackint = Stack >>> s.push1 >>> revealtypes.pop      mypy 會說：Revealed type is \"int\" （小提醒：較新版本的 mypy 預設用短名顯示型別——int；很舊的版本或開啟特定設定才會印出完整的 builtins.int。這純粹是顯示差異，不影響檢查結果。） 對照 Java 的 class Stack<T> 與 <T> T firstList<T> items，概念一模一樣。3.12 之前（或要相容舊版）的寫法是先建 TypeVar： from typing import TypeVar, Generic T = TypeVar\"T\" def firstitems: listT -> T: return items0 class StackGenericT:      舊寫法要明確繼承 GenericT ... 有界型別（bounded）也有對應——「T 必須具備某種能力」。下面要求 T 必須支援 < 比較，用一個 Protocol（第 8 章）當上界： from typing import Protocol, Any class ComparableProtocol: "
+  },
+  {
+    "file": "ch09-type-hints-and-static-checking.md",
+    "chapterTitle": "第 9 章：型別提示與靜態檢查（Java 工程師的舒適圈）",
+    "sectionTitle": "`Protocol` 與結構型別檢查",
+    "sectionId": "protocol-與結構型別檢查",
+    "content": "第 8 章介紹過 Protocol（結構型別）。從型別系統的角度再補一點：它讓你能為「行為」而非「繼承關係」寫型別，這在做泛型抽象時特別有用。 from typing import Protocol class SupportsCloseProtocol: def closeself -> None: ... def usethencloseresource: SupportsClose -> None: 任何有 close 的東西都能傳進來：檔案、連線、你的自訂類別…… 完全不需要它們去繼承某個共同基底 resource.close 對照 Java：要表達「任何可關閉的東西」，Java 用 AutoCloseable 介面，而且每個型別都得明寫 implements AutoCloseable。Python 的 Protocol 是結構性的——第三方類別只要剛好有 close 就自動相容，你不必、也無法去改它的繼承宣告。需要執行期 isinstance 檢查時，加 @runtimecheckable（見第 8 章）。 > 💡 Pythonic 重點：寫函式參數型別時，優先問「我需要對方具備什麼能力」，用 Protocol 描述那個最小能力集，而不是要求一個具體的類別或基底。這讓你的 API 更好測（傳個 fake 就行）、更不綁實作。 ---"
+  },
+  {
+    "file": "ch09-type-hints-and-static-checking.md",
+    "chapterTitle": "第 9 章：型別提示與靜態檢查（Java 工程師的舒適圈）",
+    "sectionTitle": "mypy / pyright 的導入與 CI 整合",
+    "sectionId": "mypy-pyright-的導入與-ci-整合",
+    "content": "型別提示要發揮價值，得有檢查器在 CI 與編輯器裡跑。兩大選擇： - mypy：型別檢查的事實標準，由 Python 官方人員維護。 - pyright：微軟出品、用 TypeScript 寫、速度快，VS Code 的 Pylance 內建它。 設定寫在 pyproject.toml（對照 Maven 的 <configuration>）： tool.mypy pythonversion = \"3.12\" strict = true                       一鍵開啟一整組嚴格檢查（強烈建議新專案就開） warnunusedignores = true          抓出已經不需要的  type: ignore warnredundantcasts = true strict = true 會打開像 disallowuntypeddefs（不准有沒標型別的函式）、warnreturnany 等一整組規則，相當於 Java「把所有 compiler warning 當 error」。新專案建議一開始就開 strict；既有專案則漸進導入（下一節）。 CI 整合就是在流水線加一步（以 GitHub Actions 為例）： - name: Type check run: uv run mypy src/ 讓 mypy 失敗就讓 build 紅燈，型別錯誤就跟測試失敗一樣擋下 PR——這就把 Java 編譯器的型別把關，以工具的形式裝回了 Python 的工作流。 > 💡 Pythonic 重點：debug 型別時善用 revealtypex——它不是真函式，是給 mypy 看的「請告訴我你推出 x 是什麼型別」。執行前刪掉即可（mypy 不要求 import）。另一個是 reveallocals。這兩個是釐清「為什麼 mypy 覺得這裡型別不對」的利器"
+  },
+  {
+    "file": "ch09-type-hints-and-static-checking.md",
+    "chapterTitle": "第 9 章：型別提示與靜態檢查（Java 工程師的舒適圈）",
+    "sectionTitle": "pydantic：執行期驗證（對照 Bean Validation）",
+    "sectionId": "pydantic執行期驗證對照-bean-validation",
+    "content": "再強調一次關鍵事實：型別提示在執行期不做任何檢查。def fage: int 收到 \"100\" 不會報錯。當資料來自外部世界（HTTP request、JSON、設定檔、DB），你需要的是執行期驗證——這正是 pydantic 的領域，也是 FastAPI（第 16 章）的核心。 from pydantic import BaseModel, Field, ValidationError class UserBaseModel: name: str age: int = Fieldge=0, le=150        約束：0 <= age <= 150 email: str pydantic 在建立物件那一刻就驗證、甚至轉型： >>> u = Username=\"Albert\", age=42, email=\"a@b.com\" >>> u.age 42 >>> Username=\"Albert\", age=\"42\", email=\"a@b.com\".age     字串 \"42\" 自動轉成 int 42 >>> Username=\"Albert\", age=200, email=\"a@b.com\"          違反 le=150 Traceback most recent call last: ... pydanticcore.pydanticcore.ValidationError: 1 validation error for User age Input should be less than or equal to 150 type=lessthanequal, ... 對照 Java 的 Bean Validation（@NotNull、@Min、@Max、@Email）+ Hibernate Validator：兩者都是「宣告式地對資料下約束、在執行期"
+  },
+  {
+    "file": "ch09-type-hints-and-static-checking.md",
+    "chapterTitle": "第 9 章：型別提示與靜態檢查（Java 工程師的舒適圈）",
+    "sectionTitle": "漸進式型別（gradual typing）的取捨",
+    "sectionId": "漸進式型別gradual-typing的取捨",
+    "content": "Python 的型別系統是漸進式的：你可以一行型別都不標（純動態），也可以標到 strict 全綠（接近靜態語言），或落在中間。Any 是這套系統的「逃生出口」——任何東西都相容 Any、Any 也相容任何東西，等於對那一塊關閉檢查。 from typing import Any def parseraw: Any -> dictstr, int: raise NotImplementedError     raw 是 Any：進來不檢查，但回傳值有型別，呼叫端仍受保護 導入策略與取捨： - 新專案：直接 strict = true，從第一天就維持全綠，成本最低。 - 既有大型專案：漸進導入。先在 pyproject.toml 對少數模組開檢查，或用  type: ignorecode 暫時壓住特定錯誤（記得標明 error code，配合 warnunusedignores 之後就能清掉過期的）。優先標公開 API 邊界與複雜的領域邏輯——這裡型別的投資報酬率最高；一次性腳本可以完全不標。 - 務必標明 ignore 的 error code：寫  type: ignorearg-type 而不是裸的  type: ignore，才不會連帶吞掉其他真正的錯誤。 > ⚠️ 陷阱：Any 會「傳染」。一個回傳 Any 的函式，其結果再拿去做任何運算往往還是 Any，靜態檢查在那條路徑上等於失效。json.loads 的回傳就是 Any——拿到外部 JSON 後，盡早用 pydantic 或明確的型別斷言把它「收斂」成具體型別，別讓 Any 一路擴散到整個程式。 > 💡 Pythonic 重點：漸進式型別的精神不是「型別越多越好」，而是把型別投資在會回本的地方：團隊協作的公開介面、容易錯的複雜邏輯、外部資料的邊界。享受動態語言的彈性（快速原型、duck typing），同時用"
+  },
+  {
+    "file": "ch09-type-hints-and-static-checking.md",
+    "chapterTitle": "第 9 章：型別提示與靜態檢查（Java 工程師的舒適圈）",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "1. 用現代型別語法：listint、dictstr, int、X  None、X  Y，別再用 typing.List/Optional/Union 舊寫法。str  None 不是 Java Optional，靠型別縮小來安全使用。 2. mypy 會做流程敏感的型別縮小：if x is None: return 之後它知道 x 是非 None 型別。型別提示不只是文件，工具會順著控制流推理。 3. 泛型有 3.12 新語法：def firstT...、class StackT，跟 Java <T> 神似；舊寫法用 TypeVar + GenericT。 4. 型別抹除的另一面：Java 編譯期假裝有泛型、執行期抹掉造成摩擦；Python 坦白地讓提示在執行期幾乎完全無效——零執行期保證，靜態安全全靠檢查器。 5. 變異性（variance）：listint 不是 listobject（list 不變），改用唯讀的 Sequence（協變）才能收子型別容器——對應 Java 泛型的不變與 ? extends/? super（PECS）。cast/TypedDict 是零執行期成本的型別斷言／形狀描述，pydantic 才有真正的執行期驗證。 6. Self／Final／Literal 把 Java 的把關裝回靜態層：Self 讓 classmethod 工廠／鏈式方法的回傳型別跟著子類別收斂（回扣第 7 章 cls 多型，免去 Java 的遞迴泛型）；Final 是靜態版 final（mypy 擋重新賦值）；Literal 收緊「只能是這幾個值」（輕量版 enum）。 7. Protocol 為「能力」而非「繼承」寫型別：描述函式需要的最小能力集，API 更好測、更不綁實作。 8. 三層責任要分清：mypy/pyright 管靜態（你的程式邏輯）、pydantic 管執"
+  },
+  {
+    "file": "ch09-type-hints-and-static-checking.md",
+    "chapterTitle": "第 9 章：型別提示與靜態檢查（Java 工程師的舒適圈）",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "練習 1（型別縮小） 為下面函式加上型別提示，讓 mypy 在 strict 下全綠。config.get\"port\" 回傳 str  None，你要處理 None 的情況再轉成 int。寫完用 uv run --with mypy mypy 驗證，並故意把回傳改成可能回 None，觀察 mypy 怎麼抱怨。 def getportconfig: port = config.get\"port\" return intport 練習 2（泛型容器） 用 Python 3.12 新語法寫一個泛型 PairA, B（兩個可能不同型別的欄位 first: A、second: B），提供 swap -> PairB, A。用 revealtype 驗證 Pair1, \"x\".swap 被推導成 Pairstr, int。 練習 3（抹除實驗） 不查文件，先預測下面每行的結果再執行：listint is liststr、isinstance1, listint、isinstance1, list。用一句話解釋為什麼 Python 不讓你對 listint 做 isinstance。 練習 4（mypy vs pydantic 的分界） 寫一個 @dataclass 版的 Config 和一個 pydantic BaseModel 版的 Config，各塞一個 port: int。分別用 Configport=\"8080\"（字串）建立，觀察兩者行為的差異（一個照建立但 mypy 會在靜態時抱怨、一個在執行期轉型或報錯）。用這個差異說明「信任邊界」該用哪一個。 練習 5（馴服 Any） data = json.loadsraw 的 data 是 Any。寫一個 pydantic model Eventname: str, count: int，把 data 收斂成 Event，讓後續程式碼享"
+  },
+  {
+    "file": "ch10-decorators-and-metaprogramming.md",
+    "chapterTitle": "第 10 章：裝飾器與元程式設計",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "在 Java 裡，要在不改動原始碼的前提下「橫切」一段邏輯——記時、記日誌、開交易、做權限檢查——你會想到 annotation 加上一個框架：寫個 @Transactional，然後讓 Spring AOP 或 AspectJ 在執行期用動態代理、或在編譯期織入（weaving）位元組碼，把行為塞進去。Python 把同一件事做得直接得多：裝飾器（decorator）就是一個吃函式、回傳函式的普通函式，沒有反射、沒有代理、沒有框架，在 def 執行的那一刻就把包裝套好了。本章從裝飾器原理一路往下挖到 Python 元程式設計（metaprogramming）的底層——getattr、descriptor、metaclass——你會發現 @property、@dataclass、甚至「方法為什麼能綁定 self」這些每天用的東西，背後都是同一套機制。重點先講在前頭：裝飾器是日常工具，descriptor 是理解 @property 的鑰匙，metaclass 是 99% 用不到的重武器。 ---"
+  },
+  {
+    "file": "ch10-decorators-and-metaprogramming.md",
+    "chapterTitle": "第 10 章：裝飾器與元程式設計",
+    "sectionTitle": "裝飾器原理：`@deco` 只是語法糖",
+    "sectionId": "裝飾器原理deco-只是語法糖",
+    "content": "承接第 3 章——函式是一等物件，能被當參數傳入、當回傳值傳出。裝飾器把這兩件事合起來：一個接收函式、回傳函式的高階函式（higher-order function）。 先看最樸素的形式，完全不用 @ 符號： from collections.abc import Callable from typing import Any def myloggerfunc: Callable..., Any -> Callable..., Any: def wrapperargs: Any, kwargs: Any -> Any: printf\"呼叫 {func.name}，參數 {args} {kwargs}\" result = funcargs, kwargs printf\"{func.name} 回傳 {result!r}\" return result return wrapper def adda: int, b: int -> int: return a + b add = myloggeradd         關鍵這一行：把 add 換成包裝後的版本 >>> add3, 4 呼叫 add，參數 3, 4 {} add 回傳 7 7 add = myloggeradd 是整個裝飾器的精髓：mylogger 收到原始的 add，回傳一個新函式 wrapper，我們把 wrapper 重新綁定到 add 這個名字上。之後呼叫 add3, 4，跑的其實是 wrapper，它在前後印日誌、中間轉發給原本的函式。 @ 符號只是把這行「重新賦值」寫得漂亮一點： @mylogger           完全等價於 add = myloggeradd def adda: int, b: int -> int: return a + b > 💡 Pythonic 重點：@deco 與 f "
+  },
+  {
+    "file": "ch10-decorators-and-metaprogramming.md",
+    "chapterTitle": "第 10 章：裝飾器與元程式設計",
+    "sectionTitle": "`functools.wraps`：別讓包裝抹掉身分",
+    "sectionId": "functoolswraps別讓包裝抹掉身分",
+    "content": "上面 timed 裡那行 @wrapsfunc 不是裝飾品。沒有它，包裝會把原函式的 metadata 全部蓋掉——因為呼叫者拿到的是 wrapper，不是原函式： from collections.abc import Callable from typing import Any def baddecofunc: Callable..., Any -> Callable..., Any: def wrapperargs: Any, kwargs: Any -> Any:     沒有 @wraps return funcargs, kwargs return wrapper @baddeco def greetname: str -> str: \"\"\"跟某人打招呼。\"\"\" return f\"Hi {name}\" >>> greet.name 'wrapper'                        慘了，名字變成 wrapper >>> greet.doc >>>  None，docstring 也不見了 greet.name 變成 'wrapper'、docstring 消失——這會搞壞日誌、除錯訊息、help、以及任何靠 name 運作的工具（包括其他裝飾器）。functools.wraps 把原函式的 name、doc、module、qualname 等複製到 wrapper 上，並額外設一個 wrapped 指回原函式： from functools import wraps def gooddecofunc: Callable..., Any -> Callable..., Any: @wrapsfunc def wrapperargs: Any, kwargs: Any -> Any: return funcargs, kwargs return w"
+  },
+  {
+    "file": "ch10-decorators-and-metaprogramming.md",
+    "chapterTitle": "第 10 章：裝飾器與元程式設計",
+    "sectionTitle": "類別裝飾器：裝飾的是類別",
+    "sectionId": "類別裝飾器裝飾的是類別",
+    "content": "裝飾器不限於函式——@ 放在 class 上面，收到的就是類別物件，回傳值（通常是修改後的同一個類別）取代原類別。最常見的用途是自動註冊到 registry： from collections.abc import Callable from typing import Any HANDLERS: dictstr, type = {} def registername: str -> Callabletype, type: def decoratorcls: type -> type: HANDLERSname = cls           把類別登記到全域表 return cls                     原封不動回傳，只是順手登記 return decorator @register\"json\" class JSONHandler: def parseself, raw: str -> Any: import json return json.loadsraw @register\"csv\" class CSVHandler: def parseself, raw: str -> Any: return row.split\",\" for row in raw.splitlines >>> HANDLERS {'json': <class 'JSONHandler'>, 'csv': <class 'CSVHandler'>} >>> HANDLERS\"json\".parse'{\"x\": 1}' {'x': 1} > 📝 關於輸出：在 REPL 或模組裡實際執行時，類別的 repr 會帶模組前綴，例如 <class 'main.JSONHandler'>。為求簡潔，本章（以及後面 metaclass 的 RegistryMeta.registry、Plug"
+  },
+  {
+    "file": "ch10-decorators-and-metaprogramming.md",
+    "chapterTitle": "第 10 章：裝飾器與元程式設計",
+    "sectionTitle": "`__getattr__` / `__setattr__`：攔截屬性存取",
+    "sectionId": "getattr-setattr攔截屬性存取",
+    "content": "元程式設計的下一層是攔截「屬性存取」本身。第 8 章用 getattr 做過自動委派，這裡把它跟兄弟方法講清楚——它們是 Python 動態屬性的核心。 getattr vs getattribute 兩個名字很像，行為差很多： - getattribute：每一次屬性存取都呼叫它，無論屬性存不存在。它是屬性查找的總入口，預設實作負責去 dict、類別、descriptor 裡找。極少需要覆寫，覆寫錯了整個物件就壞了。 - getattr：只有在正常查找失敗時才呼叫（找不到屬性、即將 AttributeError 之前）。這才是你 99% 想用的那個——做委派、惰性屬性、動態欄位。 class Dynamic: def initself -> None: self.real = 42 def getattrself, name: str -> str: 只有 self.real 以外、找不到的屬性才會進來 注意：這裡標 -> str 只是因為本範例剛好都回字串； 真實的 getattr 回傳型別取決於用途（委派、惰性屬性常是任意型別）， 簽章並非固定要回 str。 return f\"<動態產生的 {name}>\" >>> d = Dynamic >>> d.real            真實存在，不會呼叫 getattr 42 >>> d.anything        找不到 → 觸發 getattr '<動態產生的 anything>' >>> d.foobar '<動態產生的 foobar>' > 💡 Pythonic 重點：要做「找不到時的後備（fallback）」用 getattr；要攔截「全部」屬性存取（罕見，例如 proxy）才用 getattribute。把 getattr 理解成「屬性查找的 catch」就對了——只有 miss 才進來。 setatt"
+  },
+  {
+    "file": "ch10-decorators-and-metaprogramming.md",
+    "chapterTitle": "第 10 章：裝飾器與元程式設計",
+    "sectionTitle": "Descriptor 協定：`@property` 的底層",
+    "sectionId": "descriptor-協定property-的底層",
+    "content": "Descriptor（描述器）是 Python 物件模型裡最被低估、卻最強大的機制。一句話：descriptor 是一個「把屬性存取的控制權，從物件交給另一個物件」的協定。@property、classmethod、staticmethod、甚至「一般方法為什麼會自動綁定 self」——全都是 descriptor 在背後撐著。 一個物件只要實作了以下任一方法，它就是 descriptor： - getself, obj, objtype：讀取時呼叫 - setself, obj, value：指派時呼叫 - setnameself, owner, name：類別定義時，自動告訴 descriptor「它被綁到哪個屬性名」 把「非負整數欄位」這個常見驗證需求寫成 descriptor： class NonNegative: def setnameself, owner: type, name: str -> None: 類別建立時自動呼叫，name 是這個 descriptor 被指派到的屬性名 self.name = f\"{name}\" def getself, obj: object, objtype: type  None = None -> int: if obj is None:                          從類別（而非實例）存取時 return self                           type: ignorereturn-value return obj.dict.getself.name, 0 def setself, obj: object, value: int -> None: if not isinstancevalue, int: raise TypeErrorf\"{self.name1:} 必須是 int"
+  },
+  {
+    "file": "ch10-decorators-and-metaprogramming.md",
+    "chapterTitle": "第 10 章：裝飾器與元程式設計",
+    "sectionTitle": "Metaclass 簡介：類別也是物件",
+    "sectionId": "metaclass-簡介類別也是物件",
+    "content": "最後一層，也是最深、實務上最少用的一層。先接受一個事實：在 Python 裡，類別本身也是物件。既然是物件，它一定有自己的型別——那個型別就是 metaclass（元類別），預設是 type。 >>> class Foo: ... >>> typeFoo             Foo 這個「類別」的型別是 type <class 'type'> >>> type42              42 的型別是 int <class 'int'> >>> typeint             int 的型別也是 type <class 'type'> class Foo: ... 這個語法，骨子裡是呼叫 type 來建立一個類別物件。你甚至能跳過 class 語法、直接用 typename, bases, namespace 動態造類別： >>> Dog = type\"Dog\", , {\"speak\": lambda self: \"Woof\"} >>> Dog.speak 'Woof' Dog = type... 跟 class Dog: ... 建出來的東西一模一樣。metaclass 就是「製造類別的工廠」——你能自訂一個 metaclass，在類別被建立的瞬間介入（檢查、修改、註冊）。最小範例：建立子類別時自動註冊： class RegistryMetatype: registry: dictstr, type = {} def newmcs, name: str, bases: tupletype, ..., namespace: dictstr, object: cls = super.newmcs, name, bases, namespace if bases:                           跳過基底類別自己，只註冊子類別 Registr"
+  },
+  {
+    "file": "ch10-decorators-and-metaprogramming.md",
+    "chapterTitle": "第 10 章：裝飾器與元程式設計",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "1. 裝飾器就是「吃函式、回傳函式」的高階函式，@deco 完全等價於 f = decof，只是語法糖。它在 def 執行的當下就套用，不是呼叫時。 2. 裝飾器 vs Java annotation：目的相同（橫切關注點），機制相反——annotation 是被動中繼資料、要靠框架反射/織入；decorator 是主動函式、純語言特性、無需框架。 3. 永遠加 functools.wraps：否則 wrapper 會抹掉原函式的 name、doc 等身分，搞壞日誌與工具。@wraps 還留下 wrapped 逃生門。 4. 帶參數的裝飾器是三層巢狀：最外層吃裝飾器參數、中間層吃函式、最內層吃呼叫引數。@retry 一定要加括號。 5. 類別裝飾器收到類別、回傳（增強後的）類別，常用於自動註冊。@dataclass 本身就是類別裝飾器。 6. getattr 只在查找失敗時呼叫（做 fallback/委派），getattribute 每次都攔截（罕用）。setattr 攔截所有指派，內部設值務必走 super.setattr 或 self.dict，否則無窮遞迴。 7. descriptor（get/set/setname）是 @property、classmethod、method binding 的底層。data descriptor（有 set）優先序高於實例 dict，non-data（只有 get）較低。要把驗證套到多個欄位就自己寫 descriptor。 8. metaclass 是「類別的類別」（type），能在類別建立時介入，但 99% 用不到——多半 initsubclass 或類別裝飾器就能取代，知道存在、看得懂框架碼即可。 ---"
+  },
+  {
+    "file": "ch10-decorators-and-metaprogramming.md",
+    "chapterTitle": "第 10 章：裝飾器與元程式設計",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "練習 1（拆語法糖） 不要執行，先寫出下面這段的「去語法糖」等價版本（用 = 賦值，不用 @），再執行驗證你的理解。說明 countcalls 是在「定義 hello 時」還是「第一次呼叫 hello 時」執行的。延伸思考：去語法糖後 hello 其實是 wrapper，而計數器 func.calls 掛在原始 func（被包起來那個）身上，不在 wrapper 上——試著存取 hello.calls，觀察為何會丟 AttributeError、計數器到底掛在哪個物件上。想讓 hello.calls 取得到，計數器該改掛哪裡（提示：改成 wrapper.calls，並補上 @wraps）？ def countcallsfunc: func.calls = 0 def wrapperargs, kwargs: func.calls += 1 return funcargs, kwargs return wrapper @countcalls def hello: return \"hi\" 練習 2（修好遺失的身分） 拿掉某個你寫的裝飾器裡的 @wraps，用 yourfunc.name 和 helpyourfunc 觀察壞掉的樣子，再加回 @wraps 對比。額外題：用 yourfunc.wrapped 拿回原函式並直接呼叫，繞過裝飾器邏輯。 練習 3（帶參數的裝飾器） 寫一個 @cacheforseconds=60：在指定秒數內，相同引數的呼叫直接回傳上次的結果（簡易 TTL 快取）。務必用三層巢狀結構，並加 @wraps。提示：用 time.monotonic 記時間戳，用 dict 以引數為 key 存 timestamp, result。寫一個會 print 的慢函式驗證第二次呼叫沒有真的執行。 練習 4（descriptor 取代 property 樣板） 你有一個 "
+  },
+  {
+    "file": "ch11-modules-packages-project-structure.md",
+    "chapterTitle": "第 11 章：模組、套件與專案結構",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "在 Java，編譯期就把「我有哪些類別、它們屬於哪個 package」釘死了：package com.acme.billing; 寫在檔頭，class 名稱要跟檔名一致，classpath 在啟動時固定，JVM 載入類別是惰性、嚴格、無副作用的。Python 把這一整套搬到了執行期：import 是一條會跑的敘述，模組第一次被載入時會「從上到下執行整個檔案」，而且只執行一次、之後快取在記憶體裡。這個差異會顛覆你對「載入」的直覺——它解釋了循環匯入為何會炸、為何頂層別放重活、為何相對匯入在腳本裡會失效。本章用一個會貫穿全章的最小套件範例，把 Python 的模組系統與現代專案佈局講透。 ---"
+  },
+  {
+    "file": "ch11-modules-packages-project-structure.md",
+    "chapterTitle": "第 11 章：模組、套件與專案結構",
+    "sectionTitle": "module 與 package：執行期的命名空間",
+    "sectionId": "module-與-package執行期的命名空間",
+    "content": "先把詞彙對齊。在 Python： - module（模組）：一個 .py 檔。檔名（去掉 .py）就是模組名。 - package（套件）：一個「裝著模組的目錄」。傳統上目錄裡要有 init.py 才算 package（沒有的話是「namespace package」，後面會談）。 - import：把另一個模組載入、執行、並在當前命名空間綁定一個名字。 Java  Python  思維差異 --------- package com.acme.billing;（檔頭宣告）  目錄結構就是套件名，不在檔案裡宣告  Python 的套件名來自它在檔案系統的相對位置 import com.acme.billing.Invoice;  from acme.billing import invoice  Java import 是編譯期符號解析；Python import 是執行期、會跑程式碼 classpath（JAR/目錄清單）  sys.path（目錄/zip 清單）  兩者都是「去哪裡找」，但 sys.path 可在執行期被改 JVM 惰性載入、無副作用  模組第一次 import 時整檔執行  這是最大的心智轉換 > 🔁 Java 對照：Java 的 import 只是「打字省略」，不會載入任何東西，真正載入在第一次用到該類別時由 ClassLoader 完成。Python 的 import x 是一條敘述：找到 x、執行 x 的全部頂層程式碼、把模組物件綁到名字 x。 本章的範例套件 整章用這個最小但可運作的套件。先把目錄樹放在這裡，後面所有範例都對應它： billing-demo/ ├── pyproject.toml ├── src/ │   └── billing/ │       ├── init.py │       ├── money.py │      "
+  },
+  {
+    "file": "ch11-modules-packages-project-structure.md",
+    "chapterTitle": "第 11 章：模組、套件與專案結構",
+    "sectionTitle": "import 機制：sys.path、sys.modules 與只載入一次",
+    "sectionId": "import-機制syspathsysmodules-與只載入一次",
+    "content": "import billing.money 背後發生三件事： 1. 尋找（find）：直譯器依序問每個「finder」：我能定位 billing 嗎？最常見的 finder 走訪 sys.path 裡的每個目錄找 billing/。 2. 載入（load）：找到後，建立一個 module 物件，從上到下執行該檔的所有頂層程式碼，把產生的名字放進 module 的命名空間。 3. 綁定（bind）：在你目前的命名空間綁定名字。import billing.money 綁的是 billing；from billing import money 綁的是 money。 sys.path 就是 Python 的 classpath。它從哪裡來？ >>> import sys >>> sys.path:3 '', '/usr/lib/python3.14', '/usr/lib/python3.14/lib-dynload' 開頭那個 sys.path0 很關鍵，但它的字面值會因啟動方式而不同：在 REPL、python -c、python -m 時它是空字串 ''（代表「目前工作目錄」，就是上面 REPL 範例看到的）；而你直接 python foo.py 時，它是 foo.py 所在目錄的絕對路徑（例如 /private/tmp），不是 ''。兩者語意相近——都讓你能 import 同目錄下的檔案——但字面不同，別誤以為 '' 跟「腳本目錄」是同一回事。重點是：你直接 python foo.py 時，foo.py 所在的目錄會被加進 sys.path 最前面。這是很多「在我電腦上跑得起來、裝起來卻 import 不到」問題的根源，後面 src layout 會回頭解決它。 模組只載入一次：sys.modules 快取 第一次 import 一個模組，Python 執行它的頂層程式碼，"
+  },
+  {
+    "file": "ch11-modules-packages-project-structure.md",
+    "chapterTitle": "第 11 章：模組、套件與專案結構",
+    "sectionTitle": "`__init__.py`、`__all__` 與相對 vs 絕對匯入",
+    "sectionId": "initpyall-與相對-vs-絕對匯入",
+    "content": "init.py 的角色 init.py 是「這個目錄被 import 為 package 時會執行的檔案」。它做三件事： 1. 標記這個目錄是個傳統 package。 2. 它的頂層程式碼在「package 第一次被 import」時執行——import billing 跑的就是 billing/init.py。 3. 它定義 package 的門面（facade）：把深層模組的東西「拉上來」變成 package 級公開 API。 \"\"\"billing：一個示範用的計費套件。\"\"\" from billing.money import formatmoney, tocents from billing.invoice import Invoice all = \"Invoice\", \"formatmoney\", \"tocents\" version = \"0.1.0\" 這樣使用者能寫 from billing import Invoice，不必知道它其實住在 billing/invoice.py。你可以隨意重構內部模組結構，只要 init.py 的門面不變，下游就不受影響——這跟 Java 用 package-info、或刻意只 public 暴露門面類別、其餘設 package-private 是同一個封裝思維。 all 是一個字串清單，控制兩件事： - from billing import  只會匯入 all 列出的名字。 - 它是給讀者與工具看的「公開 API 宣告」（很多 linter、文件工具拿它當公開介面的依據）。 > 💡 Pythonic 重點：Python 沒有 public/private 關鍵字，封裝靠慣例：底線開頭（helper、InternalThing）表示「內部用，別碰」，工具與同事都會尊重。all 則是 package 層級的「這些是我保證的公開"
+  },
+  {
+    "file": "ch11-modules-packages-project-structure.md",
+    "chapterTitle": "第 11 章：模組、套件與專案結構",
+    "sectionTitle": "`if __name__ == \"__main__\"`：可執行又可被 import",
+    "sectionId": "if-name-main可執行又可被-import",
+    "content": "Java 的進入點是 public static void mainString args，由 JVM 在啟動指定的類別上呼叫。Python 沒有「特殊的 main 方法」，它用一個慣用判斷式： def main -> None: inv = Invoice\"ACME\" inv.addlineDecimal\"19.99\" inv.addlineDecimal\"5.00\" printinv if name == \"main\": main 機制很單純：每個模組都有一個 name 變數。 - 當這個檔案是被直接執行的（python foo.py 或 python -m foo），name 是 \"main\"。 - 當它是被 import 的，name 是它的模組名（例如 \"billing.invoice\"）。 >>> import billing.invoice >>> billing.invoice.name 'billing.invoice' 所以 if name == \"main\": 的意思是「只有當我是被當主程式跑時，才執行這段」。這讓同一個檔案既能被 import（當函式庫）、又能被直接執行（當腳本），而 import 它的人不會意外觸發那段示範/啟動程式碼。 > 🔁 Java 對照：if name == \"main\" ≈ public static void main，但更靈活——任何模組都能有自己的「main」，方便邊寫邊測。對照 Java 你得另開一個 class 或寫 JUnit 才能跑一小段。 python -m 與 main.py python -m billing.invoice 跟 python src/billing/invoice.py 看似一樣，其實天差地別： - python src/billing/invoice.py：把那個檔案當腳本跑，所在"
+  },
+  {
+    "file": "ch11-modules-packages-project-structure.md",
+    "chapterTitle": "第 11 章：模組、套件與專案結構",
+    "sectionTitle": "標準專案結構：src layout",
+    "sectionId": "標準專案結構src-layout",
+    "content": "你已經用過 Maven/Gradle 的 src/main/java、src/test/java。Python 社群現在的共識佈局是 src layout，動機與 Maven 把原始碼跟測試分目錄一樣，但解決的是 Python 特有的一個陰險問題。 billing-demo/ ├── pyproject.toml ├── src/ │   └── billing/ │       ├── init.py │       ├── money.py │       ├── invoice.py │       ├── tax.py │       └── main.py └── tests/ └── testinvoice.py 為什麼 src layout 優於 flat layout 「flat layout」是把 billing/ 直接放在專案根目錄（跟 pyproject.toml、tests/ 同層）。問題出在前面講過的：當前工作目錄會被加進 sys.path。於是你在專案根跑測試時，import billing 抓到的是「目錄裡的原始碼」，而不是「你已經 pip install 進 venv 的那一份套件」。 這聽起來不痛不癢，但它會讓你測到一份根本沒被正確打包的程式碼：假設某個檔案沒被列進打包設定，flat layout 下測試照樣 import 得到（因為它直接讀原始碼目錄），於是測試全綠——使用者裝起來卻 ModuleNotFoundError。 src layout 把 billing/ 藏進 src/。src/ 本身不在 sys.path 上，所以唯一能 import 到 billing 的方式，就是先把它（用 editable install）裝進環境。這強迫你的測試跑在「跟使用者一樣的安裝路徑」上，打包遺漏會立刻在測試階段爆出來。 > 💡 Pytho"
+  },
+  {
+    "file": "ch11-modules-packages-project-structure.md",
+    "chapterTitle": "第 11 章：模組、套件與專案結構",
+    "sectionTitle": "`pyproject.toml`：完整解析與發佈到 PyPI",
+    "sectionId": "pyprojecttoml完整解析與發佈到-pypi",
+    "content": "pyproject.toml 是現代 Python 專案的單一設定檔，地位等同 pom.xml／build.gradle，但用 TOML、且涵蓋「打包 + 工具設定」兩件事。完整看一遍： build-system requires = \"hatchling\" build-backend = \"hatchling.build\" project name = \"billing-demo\" version = \"0.1.0\" description = \"示範用的計費套件\" readme = \"README.md\" requires-python = \">=3.12\" authors = { name = \"Albert Chiu\", email = \"chiu.albert@gmail.com\" } license = \"MIT\" dependencies = \"httpx>=0.27\", project.optional-dependencies dev = \"pytest>=8\", \"mypy>=1.10\" project.scripts billing = \"billing.main:main\" project.urls Homepage = \"https://github.com/albert/billing-demo\" tool.pytest.inioptions testpaths = \"tests\" tool.mypy strict = true tool.hatch.build.targets.wheel packages = \"src/billing\" 幾個 Java 工程師要對齊的觀念： - build-system 宣告「用什麼後端打包」（hatchling、setuptools、flit、pdm…），對照你選 maven-compiler-plugin "
+  },
+  {
+    "file": "ch11-modules-packages-project-structure.md",
+    "chapterTitle": "第 11 章：模組、套件與專案結構",
+    "sectionTitle": "循環匯入：成因與三種解法",
+    "sectionId": "循環匯入成因與三種解法",
+    "content": "兩個模組互相 import，是 Java 工程師最容易低估的雷。在 Java，A 與 B 互相 import 完全沒問題——編譯器一次看到所有符號，循環依賴頂多是「設計味道」。在 Python，import 是執行期、由上而下逐行跑的，循環會讓某個模組「只初始化到一半」就被對方拿去用，於是炸出 ImportError 或 AttributeError。 成因：部分初始化的模組 製造一個循環。invoice.py 想用 report.py 的格式化函式，而 report.py 又想用 invoice.py 的 Invoice： from billing.invoice import Invoice           ← 頂層 import invoice def renderinv: Invoice -> str: return f\"REPORT: {inv}\" from billing.report import render             ← 頂層 import report $ python -m billing ImportError: cannot import name 'Invoice' from partially initialized module 'billing.invoice' most likely due to a circular import 逐步追因：載入 invoice →執行到 from billing.report import render →跳去載入 report →report 頂層執行 from billing.invoice import Invoice →此時 invoice 已在 sys.modules（避免無限遞迴），但它還沒跑到定義 Invoice 那行，命名空間裡還沒有 Invoice →取不到 →Im"
+  },
+  {
+    "file": "ch11-modules-packages-project-structure.md",
+    "chapterTitle": "第 11 章：模組、套件與專案結構",
+    "sectionTitle": "跑起來：測試與執行整個範例",
+    "sectionId": "跑起來測試與執行整個範例",
+    "content": "把測試補上，用 uv run 在隔離環境執行（套件已 editable 裝入）： from decimal import Decimal from billing.invoice import Invoice           因為 editable install，import 抓到的是已安裝套件 def testtotalwithtax -> None: inv = Invoice\"ACME\" inv.addlineDecimal\"19.99\" inv.addlineDecimal\"5.00\" 小計 2499 分；含 5% 稅 → round2499  1.05 = 2624 assert inv.totalcents == 2624 def testtotalwithouttax -> None: inv = Invoice\"ACME\" inv.addlineDecimal\"10.00\" assert inv.totalcentstaxed=False == 1000 $ uv sync --extra dev                       建環境、裝相依、裝 dev extra（pytest/mypy）、editable 裝 billing-demo $ uv run pytest                             在隔離環境跑測試 $ uv run python -m billing                  用模組方式執行套件 InvoiceACME, $26.24 $ uv run billing                            用 project.scripts 的 entry point 指令 InvoiceACME, $26.24 > ⚠️ 陷阱：純 uv sync 不會安裝任何 opt"
+  },
+  {
+    "file": "ch11-modules-packages-project-structure.md",
+    "chapterTitle": "第 11 章：模組、套件與專案結構",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "- module 是 .py、package 是含 init.py 的目錄；import 依 sys.path（≈ classpath）尋找，但 sys.path 可在執行期改，且當前/腳本目錄會被自動加入最前面。 - import 是會跑的敘述：第一次載入時整檔由上而下執行、結果快取在 sys.modules，之後 import 都走快取、不重跑。頂層只放定義，別放重活——副作用只發生一次且時機難料。 - import x 與 from x import y 載入同一模組，差別在你命名空間綁了哪個名字；from 綁進來的名字在 import 當下就定死，是 monkeypatch 的經典陷阱。 - init.py 是 package 的門面：用它＋all 暴露穩定的公開 API，底線開頭與 all 是 Python 沒有 public/private 時的封裝慣例。 - 相對匯入（.module、..pkg）不能用在被直接執行的腳本，因為 name 變 \"main\"、package 為空；改用 python -m pkg.module 執行。 - if name == \"main\" ≈ Java 的 main，讓同一檔案可 import 可執行；python -m 以模組語意執行、main.py 讓整個套件可被 python -m pkg 叫起。 - src layout 優於 flat layout：把套件藏進 src/ 強迫「唯有 editable install 後才 import 得到」，避免測到未正確打包的原始碼；新專案一律用它。 - pyproject.toml 是 Python 的 pom：build-system 選打包後端、project 放座標/相依/scripts、tool. 收工具設定；uv build 產 wheel/sdist、uv publi"
+  },
+  {
+    "file": "ch11-modules-packages-project-structure.md",
+    "chapterTitle": "第 11 章：模組、套件與專案結構",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "練習 1（觀察 sys.modules 快取） 在 tax.py 頂層放一行 print\"loading tax\"，然後在 REPL 連續 import billing.tax 三次。觀察那行只印一次，並用 sys.modules'billing.tax' 取出同一個模組物件、確認三次 import ... as t 拿到的 t is sys.modules'billing.tax' 為 True。提示：模組是進程級單例。 練習 2（修好相對匯入的腳本） 把 invoice.py 的絕對匯入改成相對匯入（from .money import ...），然後分別用 python src/billing/invoice.py 和 python -m billing.invoice 執行，記錄各自的結果與錯誤訊息。解釋為什麼前者報 attempted relative import with no known parent package。 練習 3（製造並修好循環匯入） 依本章 report.py ↔ invoice.py 的例子刻意造一個循環，重現 partially initialized module 錯誤。接著分別用「延後 import 進函式」與「if TYPECHECKING」兩種方式修好，並說明各自的取捨（執行期成本 vs 只能用於純型別場景）。提示：用 from future import annotations。 練習 4（src layout 與 entry point） 依本章目錄樹建立 billing-demo，寫好 pyproject.toml（含 project.scripts 的 billing 入口），跑 uv sync --extra dev（記得 pytest 在 dev extra，純 uv sync 不會裝它）後依序執行 uv run p"
+  },
+  {
+    "file": "ch12-exceptions-and-defensive-programming.md",
+    "chapterTitle": "第 12 章：例外處理與防禦性程式設計",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "身為 Java 工程師，你的編譯器幫你管了一輩子的例外：哪些方法會丟什麼、throws 要宣告什麼、catch 漏了哪個都過不了 javac。Python 把這套全拆了——沒有 checked exception，沒有 throws，編譯器不會逼你接任何東西。第一次轉過來，你會覺得像沒繫安全帶開車。本章要做的，是把你那套「工程紀律」從「編譯器強制」搬到「自律 + 文件 + 工具」上：精準捕捉、fail fast、用 chaining 保留根因、用 logging 取代 print、用 warnings 管棄用。學完你會發現，沒有 checked exception 反而讓你寫出更乾淨的程式碼——前提是你得自己扛起責任。 ---"
+  },
+  {
+    "file": "ch12-exceptions-and-defensive-programming.md",
+    "chapterTitle": "第 12 章：例外處理與防禦性程式設計",
+    "sectionTitle": "例外階層與「沒有 checked exception」",
+    "sectionId": "例外階層與沒有-checked-exception",
+    "content": "沒有 checked exception，這是哲學選擇 先把這件事講清楚，因為它顛覆你最深的直覺。Java 把例外分兩類： Java  範例  編譯器要求 --------- checked exception  IOException、SQLException  必須 catch 或在 throws 宣告，否則編譯失敗 unchecked exception  NullPointerException、IllegalArgumentException（繼承 RuntimeException）  不強制處理 Python 只有一種：全部都是 unchecked。沒有 throws 宣告，沒有任何例外會被編譯器要求你處理。下面這段，呼叫端完全不知道、也不被強制知道 connect 會丟 ConnectionError： def connecthost: str -> Socket: if not reachablehost: raise ConnectionErrorf\"無法連線到 {host}\"    沒人逼呼叫端 catch 它 ... // Java：簽章被例外汙染，呼叫鏈一路往上宣告 throws Socket connectString host throws ConnectionException { ... } 這不是 Python「偷懶」，而是刻意的設計取向。Java 社群自己對 checked exception 的爭議已經吵了二十年——Bruce Eckel、Anders Hejlsberg（C 設計者）都公開反對它，理由是：checked exception 在大型系統不易擴展（scalability）、會逼出 catch Exception e {} 這種吞例外的反模式、也讓介面隨實作細節改變而被迫改簽章。C、Kotlin、Scala 後來都不採用 c"
+  },
+  {
+    "file": "ch12-exceptions-and-defensive-programming.md",
+    "chapterTitle": "第 12 章：例外處理與防禦性程式設計",
+    "sectionTitle": "try / except / else / finally：四個區塊各司其職",
+    "sectionId": "try-except-else-finally四個區塊各司其職",
+    "content": "Java 只有 try / catch / finally。Python 多了一個你沒看過的 else，而且四個區塊的分工比 Java 更講究。 def loaduseruserid: int -> dict: try: raw = db.fetchuserid         1. 可能出錯的「嘗試」 except KeyError: raise UserNotFounduserid     2. 出錯時的處理 else: return parseraw               3. 沒出錯才執行 finally: db.release                    4. 不管怎樣都執行 else：try 沒拋例外才執行 else 是 Java 工程師最該停下來想一下的區塊。它的語意是「try 區塊正常結束（沒拋例外）時才執行」。為什麼不直接把 parseraw 寫進 try？因為這樣能精準界定「哪一行的例外是你要接的」： try: raw = db.fetchuserid return parseraw           如果 parse 內部也丟 KeyError，會被誤接成 UserNotFound！ except KeyError: raise UserNotFounduserid try: raw = db.fetchuserid     只有這行的 KeyError 該被視為「找不到使用者」 except KeyError: raise UserNotFounduserid else: return parseraw           parse 的錯誤會原樣往上拋，不會被誤判 這正是防禦性設計的核心：try 區塊應該只包真正可能拋出你要接的那個例外的程式碼，其餘搬進 else。Java 沒有 else，所以 Java 工程師習慣把後續邏輯也塞"
+  },
+  {
+    "file": "ch12-exceptions-and-defensive-programming.md",
+    "chapterTitle": "第 12 章：例外處理與防禦性程式設計",
+    "sectionTitle": "自訂例外與 exception chaining",
+    "sectionId": "自訂例外與-exception-chaining",
+    "content": "建立專案的例外階層 跟 Java 一樣，你應該為專案定義一個例外階層。慣例是先有一個基底例外，所有自家例外都繼承它，這樣呼叫端可以「一網打盡」自家錯誤，也能精準接某一種： class OrderErrorException: \"\"\"訂單模組所有例外的基底。\"\"\" class OrderNotFoundOrderError: def initself, orderid: int -> None: super.initf\"找不到訂單 {orderid}\" self.orderid = orderid         例外帶足資訊，方便上層程式化處理 class PaymentDeclinedOrderError: def initself, orderid: int, reason: str -> None: super.initf\"訂單 {orderid} 付款被拒：{reason}\" self.orderid = orderid self.reason = reason // Java：概念完全一致 class OrderException extends RuntimeException { ... } class OrderNotFoundException extends OrderException { ... } 用起來，呼叫端可選擇接基底（管它哪種）或具體類別： try: placeorderreq except PaymentDeclined as e: notifyusere.reason       程式化讀 e.reason，不是 parse 錯誤字串 except OrderError as e: logger.error\"訂單處理失敗: %s\", e > 💡 Pythonic 重點：例外要帶足資訊。別只 raise OrderError\"失敗\"，把"
+  },
+  {
+    "file": "ch12-exceptions-and-defensive-programming.md",
+    "chapterTitle": "第 12 章：例外處理與防禦性程式設計",
+    "sectionTitle": "logging：千萬別用 print",
+    "sectionId": "logging千萬別用-print",
+    "content": "print 除錯是 Python 新手的通病，對你這種寫過 Java 的人來說，這等於在 production code 裡用 System.out.println——不可接受。Python 的 logging 模組就是它的 SLF4J/Logback，概念幾乎一對一對應。 logger 階層、level、handler、formatter Java（SLF4J/Logback）  Python（logging）  說明 --------- LoggerFactory.getLoggerFoo.class  logging.getLoggername  取得具名 logger Logger 名稱用 . 分層  同樣用 . 分層  a.b.c 的 parent 是 a.b Appender  Handler  決定輸出到哪（console/file/...） PatternLayout  Formatter  決定輸出格式 Level（TRACE..ERROR）  Level（DEBUG..CRITICAL）  過濾門檻 logback.xml  dictConfig / basicConfig  設定 logger 是樹狀階層，用名稱的點號分層，跟 Java 一模一樣。慣例是每個模組頂部寫： import logging logger = logging.getLoggername    模組是 myapp.service 時，logger 名就是 myapp.service >>> import logging >>> logging.getLogger\"myapp\"           先讓中介 logger 存在 <Logger myapp WARNING> >>> child = logging.getLogger\"myapp.parser\" >>> child.p"
+  },
+  {
+    "file": "ch12-exceptions-and-defensive-programming.md",
+    "chapterTitle": "第 12 章：例外處理與防禦性程式設計",
+    "sectionTitle": "warnings 與棄用策略",
+    "sectionId": "warnings-與棄用策略",
+    "content": "最後一塊是 warnings，對應 Java 的 @Deprecated。先釐清它跟 logging 的分工，這是 Java 工程師常混淆的點： warnings  logging --------- 對象  開發者（用你 API 的人）  維運者 / 你自己 典型用途  API 棄用、語意可疑的用法  執行期事件、錯誤、追蹤 預設行為  同一處只印一次、可被過濾、可轉成錯誤  依 level 輸出 控制  -W 旗標 / warnings.filterwarnings  log level / handler 用 warnings.warn 標記棄用 棄用一個 API 時，用 DeprecationWarning： import warnings def oldapi -> int: warnings.warn \"oldapi 已棄用，將於 2.0 移除，請改用 newapi\", DeprecationWarning, stacklevel=2,         關鍵：見下方說明 return newapi >>> import warnings >>> warnings.simplefilter\"always\"      預設 DeprecationWarning 在某些情境會被靜音，這裡強制顯示 >>> oldapi <stdin>:1: DeprecationWarning: oldapi 已棄用，將於 2.0 移除，請改用 newapi 42 // Java：靠註解 + javadoc，編譯期由 IDE/javac 提示 @Deprecated public int oldApi { ... } 差別很關鍵：Java 的 @Deprecated 是編譯期提示（IDE 畫刪除線、-Xlint:deprecation 警告）；Python 的 DeprecationW"
+  },
+  {
+    "file": "ch12-exceptions-and-defensive-programming.md",
+    "chapterTitle": "第 12 章：例外處理與防禦性程式設計",
+    "sectionTitle": "防禦性設計：把紀律從編譯器搬到自己身上",
+    "sectionId": "防禦性設計把紀律從編譯器搬到自己身上",
+    "content": "收束本章，把散落的原則整理成你日常該守的幾條鐵律： 1. 精準捕捉，別裸 except:。接你打算處理、也知道怎麼處理的那個例外。接不該接的等於把 bug 藏起來。 python ❌ 把所有錯誤（連程式 bug）都當成「設定錯誤」吞掉 try: cfg = loadconfigpath except Exception: cfg = DEFAULTCONFIG ✅ 只接真正預期的那個 try: cfg = loadconfigpath except FileNotFoundError: cfg = DEFAULTCONFIG           檔案不存在用預設，合理 其他錯誤（解析失敗、權限不足）原樣往上拋——那是真 bug，該炸 2. fail fast。輸入不合法就在邊界立刻 raise，別讓壞資料滲進系統深處才爆，那時 traceback 早就離現場十萬八千里。這跟 Java 的 Objects.requireNonNull / 參數驗證同理。 3. 例外帶足資訊。把 orderid、path、reason 存成屬性，讓上層能程式化處理，而不是去 parse 錯誤字串。 4. 用 chaining 保留根因。轉換例外時 raise HighLevelError... from lowlevel，除非根因真是無關細節才 from None。 5. except 內用 logger.exception，永遠保留 traceback。 6. 不要吞例外。except SomeError: pass 是高風險動作，至少要 log。真的要靜默忽略，用 contextlib.suppress 明確表達意圖： python import contextlib with contextlib.suppressFileNotFoundError: os.removetmppath  "
+  },
+  {
+    "file": "ch12-exceptions-and-defensive-programming.md",
+    "chapterTitle": "第 12 章：例外處理與防禦性程式設計",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "- Python 沒有 checked exception，全部例外都是 unchecked，沒有 throws。這是刻意的設計選擇，呼應 EAFP 哲學與「靠文件/型別而非編譯器強制」的一貫立場。 - 例外根是 BaseException；SystemExit、KeyboardInterrupt 故意不在 Exception 之下，所以 except Exception: 安全地不誤接 Ctrl-C。永遠別用裸 except: 或 except BaseException:。 - try/except/else/finally 四區塊：else 是 Java 沒有的，用它把「不該被這個 except 接的程式碼」移出 try，讓捕捉範圍精準。 - 多個 except 子類在前父類在後；except A, B 接多種；3.11 的 ExceptionGroup + except 處理「同時多個例外」（asyncio TaskGroup 的失敗形態）。 - 為專案建立繼承 Exception 的例外階層；轉換例外時用 raise New... from original 保留根因（cause），無關細節才 from None（context 是預設的隱式鏈結）。 - 用 logging 不用 print：logging.getLoggername、%s 占位符、except 內用 logger.exception。函式庫絕不動 root logger，加 NullHandler 即可，輸出由應用程式決定。 - 棄用 API 用 warnings.warn..., DeprecationWarning, stacklevel=2（對應 @Deprecated，但執行期觸發、可被 CI 轉成錯誤）；stacklevel=2 讓警告指向呼叫處而非函式庫內部。 - 防禦性設計鐵律：精"
+  },
+  {
+    "file": "ch12-exceptions-and-defensive-programming.md",
+    "chapterTitle": "第 12 章：例外處理與防禦性程式設計",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "1. 戒掉裸 except：下面這段把所有錯誤都當「使用者不存在」。請改寫成只接真正代表「找不到」的例外，其餘原樣往上拋，並用 raise ... from ... 保留根因。 python def getuseruid: try: row = db.query\"SELECT  FROM users WHERE id=?\", uid return Userrow except Exception: raise UserNotFounduid 提示：先想清楚「找不到」對應哪個底層例外（可能是 KeyError 或自訂的 NoRowsError），其餘（連線斷、SQL 語法錯）不該被偽裝成 UserNotFound。 2. 用 else 收斂 try：把一段「try 裡塞了 fetch + parse + return 三件事、只想接 fetch 的 TimeoutError」的程式碼，重構成 try（只放 fetch）/ except TimeoutError / else（放 parse + return）三段式，確保 parse 的錯誤不會被誤接。 3. 建立例外階層：為一個 payment 模組設計例外階層：基底 PaymentError，子類 CardDeclined（帶 cardlast4 與 reason 屬性）、InsufficientFunds（帶 shortfall 金額）。寫一個 charge 函式在內部把第三方 SDK 丟的 SdkError 轉成你的例外（用 from），並寫呼叫端示範「接基底一網打盡」與「接具體類別讀屬性」兩種用法。 4. logging 取代 print：把任一個你用 print 除錯的小腳本改成 logging：模組頂部 logger = logging.getLoggername，main 裡 basicConfig，把錯誤處的"
+  },
+  {
+    "file": "ch13-testing.md",
+    "chapterTitle": "第 13 章：測試",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "測試你不陌生——JUnit、Mockito、Hamcrest、覆蓋率報表，這套工程紀律你早就內化了。但 Python 的測試文化會顛覆兩個直覺：第一，主流框架 pytest 用裸 assert，沒有 assertEquals/assertThat 那一大家子斷言方法，卻能給你比 JUnit 更漂亮的失敗訊息；第二，依賴注入不靠註解與容器，而靠一個叫 fixture 的函式機制，外加一個讓「測試案例本身變參數」的 parametrize。這一章把你的 JUnit/Mockito 經驗平移過來，再補上 Python 特有的兩件利器：property-based testing（hypothesis） 與 docstring 即測試（doctest）。 ---"
+  },
+  {
+    "file": "ch13-testing.md",
+    "chapterTitle": "第 13 章：測試",
+    "sectionTitle": "pytest 基礎：對照 JUnit 5",
+    "sectionId": "pytest-基礎對照-junit-5",
+    "content": "Python 標準庫內建 unittest（PyUnit），它是 JUnit 的直系後裔——class TestXunittest.TestCase、self.assertEqual...、setUp/tearDown，連 camelCase 都照抄。但 Python 社群的事實標準是第三方的 pytest，因為它把 JUnit 風格的冗長一掃而空。我們直接學 pytest。 測試的長相：函式，不是方法 JUnit 5 裡測試是類別中的方法： class PricingTest { @Test void subtotalSumsItems { int result = Pricing.subtotalitems; Assertions.assertEquals18000, result; } } pytest 的測試是模組層級的普通函式，靠命名慣例被發現——檔名 test.py（或 test.py）、函式 test，不需要任何註解： from pricing import subtotal def testsubtotalsumsitems: result = subtotalitems assert result == 18000           就是 Python 內建的 assert，沒有 assertEquals 沒有 @Test、沒有繼承 TestCase、沒有 public。pytest 掃描檔案、找到 test 開頭的函式就當測試跑。你也可以把測試放進 class TestPricing: 裡（純粹為了分組，類別名要 Test 開頭、且不能有 init），但多數 Python 專案連類別都省了。 > 🔁 Java 對照：JUnit 用 @Test 註解標記測試；pytest 用「test 命名慣例」收集測試。慣例優於設定，這是貫穿 Python 工具鏈的"
+  },
+  {
+    "file": "ch13-testing.md",
+    "chapterTitle": "第 13 章：測試",
+    "sectionTitle": "fixture：依賴注入，但更輕",
+    "sectionId": "fixture依賴注入但更輕",
+    "content": "JUnit 5 用 @BeforeEach/@AfterEach 準備與清理、用 extension（如 @ExtendWith）或建構子注入相依。pytest 把這些統一成一個機制：fixture。 基本款：fixture 是「會被注入的函式」 宣告一個 @pytest.fixture，它的回傳值會被注入到任何「參數名稱跟它同名」的測試裡： import pytest from pricing import Item, subtotal @pytest.fixture def cart -> listItem: return Item\"apple\", price=3000, qty=2, Item\"book\", price=12000, qty=1, def testsubtotalcart: listItem -> None:    參數名 cart 對上 fixture cart assert subtotalcart == 18000 pytest 看到 testsubtotal 有個參數叫 cart，就去找名為 cart 的 fixture、呼叫它、把結果餵進來。這是按名稱的依賴注入——像 Spring 的 @Autowired 加上 by-name 解析，但完全不需要容器或註解掃描，靠的是函式參數名。 > 🔁 Java 對照：@BeforeEach 建立的物件你存進欄位、測試方法讀欄位；fixture 則是把那個物件當參數注入。fixture 比 @BeforeEach 更模組化——每個測試只「點名」自己要的 fixture，不會被一個共用的 setup 塞一堆用不到的東西。 setup/teardown：yield fixture 要做清理（關連線、刪暫存檔），用 yield 把 fixture 拆成「之前」與「之後」兩半。yield 前是 setup、yi"
+  },
+  {
+    "file": "ch13-testing.md",
+    "chapterTitle": "第 13 章：測試",
+    "sectionTitle": "參數化與 marker",
+    "sectionId": "參數化與-marker",
+    "content": "parametrize：一份邏輯，多組資料 JUnit 5 的 @ParameterizedTest + @CsvSource 你用過。pytest 的 @pytest.mark.parametrize 是同一個概念，但更輕、更 Python： @pytest.mark.parametrize \"amount, percent, expected\", 10000, 0, 10000, 10000, 10, 9000, 10000, 100, 0, 9999, 10, 9000,        整數除法：9999  10 // 100 = 999，所以 9999 - 999 = 9000 , def testapplydiscountamount, percent, expected: assert applydiscountamount, percent == expected 每一組 tuple 會展開成一個獨立的測試案例——上面這個就是 4 個測試，任何一組失敗，其他照跑、報表也會精準指出是哪一組（pytest 會把參數值印進測試 ID，像 testapplydiscount9999-10-9000）。對照 JUnit： @ParameterizedTest @CsvSource{\"10000, 0, 10000\", \"10000, 10, 9000\", \"10000, 100, 0\"} void testApplyDiscountint amount, int percent, int expected { assertEqualsexpected, Pricing.applyDiscountamount, percent; } 差別在 Python 的版本直接傳 Python 物件（不是 CSV 字串再解析），所以你能塞 list、dict、自訂物件當參數，型別也不"
+  },
+  {
+    "file": "ch13-testing.md",
+    "chapterTitle": "第 13 章：測試",
+    "sectionTitle": "unittest.mock：對照 Mockito",
+    "sectionId": "unittestmock對照-mockito",
+    "content": "標準庫的 unittest.mock（不需第三方）就是 Python 的 Mockito。核心是 MagicMock 與 patch。 MagicMock：自動長出任何屬性的替身 MagicMock 對照 Mockito 的 mockSomeClass.class，但更激進——它自動回應任何屬性存取與方法呼叫，回傳的還是 MagicMock： >>> from unittest.mock import MagicMock >>> m = MagicMock >>> m.anything.you.access             沒定義也不報錯，自動生出一個子 mock <MagicMock name='mock.anything.you.access' id='...'> >>> m.anymethod1, 2                任何方法都能呼叫 <MagicMock name='mock.anymethod' id='...'> 設定回傳值用 returnvalue（對應 Mockito when....thenReturn...）、設定多次呼叫的不同回傳或丟例外用 sideeffect： repo = MagicMock repo.finduser.returnvalue = {\"id\": 1, \"name\": \"Albert\"}    whenrepo.findUserany.thenReturn... user = repo.finduser1 assert user\"name\" == \"Albert\" repo.finduser.assertcalledoncewith1      verifyrepo.findUser1 Mockito  unittest.mock  說明 --------- mockRepo.class  MagicMock "
+  },
+  {
+    "file": "ch13-testing.md",
+    "chapterTitle": "第 13 章：測試",
+    "sectionTitle": "coverage、hypothesis、doctest、tox/nox",
+    "sectionId": "coveragehypothesisdoctesttoxnox",
+    "content": "coverage.py：覆蓋率與它的侷限 對照 JaCoCo。透過 pytest-cov 外掛整合進 pytest： uv run --with pytest --with pytest-cov pytest --cov=pricing --cov-report=term-missing 以下為示意輸出，實際的 Stmts 行數與覆蓋率會依你自己的 pricing.py 而定： Name         Stmts   Miss  Cover   Missing ------------------------------------------ pricing.py      12      0   100% ------------------------------------------ TOTAL           12      0   100% --cov-report=term-missing 會列出沒被覆蓋的行號（Missing 欄），這是它最有用的地方——直接告訴你哪幾行從沒被執行。也能輸出 html（互動報表）或 xml（餵給 CI/SonarQube）。在 pyproject.toml 設門檻： tool.coverage.report failunder = 85           覆蓋率低於 85% 就讓 build 失敗 showmissing = true > ⚠️ 陷阱：高覆蓋率 ≠ 測得好。覆蓋率只證明那行「被執行過」，不證明它「被驗證過」。一個沒有任何 assert、只是把所有函式呼叫一遍的測試也能拿 100%——這在 Java/JaCoCo 也一樣。把覆蓋率當「找出完全沒被測到的程式碼」的工具（那是真訊號），別把它當「測試品質」的指標。語句覆蓋（statement）尤其寬鬆，分支覆蓋（branch，--cov-branch）嚴一點"
+  },
+  {
+    "file": "ch13-testing.md",
+    "chapterTitle": "第 13 章：測試",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "1. pytest 用函式 + 命名慣例 + 裸 assert：test.py 裡的 test 函式自動被收集，無 @Test、無 TestCase。assert rewriting 讓裸 assert a == b 也有豐富 diff，所以不需要 assertEquals 那套 API。 2. fixture 是按名稱注入的依賴：宣告 @pytest.fixture，測試用同名參數「點名」即可注入。yield 版把 setup/teardown 寫在一起（yield 後一定執行）；scope 控制建立頻率，但共享 scope 小心狀態污染。 3. conftest.py 與內建 fixture 省你造輪子：tmppath、capsys、monkeypatch 直接要就有；conftest.py 按目錄階層共享 fixture、免 import。 4. parametrize 把資料展開成多個獨立案例，傳的是 Python 物件而非 CSV；marker 貼標籤（skip/skipif/xfail、自訂 marker + -m 過濾）；pytest.raises 測例外、match= 用 regex。 5. unittest.mock = Python 版 Mockito：MagicMock 自動長屬性、returnvalue/sideeffect 設行為、assertcalledoncewith 驗證。 6. where to patch 是 mock 的命門：patch「名稱被查找的地方」而非「定義處」——from x import f → patch 被測模組.f；import x 用 x.f → patch x.f。搞錯就 mock 不生效。 7. 覆蓋率是「找沒測到的碼」的工具，不是品質指標——高覆蓋率不代表斷言充分。 8. hypothesis（property"
+  },
+  {
+    "file": "ch13-testing.md",
+    "chapterTitle": "第 13 章：測試",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "練習 1（JUnit → pytest 平移） 把這段 JUnit 風格的測試改寫成 pytest：一個 @BeforeEach 建立空 ShoppingCart、兩個測試方法（加一個商品後 size 為 1、加重複商品後 quantity 累加）。要求用 fixture 取代 @BeforeEach、用裸 assert。提示：fixture 回傳那個 cart，兩個測試函式都把它當參數。 練習 2（parametrize + raises） 為 applydiscountamount, percent 寫一條 parametrize 測試，涵蓋 percent 為 0、50、100 三組正常值，再寫一條獨立測試用 pytest.raisesValueError, match=... 驗證 percent=-1 與 percent=101 都會被拒絕。觀察失敗時 pytest 報的測試 ID 長什麼樣。 練習 3（where to patch） 寫一個 weather.py，裡面 from httpclient import getjson 並用它實作 currenttempcity。寫測試把 getjson mock 掉、回傳假資料，斷言 currenttemp 算出正確結果。先故意 patch \"httpclient.getjson\"（定義處）跑一次、看它為什麼攔不到，再改成 patch \"weather.getjson\"（使用處）。用一句話解釋差異。 練習 4（property-based：抓真 bug） 寫一個 parseduration\"1h30m\" -> int（回傳總秒數）與反向的 formatdurationseconds -> str，故意在某個邊界留 bug（例如剛好 0 秒或超過 60 分鐘）。用 hypothesis 寫 round-trip 性質 "
+  },
+  {
+    "file": "ch14-concurrency-and-async.md",
+    "chapterTitle": "第 14 章：並行與非同步（Concurrency & Async）",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "這是全書與 Java 直覺差距最大的一章。你在 Java 裡建立的核心信念——「開幾條 thread 就吃幾顆核」「java.util.concurrent 是萬用工具箱」「並行 = 平行」——到了 CPython 全部要打上問號。原因只有一個名字：GIL（Global Interpreter Lock，全域直譯器鎖）。它不會讓你不能用多執行緒，但會徹底改變「什麼時候該用哪種並行模型」的決策。讀完這章，你要能在面對一個任務時，三秒內判斷它是 I/O bound 還是 CPU bound，然後選對 threading、multiprocessing、還是 asyncio——而不是反射性地 new Thread。 ---"
+  },
+  {
+    "file": "ch14-concurrency-and-async.md",
+    "chapterTitle": "第 14 章：並行與非同步（Concurrency & Async）",
+    "sectionTitle": "GIL：理解 CPython 並行的第一原理",
+    "sectionId": "gil理解-cpython-並行的第一原理",
+    "content": "Java 的並行心智模型 在 JVM 上，thread 是「真的」作業系統執行緒，可以同時在多顆核心上跑 Java bytecode。你寫一個 CPU 密集的計算，丟給四條 thread，在四核機器上大約能快四倍（理想狀況）。synchronized、volatile、java.util.concurrent 這整套工具，存在的目的就是協調這些真正同時執行的執行緒。 // Java：四條 thread 真的同時跑，CPU bound 也能平行加速 ExecutorService pool = Executors.newFixedThreadPool4; List<Future<Long>> futures = new ArrayList<>; for int i = 0; i < 4; i++ { futures.addpool.submit -> heavyCompute;  // 四顆核同時算 } CPython 的真相 CPython 有一把全域鎖：同一時刻，只有一個 thread 能執行 Python bytecode。threading.Thread 開出來的確實是真正的 OS thread，但它們必須輪流持有 GIL 才能執行直譯器。所以對純 CPU 的 Python 計算，多開 thread 不會變快——它們在搶同一把鎖。 實測勝過千言萬語。下面四份等量的 CPU 工作，序列跑與用四條 thread 跑，時間幾乎一樣（在 Python 3.14、10 核機器上實測）。註解裡的秒數是某次實測的約略值，實際數字依機器而異，重點看的是兩者的相對比例，不是絕對秒數： import time from concurrent.futures import ThreadPoolExecutor def cpuworkn: int -> int: return sumi  i"
+  },
+  {
+    "file": "ch14-concurrency-and-async.md",
+    "chapterTitle": "第 14 章：並行與非同步（Concurrency & Async）",
+    "sectionTitle": "threading：I/O bound 的主力",
+    "sectionId": "threadingio-bound-的主力",
+    "content": "threading 模組的 API 跟 java.util.concurrent 高度對應，你會很快上手。重點在於用對場景（I/O bound），而不是 API 本身。 你要做的事  Java  Python --------- 建立並啟動執行緒  new Threadr.start  threading.Threadtarget=f.start 等待結束  t.join  t.join 互斥鎖  synchronized / ReentrantLock  threading.Lock（搭配 with） 條件等待/通知  wait / notify  threading.Condition / Event 執行緒安全佇列  BlockingQueue  queue.Queue 原子操作  AtomicInteger  （無直接對應，用 Lock） Thread 與 Lock import threading class BankAccount: def initself, balance: int = 0 -> None: self.balance = balance self.lock = threading.Lock def depositself, amount: int -> None: with self.lock:            等同 Java 的 synchronized 區塊 self.balance += amount @property def balanceself -> int: return self.balance with self.lock 就是 Java 的 synchronized lock { ... }：進入時取得鎖，離開（含例外）時自動釋放。這是 context manager（詳見第 12 章）的典型用途。 Queue：執"
+  },
+  {
+    "file": "ch14-concurrency-and-async.md",
+    "chapterTitle": "第 14 章：並行與非同步（Concurrency & Async）",
+    "sectionTitle": "multiprocessing：CPU bound 的解法",
+    "sectionId": "multiprocessingcpu-bound-的解法",
+    "content": "既然 GIL 卡死了多 thread 的 CPU 平行，怎麼真的吃滿多核？答案是多進程（multiprocessing）：開多個獨立的 Python 進程，每個進程有自己的直譯器、自己的 GIL，於是它們能真正同時在不同核心上跑。這是 Java 工程師最陌生的一招——在 JVM 上你幾乎不會為了 CPU 平行而開多進程。 代價有三個，都要記住： 1. 跨進程要序列化：進程間不共享記憶體，傳參數與回傳值都要用 pickle 序列化再傳。不可 pickle 的東西（lambda、開啟的檔案、某些閉包）傳不過去。 2. 啟動成本高：開一個進程比開一條 thread 貴得多，資料量小的工作可能得不償失。 3. 需要 name 守衛：在預設使用 spawn 的平台（macOS、Windows）上，子進程會重新 import 你的主模組，沒有 if name == \"main\": 保護就會無限遞迴開進程（承接第 11 章的模組執行模型）。 import time from concurrent.futures import ProcessPoolExecutor def cpuworkn: int -> int: return sumi  i for i in rangen N = 5000000 if name == \"main\":           ← 多進程的必備守衛，別省略 t0 = time.perfcounter with ProcessPoolExecutormaxworkers=4 as ex: listex.mapcpuwork, N  4 printf\"procs: {time.perfcounter - t0:.3f}s\" 對前面那份 CPU 工作，多進程版本能真正分散到多核（雖然啟動與 pickle 成本讓它對小工作不見得划算，工作越重、攤平成本後加速越明顯）"
+  },
+  {
+    "file": "ch14-concurrency-and-async.md",
+    "chapterTitle": "第 14 章：並行與非同步（Concurrency & Async）",
+    "sectionTitle": "concurrent.futures：你該優先用的那一層",
+    "sectionId": "concurrentfutures你該優先用的那一層",
+    "content": "concurrent.futures 提供統一的高階介面，把「執行緒池」和「進程池」包成同一組 API。它直接對應 Java 的 ExecutorService / Future，而且換並行模型只要換一個類別名稱——這是它最大的價值。 Java  Python ------ ExecutorService  Executor（ThreadPoolExecutor / ProcessPoolExecutor） pool.submittask  executor.submitfn, args Future<T>  concurrent.futures.Future future.get  future.result invokeAll...  executor.mapfn, iterable CompletableFuture 組合  ascompleted... / wait... 下面這個範例會發出真實網路請求，需連網才能執行；印出的位元組數依當下各網站的內容而定，每次跑不見得一樣： from concurrent.futures import ThreadPoolExecutor, ascompleted import urllib.request URLS = \"https://example.com\", \"https://www.python.org\", \"https://docs.python.org\" def fetchurl: str -> tuplestr, int: with urllib.request.urlopenurl, timeout=10 as resp: return url, lenresp.read with ThreadPoolExecutormaxworkers=8 as ex: submit：拿到 Future，之後再收結果（對照 C"
+  },
+  {
+    "file": "ch14-concurrency-and-async.md",
+    "chapterTitle": "第 14 章：並行與非同步（Concurrency & Async）",
+    "sectionTitle": "asyncio：單執行緒的協作式並行",
+    "sectionId": "asyncio單執行緒的協作式並行",
+    "content": "threading 用作業系統的搶佔式排程（preemptive scheduling）跑大量 I/O；asyncio 給你另一條路——單一執行緒、單一 GIL，靠協作式排程（cooperative scheduling）在一條 thread 裡並發處理上萬個 I/O。沒有 thread 切換成本、沒有鎖、記憶體佔用極省。代價是：你要把程式碼改寫成 async/await 的形式。 核心三件套：async def / await / event loop import asyncio async def fetchname: str, delay: float -> str:    協程函式（coroutine function） printf\"start {name}\" await asyncio.sleepdelay                       在等待點交出控制權 printf\"done {name}\" return name async def main -> None: gather：併發跑多個協程，全部完成後一起回傳（對照 CompletableFuture.allOf） results = await asyncio.gather fetch\"a\", 0.3, fetch\"b\", 0.3, fetch\"c\", 0.3, printresults             'a', 'b', 'c' asyncio.runmain            啟動 event loop，跑到 main 結束 執行結果是三個 start 先一起印出來，等 0.3 秒後三個 done 才出現——總耗時約 0.3 秒而非 0.9 秒。它們並發執行：在 await asyncio.sleep 的等待點，協程把控制權交還給 event loop（事件迴圈），loop"
+  },
+  {
+    "file": "ch14-concurrency-and-async.md",
+    "chapterTitle": "第 14 章：並行與非同步（Concurrency & Async）",
+    "sectionTitle": "決策樹：到底該用哪一個",
+    "sectionId": "決策樹到底該用哪一個",
+    "content": "把整章濃縮成一張可以貼在螢幕旁的表： 工作性質  規模  選擇  為什麼 ------------ I/O bound  少量～中等並發  ThreadPoolExecutor（concurrent.futures）  最簡單，等待時釋放 GIL，免改寫程式碼 I/O bound  大量、高併發（上千連線）  asyncio  單執行緒省記憶體與切換成本，為海量 I/O 而生 CPU bound  任意  ProcessPoolExecutor / multiprocessing  多進程各自有 GIL，真正吃多核 CPU bound（數值）  任意  numpy / C 擴充  熱點在 C，計算時釋放 GIL，常比多進程更省事 混合（async 流程中有阻塞/CPU 段）  —  asyncio + tothread / runinexecutor  把阻塞/CPU 部分卸載到池子，不卡 loop 判斷流程，三個問題： 1. 是 CPU bound 還是 I/O bound？（在等東西還是在算東西？） - CPU bound → 走多進程（ProcessPoolExecutor），或交給 numpy/C 擴充。到此結束，別碰 threading/asyncio。 2. I/O bound，那並發量多大？ - 少量～中等（幾十、上百）→ ThreadPoolExecutor，最省腦。 - 海量（上千、需要極致效率的網路服務）→ asyncio。 3. 已經在 asyncio 裡，但需要跑阻塞/CPU 的東西？ - 用 asyncio.tothread（阻塞 I/O）或 loop.runinexecutorProcessPoolExecutor, ...（CPU）卸載出去。 > 🔁 Java 對照：在 Java 你大致只需要「丟給 ExecutorService」一招打天下"
+  },
+  {
+    "file": "ch14-concurrency-and-async.md",
+    "chapterTitle": "第 14 章：並行與非同步（Concurrency & Async）",
+    "sectionTitle": "free-threading（no-GIL）的現況",
+    "sectionId": "free-threadingno-gil的現況",
+    "content": "最後談談未來。GIL 不是不可動搖的——PEP 703 開啟了「自由執行緒（free-threading）」build，目標是讓 CPython 可以在編譯時關掉 GIL，讓多 thread 真正 CPU 平行，往 Java 的模型收斂。 狀態（截至本書撰寫，請以你的版本為準）： - Python 3.13 首次提供實驗性的 free-threaded build（俗稱 3.13t），需要特別編譯、預設不啟用。 - Python 3.14 起 free-threaded build 進入官方支援階段（不再標記為實驗性）——依 PEP 779，free-threaded build 自 3.14 起轉為官方支援的第二階段（Phase II）；但仍非預設，生態系（C 擴充、第三方套件）對它的支援還在補齊中。 - 你日常下載的標準 CPython 預設仍帶 GIL。要關掉得用 free-threaded build，並可能付出單執行緒效能的代價。 怎麼確認自己手上的直譯器？ >>> import sys >>> sys.version '3.14.4 main, Apr  7 2026, 13:13:20 Clang 21.0.0 clang-2100.0.123.102' >>> sys.isgilenabled         3.13+ 才有這個函式 True                              True = GIL 還在；free-threaded build 會是 False 也可以從建置設定看： >>> import sysconfig >>> sysconfig.getconfigvar\"PyGILDISABLED\" 0                                 0 = 一般 build；1 = free-threaded"
+  },
+  {
+    "file": "ch14-concurrency-and-async.md",
+    "chapterTitle": "第 14 章：並行與非同步（Concurrency & Async）",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "- GIL 不等於「不能用多執行緒」。它讓同一時刻只有一個 thread 執行 Python bytecode，所以多 thread 對 CPU bound 無法平行加速；但 I/O 等待時 GIL 會釋放，故 threading 對 I/O bound 仍然有效。 - GIL 保護的是直譯器內部狀態，不是你的程式。counter += 1 這種 read-modify-write 在多 thread 下照樣 race，該加鎖就加鎖——別丟掉 Java 帶來的鎖直覺。 - CPU bound 走多進程：每個進程有自己的直譯器與 GIL，能真正吃多核，代價是 pickle 序列化、啟動成本、以及必備的 if name == \"main\": 守衛。數值運算優先考慮交給釋放 GIL 的 numpy/C 擴充。 - 優先用 concurrent.futures：ThreadPoolExecutor / ProcessPoolExecutor 是你熟悉的 ExecutorService，例外會在 .result 重新拋出，I/O↔CPU 一鍵切換，不要手刻 Thread/Process。 - asyncio 是單執行緒協作式並行，為海量並發 I/O 而生。async/await 顯式讓出控制權；注意「函式著色」會往上傳染，且 async ≠ 平行，CPU bound 與阻塞呼叫絕不能塞進 event loop。 - 與 Java 21 virtual threads 的根本差異：asyncio 是顯式 await、有函式著色；virtual threads 是隱式、寫成阻塞同步碼、無著色。Python 目前沒有等價物。 - 決策樹：CPU bound → 多進程/numpy；I/O 少量 → ThreadPoolExecutor；I/O 海量 → asyncio。先分類工作（I/O "
+  },
+  {
+    "file": "ch14-concurrency-and-async.md",
+    "chapterTitle": "第 14 章：並行與非同步（Concurrency & Async）",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "1. 分類與選型：給定四個任務——a 同時下載 2000 個網頁、b 對一張大圖做像素級濾鏡運算、c 同時查詢 8 個資料庫並彙整、d 計算一個 50 位數的質因數分解——分別判斷 I/O bound 還是 CPU bound，並從決策樹選出工具。提示：先問「在等還是在算」，CPU bound 別選 threading/asyncio。 2. 證明 GIL：寫一段程式，對同一份純 Python 的 CPU 工作分別用「序列」「4 條 thread」「4 個 process」計時，印出三者耗時。觀察 thread 版為何沒比序列快、process 版為何能快。提示：用 concurrent.futures 的兩種 Executor 切換，process 版記得加 main 守衛。 3. 抓 race condition：把本章 counter += 1 的例子拿掉 with lock，跑 10 次看最終數字是否每次都不同、且小於預期。然後改用 queue.Queue 收集各 thread 的結果、最後在主執行緒加總，做到完全不需要鎖。提示：用 Queue 傳資料取代共享可變狀態，是並行最不易出錯的模式。 4. 同步轉 async：把一段用 ThreadPoolExecutor + 同步 urllib 抓多個 URL 的程式，改寫成 asyncio + httpx（async client）版本，用 TaskGroup 併發、用 except 處理可能的 ExceptionGroup。可用 uv run --with httpx python yourscript.py 執行。提示：注意「函式著色」會讓 fetch 與 main 都得是 async def。 5. 別卡住 event loop：寫一個 asyncio 程式，故意在某個協程裡呼叫 time.sleep2（阻塞），"
+  },
+  {
+    "file": "ch15-files-io-stdlib.md",
+    "chapterTitle": "第 15 章：檔案、I/O 與標準函式庫巡禮",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "身為 Java 工程師，你習慣「任何稍微像樣的事都要拉一個函式庫」：日期要 java.time 或更早是 Joda、JSON 要 Jackson、CSV 要 Apache Commons、HTTP client 要 OkHttp。Python 的世界觀不太一樣——它的標準函式庫信奉「內建電池」（batteries included），檔案、JSON、CSV、SQLite、日期時區、正規表示式、子行程、CLI 解析全都在標準庫裡，pip install 一個都不用。這一章是一趟標準庫巡禮，目標是讓你在「想寫一段 shell script 或拉一個小工具」時，第一反應是「Python 標準庫就有」，而不是 npm/Maven 找輪子。 ---"
+  },
+  {
+    "file": "ch15-files-io-stdlib.md",
+    "chapterTitle": "第 15 章：檔案、I/O 與標準函式庫巡禮",
+    "sectionTitle": "pathlib：物件式的路徑，告別字串拼接",
+    "sectionId": "pathlib物件式的路徑告別字串拼接",
+    "content": "Java 的 java.nio.file.Path / Files 已經把「路徑是物件、檔案操作是靜態方法」這套教會你了。Python 的舊世界是 os.path——一堆吃字串、回字串的函式（os.path.join、os.path.exists、os.path.splitext），你得自己拼字串、自己記哪個函式做什麼。現代 Python（3.4+，到 3.12 已非常成熟）用 pathlib.Path 取而代之，而且比 Java 更俐落。 // Java：java.nio Path base = Paths.get\"/var/log\"; Path file = base.resolve\"app\".resolve\"server.log\"; if Files.existsfile && Files.isRegularFilefile { String text = Files.readStringfile, StandardCharsets.UTF8; } from pathlib import Path base = Path\"/var/log\" file = base / \"app\" / \"server.log\"           / 運算子組路徑，跨平台 if file.exists and file.isfile: text = file.readtextencoding=\"utf-8\" / 運算子是最 Pythonic 的亮點：Path.truediv 被多載成「組路徑」，等價於 Java 的 .resolve...，但讀起來像在寫真正的路徑。它會自動用對的分隔符（Windows 上是 \\），所以你永遠不該手動 \"a/\" + \"b\" 或 os.path.join。 > 🔁 Java 對照：Paths.geta.resolveb ≈ Patha / b。Files"
+  },
+  {
+    "file": "ch15-files-io-stdlib.md",
+    "chapterTitle": "第 15 章：檔案、I/O 與標準函式庫巡禮",
+    "sectionTitle": "檔案讀寫與編碼：那個會在 CI 上炸掉的 encoding",
+    "sectionId": "檔案讀寫與編碼那個會在-ci-上炸掉的-encoding",
+    "content": "當你需要逐行串流、控制緩衝、或處理大檔時，就回到底層的 open。承接第 5 章，慣用法是搭配 with（context manager），等同 Java 的 try-with-resources，離開區塊自動關檔——即使中途拋例外。 // Java try-with-resources try BufferedReader r = Files.newBufferedReaderpath, StandardCharsets.UTF8 { String line; while line = r.readLine != null { processline; } } with open\"access.log\", encoding=\"utf-8\" as f: for line in f:                檔案物件本身就是逐行的迭代器，惰性、不吃記憶體 processline.rstrip\"\\n\" 直接 for line in f 是 Pythonic 的逐行讀法：檔案物件是迭代器，一次只讀一行，處理 10GB 的 log 也只佔一行的記憶體。不要用 f.readlines（一次全載進 list）除非你真的要整份在記憶體裡。 編碼：最該記住的一條規則 永遠明確寫 encoding=\"utf-8\"。 這是從 Java 帶過來最容易踩的雷。Java 的 new FileReaderf（無 charset）和 Python 的 openf（無 encoding）犯的是同一個錯：用平台預設編碼。在你的 Mac 上是 UTF-8、跑得好好的，到了 CI 的某些環境或 Windows（預設可能是 cp950/cp1252）就會 UnicodeDecodeError 或讀出亂碼。 text = open\"data.txt\".read             這在某些平台會出錯或亂碼"
+  },
+  {
+    "file": "ch15-files-io-stdlib.md",
+    "chapterTitle": "第 15 章：檔案、I/O 與標準函式庫巡禮",
+    "sectionTitle": "json / csv / sqlite3：序列化與內建資料庫",
+    "sectionId": "json-csv-sqlite3序列化與內建資料庫",
+    "content": "json：標準庫就是你的 Jackson // Jackson ObjectMapper mapper = new ObjectMapper; String json = mapper.writeValueAsStringuser; User u = mapper.readValuejson, User.class; import json data = {\"name\": \"Ada\", \"age\": 36, \"tags\": \"math\", \"cs\"} text = json.dumpsdata, ensureascii=False, indent=2    序列化成字串 parsed = json.loadstext                                反序列化回 dict 對照 Jackson 的關鍵差異： - json.dumps ↔ writeValueAsString，json.loads ↔ readValue。檔案版本是 json.dumpobj, file / json.loadfile（少一個 s，s 代表 string）。 - 沒有「綁定到類別」這回事。json.loads 回傳的是 dict/list/str/int/float/bool/None 的組合，型別標注是 Any（呼應第 9 章——靜態檢查器對它一無所知，存取 parsed\"age\" 不會有型別保護）。要綁到具型別的物件，請接 dataclass 或 pydantic（第 9 章）。 - ensureascii=False 很重要：預設 True 會把中文跳脫成 \\uXXXX，加 False 才會輸出可讀的 UTF-8。 >>> import json >>> json.dumps{\"city\": \"台北\"} '{\"city\": \"\\\\u53f0\\\\u5317\"}'"
+  },
+  {
+    "file": "ch15-files-io-stdlib.md",
+    "chapterTitle": "第 15 章：檔案、I/O 與標準函式庫巡禮",
+    "sectionTitle": "datetime 與時區：naive vs aware 的世界",
+    "sectionId": "datetime-與時區naive-vs-aware-的世界",
+    "content": "java.time 已經把日期時間的正確心智模型灌給你了：Instant、LocalDateTime、ZonedDateTime 的分野你很熟。Python 的 datetime 模組概念相近，但詞彙不同，而且有一個你必須內化的二分法：naive 與 aware。 from datetime import datetime, date, timedelta, timezone from zoneinfo import ZoneInfo             3.9+，直接讀作業系統的 IANA 時區資料庫 d = date2026, 6, 14                     只有日期，對應 LocalDate dt = datetime2026, 6, 14, 12, 30        naive datetime，無時區資訊 delta = timedeltadays=7, hours=3        對應 Duration / Period printdt + delta                         2026-06-21 15:30:00 Java  Python  性質 --------- LocalDate  date  純日期 LocalDateTime  naive datetime（無 tzinfo）  牆上時鐘，不知道自己在哪個時區 ZonedDateTime  aware datetime（有 tzinfo）  綁定時區，是地球上一個明確時刻 Duration / Period  timedelta  時間長度 ZoneId.of\"Asia/Taipei\"  ZoneInfo\"Asia/Taipei\"  IANA 時區 naive 是陷阱，aware 才安全 naive datetime（沒有 tzinfo）就像 Jav"
+  },
+  {
+    "file": "ch15-files-io-stdlib.md",
+    "chapterTitle": "第 15 章：檔案、I/O 與標準函式庫巡禮",
+    "sectionTitle": "re：正規表示式",
+    "sectionId": "re正規表示式",
+    "content": "Java 的 Pattern/Matcher 你很熟，Python 的 re 模組概念一一對應，但 API 更扁平，而且有個語法層的好朋友：raw string。 // Java Pattern p = Pattern.compile\"\\\\d{4}-\\\\d{2}-\\\\d{2}\"; Matcher m = p.matcher\"date: 2026-06-14\"; if m.find { String year = m.group1; } import re pat = re.compiler\"\\d{4}-\\d{2}-\\d{2}\"    r\"\" raw string，反斜線不用跳脫 m = pat.search\"date: 2026-06-14\" if m: year = m.group1               '2026' printm.groups               '2026', '06', '14' > 💡 Pythonic 重點：正規表示式一律用 raw string r\"...\"。否則 \\d 在普通字串裡 Python 會嘗試解讀跳脫序列（雖然 \\d 剛好沒事，但 \\b 就會變成退格字元），你會被迫寫成 Java 那種 \"\\\\d\" 雙反斜線地獄。r\"\\d\" 直接就是你要的兩個字元。 match / search / findall / finditer 這幾個方法的差別是 Java 工程師常搞混的： 方法  行為  Java 對照 --------- re.matchp, s  只從字串開頭比對  matcher.lookingAt re.searchp, s  在字串中找第一個符合處  matcher.find（第一次） re.fullmatchp, s  整個字串完全符合  matcher.matches re.findallp, s  回所有"
+  },
+  {
+    "file": "ch15-files-io-stdlib.md",
+    "chapterTitle": "第 15 章：檔案、I/O 與標準函式庫巡禮",
+    "sectionTitle": "subprocess：取代 shell script 的正路",
+    "sectionId": "subprocess取代-shell-script-的正路",
+    "content": "要呼叫外部程式時，Java 你會用 ProcessBuilder。Python 的 subprocess.run 更精簡，但有幾個安全與正確性的預設你必須記住。 // Java ProcessBuilder Process p = new ProcessBuilder\"git\", \"rev-parse\", \"HEAD\" .redirectErrorStreamtrue.start; String out = new Stringp.getInputStream.readAllBytes; p.waitFor; import subprocess result = subprocess.run \"git\", \"rev-parse\", \"HEAD\",    引數用 list，不是一整串字串 captureoutput=True,              抓 stdout/stderr text=True,                         解碼成 str（否則是 bytes） check=True,                        非零退出碼就拋 CalledProcessError printresult.stdout.strip          命令的標準輸出 四個關鍵參數，缺一個就少一道防護： - 引數傳 list（\"git\", \"rev-parse\", \"HEAD\"），每個引數一個元素。這是安全的核心。 - captureoutput=True：把 stdout/stderr 收進 result.stdout/result.stderr。 - text=True：以文字模式解碼（記得這也是編碼，可加 encoding=\"utf-8\"）。不加就是 bytes。 - check=True：行為等同 shell 的 set -e——子程式失敗（"
+  },
+  {
+    "file": "ch15-files-io-stdlib.md",
+    "chapterTitle": "第 15 章：檔案、I/O 與標準函式庫巡禮",
+    "sectionTitle": "argparse / click：寫 CLI 工具",
+    "sectionId": "argparse-click寫-cli-工具",
+    "content": "標準庫已經能讓你寫出有 --help、子命令、型別轉換的專業 CLI，這正是「用 Python 取代 shell script」的最後一塊拼圖。 argparse：標準庫，宣告式 argparse 內建，零依賴，宣告式定義參數，自動產生 --help 和錯誤訊息： import argparse def main -> None: parser = argparse.ArgumentParserdescription=\"跟某人打招呼\" parser.addargument\"name\", help=\"對象名字\"             位置引數 parser.addargument\"-c\", \"--count\", type=int, default=1, help=\"重複次數\"                     選項，自動轉 int parser.addargument\"--shout\", action=\"storetrue\", help=\"大聲喊\"                        布林旗標 args = parser.parseargs msg = f\"Hello, {args.name}!\" if args.shout: msg = msg.upper for  in rangeargs.count: printmsg if name == \"main\": main $ python greet.py Ada --count 2 --shout HELLO, ADA! HELLO, ADA! $ python greet.py --help usage: greet.py -h -c COUNT --shout name ... argparse 對應 Java 生態的 Apache Commons CLI 或 picocli，但內建。它支援子命令（a"
+  },
+  {
+    "file": "ch15-files-io-stdlib.md",
+    "chapterTitle": "第 15 章：檔案、I/O 與標準函式庫巡禮",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "1. pathlib.Path 取代 os.path：物件式 API、/ 運算子組路徑、.readtext/.glob/.iterdir 等方法掛在 Path 上，比 Java 的 Files 靜態方法更順手；glob/iterdir 回產生器不吃記憶體。 2. 編碼是紀律不是選項：open 與 readtext 一律明確寫 encoding=\"utf-8\"，否則依賴平台預設會在別的機器上爆掉（同 Java new FileReader 之坑）；PEP 686 是未來解，現在靠手寫。 3. 序列化用標準庫：json（dumps/loads，回傳是 Any，要 ensureascii=False）、csv（DictReader 別自己切逗號，寫檔記得 newline=\"\"），都內建、不必拉 Jackson/Commons。 4. sqlite3 是口袋裡的關聯式 DB：零設定、:memory: 模式測試神器、遵循 DB-API 2.0；參數化查詢用 ? 防 SQL injection（同 PreparedStatement），連線當 context manager 是控制交易、不是關閉。 5. datetime 分 naive 與 aware：naive ≈ LocalDateTime（危險）、aware ≈ ZonedDateTime（安全）；用 datetime.nowtimezone.utc 與 zoneinfo.ZoneInfo，內部存 UTC、顯示才 astimezone，naive 與 aware 不能混算。 6. re 一律用 raw string r\"...\"：match（開頭）/search（任意處）/fullmatch（全符合）/findall（回字串）/finditer（回 match 物件）分清楚；命名群組 ?P<name>... 與 re.sub 的"
+  },
+  {
+    "file": "ch15-files-io-stdlib.md",
+    "chapterTitle": "第 15 章：檔案、I/O 與標準函式庫巡禮",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "1. pathlib 改寫：給一個目錄路徑，找出底下（含所有子目錄）大於 1 MB 的 .log 檔，印出相對路徑與大小。請只用 pathlib，不要用 os.path。 提示：rglob\".log\" 配 .stat.stsize；relativetobase 取相對路徑。 2. 編碼地雷排查：下面的程式在你機器上沒事，但同事在 Windows 上跑出 UnicodeDecodeError，為什麼？怎麼修？ python names = open\"names.txt\".read.splitlines 提示：問題在那個沒寫的參數。順便想想如果檔案很大，.read.splitlines 還有什麼缺點。 3. SQL injection 修補：把這段有漏洞的查詢改成安全的參數化版本，並說明為什麼 f-string 在這裡是大忌。 python def finduserconn, username: return conn.execute f\"SELECT  FROM users WHERE name = '{username}'\" .fetchall 提示：? 佔位符 + 參數元組，注意單一參數的逗號。 4. 時區運算：寫一個函式 meetingtimesutciso: str -> dictstr, str，輸入一個 UTC 的 ISO 時間字串，回傳這個瞬間在 Asia/Taipei、Europe/London、America/NewYork 三地各是幾點（ISO 格式）。 提示：datetime.fromisoformat 解析、ZoneInfo 建時區、astimezone 轉換。先確認解析出來的是 aware datetime。 5. shell script 升級：把這個 Bash 一行命令 git log --oneline -n 5  wc -l 用 Python"
+  },
+  {
+    "file": "ch16-web-development.md",
+    "chapterTitle": "第 16 章：Web 開發",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "你寫 Web 後端的肌肉記憶大概是這樣的：開一個 @RestController、灑一堆 @GetMapping／@PostMapping、用 @Valid 加 @NotNull／@Size 拼出驗證、靠 springdoc 生 Swagger、再用 JPA repository 接資料庫——整套 Spring Boot 的儀式你閉著眼睛都會。Python 這邊的主流是 FastAPI，它做的事情幾乎一樣，但底層哲學顛覆了兩個你習以為常的直覺：第一，「型別提示」不再只是給 IDE 看的裝飾，而是驅動執行期驗證、序列化、自動文件的單一真實來源（single source of truth）；第二，依賴注入不靠容器掃描的魔法，而是明確寫在函式參數裡的函式呼叫。這章我們用一個貫穿全章的 items CRUD API，把 FastAPI、pydantic、SQLAlchemy、Depends 串成一個能實際跑、能被測試的服務。 本章所有範例都可用 uv run --with 'fastapistandard' --with httpx --with sqlalchemy --with pydantic-settings python xxx.py 實際執行；FastAPI 範例一律用 TestClient 在記憶體內發請求，不必真的啟動伺服器；資料庫用 in-memory SQLite，可實跑。 ---"
+  },
+  {
+    "file": "ch16-web-development.md",
+    "chapterTitle": "第 16 章：Web 開發",
+    "sectionTitle": "FastAPI 入門：型別提示驅動的殺手鏈",
+    "sectionId": "fastapi-入門型別提示驅動的殺手鏈",
+    "content": "Java 怎麼做 → Python 怎麼做 在 Spring Boot，一個帶驗證的 endpoint 大概長這樣： // Java：Spring Boot + Bean Validation @RestController @RequestMapping\"/items\" public class ItemController { @PostMapping @ResponseStatusHttpStatus.CREATED public ItemOut create@Valid @RequestBody ItemIn item { return service.createitem; } @GetMapping\"/{id}\" public ItemOut get@PathVariable int id { ... } @GetMapping public List<ItemOut> list@RequestParamdefaultValue = \"10\" int limit { ... } } // DTO 上掛 annotation 才有驗證 public record ItemIn@NotBlank @Sizemax = 50 String name, @Positive double price, List<String> tags {} FastAPI 的對應寫法： from fastapi import FastAPI, HTTPException from pydantic import BaseModel, Field app = FastAPItitle=\"Items API\"   ASGI app 物件，等同 Spring Boot 的應用入口 class ItemInBaseModel:                       request bod"
+  },
+  {
+    "file": "ch16-web-development.md",
+    "chapterTitle": "第 16 章：Web 開發",
+    "sectionTitle": "依賴注入：`Depends` 對照 Spring DI",
+    "sectionId": "依賴注入depends-對照-spring-di",
+    "content": "函式式 DI，沒有容器掃描的魔法 Spring 的 DI 是「容器在啟動時掃 classpath、找 @Component/@Service/@Repository、建好 bean、用 @Autowired 或建構子注入」。整個過程是隱式的、靠反射與 classpath 掃描。FastAPI 的 Depends 走另一條路：依賴就是一個普通函式，你在 endpoint 的參數裡明確宣告「我需要這個函式的回傳值」，FastAPI 在每次請求時呼叫它、把結果塞進來。 // Java：Spring 建構子注入 @Service public class ItemService { private final ItemRepository repo; public ItemServiceItemRepository repo { this.repo = repo; }  // 容器自動注入 } from typing import Annotated from fastapi import Depends from pydanticsettings import BaseSettings class SettingsBaseSettings: appname: str = \"Items API\" admintoken: str = \"secret\" def getsettings -> Settings:            依賴 = 一個普通函式 return Settings @app.get\"/admin/info\" def admininfosettings: AnnotatedSettings, Dependsgetsettings -> dict: return {\"app\": settings.appname}      settings 由 FastAPI 呼叫 "
+  },
+  {
+    "file": "ch16-web-development.md",
+    "chapterTitle": "第 16 章：Web 開發",
+    "sectionTitle": "ORM：SQLAlchemy 2.0 對照 JPA/Hibernate",
+    "sectionId": "ormsqlalchemy-20-對照-jpahibernate",
+    "content": "三個核心物件：Engine、Session、Model SQLAlchemy 是 Python 的事實標準 ORM，2.0 版本的宣告式 model 用 Mapped... + mappedcolumn...，型別提示直接驅動欄位定義（再次呼應第 9 章），讀起來跟 dataclass 很像。對照關係： JPA / Hibernate  SQLAlchemy 2.0  說明 --------- EntityManagerFactory  Engine（createengine）  連線工廠 / 連線池，全程式一個就好 EntityManager  Session  一個工作單元（unit of work） @Entity 類別  class XBase + Mapped 欄位  宣告式 model persistence context  identity map  同一 session 內同主鍵 = 同一物件 em.findUser, id  session.getUser, id  主鍵查詢，先查 identity map JPQL SELECT u FROM User u WHERE...  selectUser.where...  型別安全的查詢建構 em.persistx / em.merge  session.addx  加入待寫入 @Transactional / tx.commit  session.commit  提交 Spring Data JpaRepository  自己包一層或用 select  SQLAlchemy 不內建 repository，但很好包 Flyway / Liquibase  Alembic  migration 工具，下面一句帶過 宣告 model 與基本 CRUD（in-memory SQLite 實跑） from sqla"
+  },
+  {
+    "file": "ch16-web-development.md",
+    "chapterTitle": "第 16 章：Web 開發",
+    "sectionTitle": "把它們串起來：可測試的 items CRUD 服務",
+    "sectionId": "把它們串起來可測試的-items-crud-服務",
+    "content": "現在用一個檔案把 FastAPI + pydantic + SQLAlchemy + Depends 全部接起來，並用 TestClient 證明它能跑。這段是本章的核心交付物，可直接 uv run 執行。 from collections.abc import Iterator from fastapi import FastAPI, Depends, HTTPException from fastapi.testclient import TestClient from pydantic import BaseModel, Field, ConfigDict from sqlalchemy import createengine, select, String, Float, StaticPool from sqlalchemy.orm import DeclarativeBase, Mapped, mappedcolumn, Session, sessionmaker, class BaseDeclarativeBase: pass class ItemRowBase: tablename = \"items\" id: Mappedint = mappedcolumnprimarykey=True name: Mappedstr = mappedcolumnString50 price: Mappedfloat = mappedcolumnFloat class ItemCreateBaseModel:                     輸入：沒有 id name: str = Fieldminlength=1, maxlength=50 price: float = Fieldgt=0 class ItemReadBaseModel:              "
+  },
+  {
+    "file": "ch16-web-development.md",
+    "chapterTitle": "第 16 章：Web 開發",
+    "sectionTitle": "ASGI vs WSGI：對照 Servlet 容器",
+    "sectionId": "asgi-vs-wsgi對照-servlet-容器",
+    "content": "兩種介面，兩種世界觀 Python web 框架與 server 之間有一層標準介面，類似 Java 的 Servlet 規範把「web 框架」與「Servlet 容器（Tomcat/Jetty）」解耦。Python 有兩代這樣的介面： - WSGI（Web Server Gateway Interface）：同步介面。一個請求 = 一次函式呼叫，回傳前那條執行緒被佔住。對應傳統的 Servlet API + thread-per-request 的 Tomcat。Flask、傳統 Django 是 WSGI 框架。 - ASGI（Asynchronous Server Gateway Interface）：非同步介面（承接第 14 章的 asyncio）。支援 async/await、長連線、WebSocket、伺服器推送（SSE）。FastAPI / Starlette 是 ASGI 框架。 WSGI  ASGI --------- 介面性質  同步 callable  async callable（協程） Java 類比  傳統 Servlet + Tomcat（thread-per-request）  Servlet 3.1+ 非同步 / 反應式（WebFlux） 並行模型  一請求佔一條執行緒  事件迴圈，單執行緒處理大量並行連線 WebSocket / SSE  不支援  原生支援 代表框架  Flask、傳統 Django  FastAPI、Starlette、Django3.0+ async 對應 server  gunicorn（sync worker）、uWSGI  uvicorn、hypercorn、gunicorn+uvicorn worker 關鍵釐清：async def 不會讓 CPU bound 變快 這是第 14 章 GIL 那一章的直接延伸"
+  },
+  {
+    "file": "ch16-web-development.md",
+    "chapterTitle": "第 16 章：Web 開發",
+    "sectionTitle": "部署：uvicorn / gunicorn / Docker",
+    "sectionId": "部署uvicorn-gunicorn-docker",
+    "content": "從開發到生產 TestClient 只用於測試。要真的對外服務，你需要一個 ASGI server 來跑 app。 開發 / 單機用 uvicorn（純 ASGI server，基於 uvloop + httptools，很快）： uvicorn main:app --reload           --reload：改檔自動重啟，等同 spring-boot-devtools uvicorn main:app --host 0.0.0.0 --port 8000 main:app 的格式是 模組:變數名，對應 Java 的 主類別。--reload 只在開發用，正式環境要關掉。 生產要跑多個 worker 進程繞過 GIL（呼應第 14 章：多進程才有真平行）。兩種主流做法： uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4 gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 gunicorn 做法在生產更常見，因為 gunicorn 是成熟的進程管理器：worker 掛掉自動重啟、graceful reload、優雅關閉。每個 worker 是獨立進程（各有自己的 GIL 與事件迴圈），-w 4 就是四個進程吃四顆核——這正是 Java 不需要操心（JVM 一個進程多 thread 吃滿核）但 CPython 必須面對的部署現實。worker 數的經驗值常見是 2  CPU 核數 + 1，但 I/O bound 的 async 服務可以更激進，要實測。 Spring Boot  FastAPI 部署  說明 --------- 內嵌 Tomcat（一進程多 thread）  uvicorn / gunicor"
+  },
+  {
+    "file": "ch16-web-development.md",
+    "chapterTitle": "第 16 章：Web 開發",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "- FastAPI 的核心殺手鏈是「型別提示 → 自動驗證 → 自動文件」：一個 pydantic model 同時是執行期驗證規則、序列化 schema、OpenAPI 文件來源。Java 要 @Valid + Bean Validation + springdoc 三套協作才湊得出來。 - 路由參數靠慣例推斷：名字在路徑樣板裡 = path；型別是 BaseModel = body；其餘簡單型別 = query（有預設值即選填）。比 Spring 每參數掛 annotation 清爽。 - 把 request / response / DB model 分成三個類別：輸入沒 id、輸出有 id、ORM 綁資料庫，形狀本就不同。輸出 schema 建議開 fromattributes=True——它讓 modelvalidateorm 能直接從物件屬性建模，也是回傳 ORM 物件時更明確的作法。 - Depends 是顯式的函式式 DI：依賴就是被呼叫的函式，沒有容器掃描魔法；yield 依賴做 setup/teardown（Python 版 try-with-resources / @Transactional）；dependencyoverrides 是測試替換依賴的利器。 - SQLAlchemy 2.0 用 Mapped... + mappedcolumn...，型別即 schema（str  None → 可空）。session = 工作單元 + identity map（同 session 同主鍵 = 同物件），對應 Hibernate persistence context；UPDATE 靠髒檢查自動發。 - ASGI（async，FastAPI）vs WSGI（同步，Flask） 對應反應式 vs thread-per-request；但 async 解決"
+  },
+  {
+    "file": "ch16-web-development.md",
+    "chapterTitle": "第 16 章：Web 開發",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "1. 加一個 PUT 與 DELETE：在 items 服務補上 @app.put\"/items/{itemid}\"（接 ItemCreate、更新後回 ItemRead）與 @app.delete\"/items/{itemid}\"（成功回 204）。提示：更新用 session.get 拿到 ORM 物件後直接改屬性、靠髒檢查 commit；找不到一律回 404。寫 TestClient 測試覆蓋「更新存在 / 更新不存在 / 刪除後再查回 404」。 2. 加分頁與過濾：把 listitems 改成接 query 參數 skip: int = 0、limit: int = 10、namecontains: str  None = None，用 select....whereItemRow.name.contains....offsetskip.limitlimit 實作。觀察 OpenAPI /docs 是否自動把這些 query 參數列出來。 3. 用 dependencyoverrides 寫一個乾淨的 pytest fixture：建一個指向獨立 in-memory DB（記得 StaticPool）的 getsession 覆寫，包成 pytest fixture，每個測試拿到全新空白 DB。提示：fixture 裡 app.dependencyoverridesgetsession = ...，yield client，收尾 app.dependencyoverrides.clear（承接第 13 章）。 4. 驗證錯誤的自訂回應：用 @app.exceptionhandlerRequestValidationError 攔截 422，把 pydantic 的 detail 陣列轉成你團隊前端想要的格式（例如 {\"field\": \"name\", \"error\""
+  },
+  {
+    "file": "ch17-data-processing-automation.md",
+    "chapterTitle": "第 17 章：資料處理與自動化腳本",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "身為 Java 工程師，「寫個小工具」對你來說常常是個沉重的決定：要開 Maven 專案、拉 OkHttp、拉 Jackson、拉 Apache POI、寫 main、打包成 fat jar，最後得到一個三百行才能抓資料寫 Excel 的東西。於是大多數人退而求其次，回去寫 bash——然後在 awk、sed、引號跳脫的地獄裡度過下午。Python 在這個區間是壓倒性的：它是業界公認的「膠水語言」（glue language），抓 HTTP、清資料、寫報表、串子行程，每一段都短到像虛擬碼，卻又有型別、有例外、可測、跨平台。這一章把第 14、15 章建立的工具（async、pathlib、subprocess、argparse、logging）和四個重量級套件（requests/httpx、pandas、BeautifulSoup、openpyxl）串起來，目標是讓你能在一個下午做出「抓資料 → 整理 → 出報表」的自動化腳本。過程中要記住兩個工程心法：向量化（vectorization，別用 for-loop 逐列算）與可重現（reproducibility，測試用本地資料、不依賴外部世界）。 ---"
+  },
+  {
+    "file": "ch17-data-processing-automation.md",
+    "chapterTitle": "第 17 章：資料處理與自動化腳本",
+    "sectionTitle": "HTTP client：requests vs httpx",
+    "sectionId": "http-clientrequests-vs-httpx",
+    "content": "Java 11 之前抓 HTTP 是場災難（HttpURLConnection 的 API 像懲罰），所以大家用 OkHttp 或 Apache HttpClient。Java 11 之後有了官方 java.net.http.HttpClient，總算像樣。Python 這邊長年的事實標準是 requests——「HTTP for Humans」，幾乎每個 Python 專案都依賴它。近年崛起的 httpx 則是 requests 的精神續作：API 幾乎一模一樣，但多了 async（承接第 14 章的 async/await）與 HTTP/2 支援。經驗法則：純同步、不在乎 async，就用 requests；需要 async 或 HTTP/2，就用 httpx。兩者學會一個，另一個只要改 import。 requests：同步的業界標準 // Java 11 HttpClient HttpClient client = HttpClient.newHttpClient; HttpRequest req = HttpRequest.newBuilder .uriURI.create\"https://httpbin.org/get?q=python\" .header\"User-Agent\", \"demo/1.0\" .timeoutDuration.ofSeconds10 .GET .build; HttpResponse<String> resp = client.sendreq, HttpResponse.BodyHandlers.ofString; if resp.statusCode / 100 != 2 throw new IOException\"HTTP \" + resp.statusCode; String body = resp.body;   // 還要自己"
+  },
+  {
+    "file": "ch17-data-processing-automation.md",
+    "chapterTitle": "第 17 章：資料處理與自動化腳本",
+    "sectionTitle": "pandas 入門：DataFrame 思維",
+    "sectionId": "pandas-入門dataframe-思維",
+    "content": "pandas 是 Python 資料處理的核心，但對 Java 工程師而言最大的障礙不是 API，而是思維轉換。你習慣「資料 = 一堆物件，處理 = 對 collection 跑迴圈或 Stream」。pandas 要你換成另一套世界觀：把資料想成一張表，整欄整欄地操作。請同時用三個熟悉的心智模型來理解 DataFrame： - 程式化的試算表（Excel）——有列有欄、有欄名。 - 記憶體裡的 SQL 表——可以 select、where、group by、join。 - 欄導向資料集（columnar）——每一欄是同型別的連續陣列，這是它快的根源。 Series 是單一欄（帶索引的一維陣列），DataFrame 是多個 Series 並排（共享列索引）。 建立、選取、過濾 import pandas as pd orders = pd.DataFrame{ \"orderid\": 1, 2, 3, 4, 5, \"customer\": \"Alice\", \"Bob\", \"Alice\", \"Carol\", \"Bob\", \"category\": \"book\", \"book\", \"toy\", \"book\", \"toy\", \"amount\": 120, 80, 200, 60, 150, } printorders orderid customer category  amount 0         1    Alice     book     120 1         2      Bob     book      80 2         3    Alice      toy     200 3         4    Carol     book      60 4         5      Bob      toy     150 選取與過濾，請直接對照 SQ"
+  },
+  {
+    "file": "ch17-data-processing-automation.md",
+    "chapterTitle": "第 17 章：資料處理與自動化腳本",
+    "sectionTitle": "網頁爬蟲：BeautifulSoup",
+    "sectionId": "網頁爬蟲beautifulsoup",
+    "content": "抓網頁有兩步：取得 HTML（用上面的 requests/httpx）與解析 HTML（用 BeautifulSoup，套件名 beautifulsoup4）。對照 Java，BeautifulSoup ≈ Jsoup——都是把 HTML 解析成可查詢的樹，支援 CSS selector。差別是 Python 這邊解析器可插拔（內建 html.parser，或裝 lxml 求快）。 > 💡 Pythonic 重點 / 可重現心法：教學與測試絕對不要真的去爬線上網站——網站會改版、會擋你、會讓你的測試時好時壞。正確做法是把 HTML 當成本地字串（或測試 fixture 檔）來解析，這樣範例 100% 可重現、可進 CI、不依賴連網。真實程式碼裡才把這段字串換成 resp.text。下面整段就用本地 HTML 字串示範。 from bs4 import BeautifulSoup HTML = \"\"\" <html> <body> <h1 id=\"title\">2026 暢銷書榜</h1> <ul class=\"book-list\"> <li class=\"book\" data-isbn=\"978-1\"><span class=\"name\">流暢的 Python</span><span class=\"price\">880</span></li> <li class=\"book\" data-isbn=\"978-2\"><span class=\"name\">設計資料密集型應用</span><span class=\"price\">980</span></li> <li class=\"book\" data-isbn=\"978-3\"><span class=\"name\">Effective Java</span><span class=\"price\">650</span></li> </"
+  },
+  {
+    "file": "ch17-data-processing-automation.md",
+    "chapterTitle": "第 17 章：資料處理與自動化腳本",
+    "sectionTitle": "Excel／報表自動化：openpyxl",
+    "sectionId": "excel報表自動化openpyxl",
+    "content": "「把結果產成 Excel 給老闆/客戶」是企業環境最務實的需求。Java 這邊的答案是 Apache POI——功能強大但 API 極其囉嗦（XSSFWorkbook、createSheet、createRow、createCell、CellStyle、DataFormat……寫個三欄表要四十行）。Python 的對應是 openpyxl，讀寫 .xlsx，API 短得多。 // Apache POI（精簡示意） Workbook wb = new XSSFWorkbook; Sheet sheet = wb.createSheet\"報表\"; Row header = sheet.createRow0; header.createCell0.setCellValue\"產品\"; header.createCell1.setCellValue\"Q1\"; // ... 每個 cell 都要 createCell + setCellValue try FileOutputStream out = new FileOutputStream\"report.xlsx\" { wb.writeout; } from openpyxl import Workbook, loadworkbook from openpyxl.styles import Font, PatternFill from pathlib import Path wb = Workbook ws = wb.active ws.title = \"報表\" ws.append\"產品\", \"Q1\", \"Q2\", \"合計\" for cell in ws1:                                   第一列加粗、上色 cell.font = Fontbold=True, color=\"FFFFFF\" cell"
+  },
+  {
+    "file": "ch17-data-processing-automation.md",
+    "chapterTitle": "第 17 章：資料處理與自動化腳本",
+    "sectionTitle": "排程任務與系統腳本：Python 取代 shell script",
+    "sectionId": "排程任務與系統腳本python-取代-shell-script",
+    "content": "到這裡你已經有了所有零件。最後一塊拼圖是：把這些零件組成一個可排程、可維護的自動化腳本，取代你以前用 bash 寫的那些東西。 為什麼用 Python 取代 bash bash 適合「三行以內的膠水」。一旦腳本要處理錯誤、解析資料、有條件分支，bash 就會變成負債： 面向  bash  Python ---  ---  --- 可讀性  引號、跳脫、$ 地獄  像虛擬碼 錯誤處理  set -euo pipefail 也只能到這  try/except、明確例外型別 資料處理  awk/sed/cut 拼接  pandas、json、csv 型別  全是字串  有型別提示、可 mypy 可測試  幾乎不可能  pytest（第 13 章） 跨平台  Windows 直接死  macOS/Linux/Windows 一致 Python 腳本能 import、能寫測試、能加型別、有真正的例外——這些對「會長期維護、會出事要追責」的自動化任務是決定性的。承接第 15 章，你已經會用 pathlib（路徑）、subprocess（呼叫外部命令，取代 backtick）、argparse（CLI 參數，取代 $1 $2）；承接第 12 章，你會用 logging（取代 echo 到 stderr）與結構化例外處理。 排程選項 寫好腳本後，「怎麼定時跑」有幾條路，對照 Java 生態： Java  Python  適用情境 ---  ---  --- ScheduledExecutorService  sched / time.sleep 迴圈  程式內最陽春的延遲/週期 Spring @Scheduled  schedule 套件  程式內、語法甜的週期任務 Quartz  APScheduler 套件  程式內、需 cron 表達式/持久化/錯過補跑 作業系統 crontab  "
+  },
+  {
+    "file": "ch17-data-processing-automation.md",
+    "chapterTitle": "第 17 章：資料處理與自動化腳本",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "1. HTTP client：requests 是同步業界標準，httpx 是 API 近似但多了 async／HTTP/2 的續作。永遠設 timeout、用 raiseforstatus 把非 2xx 轉例外、用 resp.json 解析、用 Session/Client 重用連線（等同重用 Java HttpClient/OkHttpClient）。 2. DataFrame 思維：把 DataFrame 想成「程式化試算表／記憶體 SQL 表／欄導向資料集」。選取／過濾／groupby 直接對照 SQL 與 Stream，但寫法短得多。 3. 向量化是最重要的一課：別在 pandas 裡跑 for-loop 逐列算，用整欄運算、boolean mask、np.where、groupby。底層下放到 C/NumPy，效能差一到兩個數量級——這與 Java Stream「仍在 JVM 跑 lambda」本質不同。 4. BeautifulSoup ≈ Jsoup：find/findall/select（CSS selector）解析 HTML，gettext 取文字、\"attr\" 取屬性。class 要加底線。 5. 可重現心法：教學與測試用本地 HTML 字串／內嵌資料，不要真的爬線上網站；真實程式碼才換成 resp.text。爬蟲要守禮貌守則：看 robots.txt、誠實 User-Agent、限速、優先用官方 API、遵守法遵。 6. openpyxl ≈ Apache POI 但短得多：座標 1-based，公式以字串寫入但 openpyxl 不求值（讀回是公式字串，除非 dataonly=True 且檔案被 Excel 算過）。資料在 pandas 時直接 df.toexcel（底層即 openpyxl）。 7. Python 取代 bash：腳本一旦要錯誤"
+  },
+  {
+    "file": "ch17-data-processing-automation.md",
+    "chapterTitle": "第 17 章：資料處理與自動化腳本",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "1. 連線重用驗證：寫一支腳本，用 requests（無 Session）連抓 https://httpbin.org/get 十次，再用 requests.Session 抓十次，各自計時並印出總耗時，量化連線重用的差異。（提示：time.perfcounter；需連網。再加碼把 Session 版改寫成 httpx.AsyncClient + asyncio.gather 併發版對照。） 2. 向量化 vs 迴圈：建一個十萬列的 DataFrame（pd.DataFrame{\"x\": range100000}），分別用 a for + iloc 逐列、b df.apply、c 純向量化 df\"x\"  2 + 1 計算同一個新欄，用 time.perfcounter 比較三者耗時，解釋為何向量化最快。 3. 本地爬蟲：把本章的書榜 HTML 字串擴充（多加幾本書、再加一個 <table>），用 BeautifulSoup 解析成 listdict，再用 pd.DataFrame... 轉成 DataFrame，過濾出價格大於 700 的書並依價格排序。（提示：select + list comprehension 組 dict。） 4. 報表腳本：把整合範例改成真正的 CLI 工具：用 argparse（第 15 章）接收 --input（CSV 路徑）與 --output（xlsx 路徑），加上 --group-by 選擇聚合欄位。為 transform 函式寫一個 pytest 測試（第 13 章），餵入小 DataFrame 驗證聚合結果——示範純函式好測的價值。 5. 加樣式的報表：把練習 4 的輸出改用手寫 openpyxl（而非 toexcel），讓表頭加粗上色、數字欄加千分位格式（cell.numberformat = \",0\"）、凍結首列（ws.freez"
+  },
+  {
+    "file": "ch18-capstone-project.md",
+    "chapterTitle": "第 18 章：總整專案（Capstone）",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "前十七章把工具一件件交到你手上：型別系統、Pythonic 寫法、類別與協定、pydantic、SQLAlchemy、FastAPI、click、pytest、ruff、mypy。但工具不是專案。一個資深 Java 工程師交付的是「一個結構清楚、有測試、CI 全綠、可被 pip install 的東西」，不是一堆能跑的 script。這一章我們把所有零件組成一個小而完整的服務——一個任務清單（task list），同時提供 REST API 與 CLI 兩個入口，共用同一份核心邏輯，並通過 ruff + mypy strict + coverage 三道品質門檻。重點不在功能多，而在分層、邊界、與工程紀律如何在 Python 裡落地。本章所有核心程式碼（API、service、CLI、測試）都已實際跑通，你可以照著做出一模一樣的成品。 ---"
+  },
+  {
+    "file": "ch18-capstone-project.md",
+    "chapterTitle": "第 18 章：總整專案（Capstone）",
+    "sectionTitle": "專案規格與架構",
+    "sectionId": "專案規格與架構",
+    "content": "需求很小，刻意如此：一個任務有 title 與 status（todo / doing / done），支援增刪改查與依狀態篩選。麻雀雖小，但它逼你面對每個真實專案都會遇到的決策：資料模型放哪？驗證在哪一層？API 跟 CLI 怎麼共用邏輯？怎麼測？ src layout 目錄樹 承接第 11 章，我們用 src layout——原始碼放進 src/，強迫測試走「已安裝的套件」路徑，避免「在專案根目錄剛好 import 得到、打包後卻壞掉」的假陽性。 tasks/ ├── pyproject.toml ├── src/ │   └── tasks/ │       ├── init.py       version │       ├── models.py         SQLAlchemy ORM model（持久層） │       ├── schemas.py        pydantic schema（API 邊界） │       ├── db.py             engine / session 工廠 │       ├── service.py        核心商業邏輯（無框架相依） │       ├── main.py           FastAPI app（HTTP 入口） │       └── cli.py            click CLI（命令列入口） └── tests/ ├── conftest.py           fixture：in-memory DB、TestClient ├── testservice.py       單元測試（service 層） ├── testapi.py           整合測試（FastAPI TestClient） └── testcli.py           整"
+  },
+  {
+    "file": "ch18-capstone-project.md",
+    "chapterTitle": "第 18 章：總整專案（Capstone）",
+    "sectionTitle": "型別與資料模型三分",
+    "sectionId": "型別與資料模型三分",
+    "content": "第 9 章立過一條規矩：信任邊界用 pydantic 做執行期驗證，邊界內用 dataclass / 普通物件傳遞。在這個專案裡，這條規矩具體化成三種模型，各司其職，不要混用： 模型  工具  用在哪  為什麼 ------------ ORM model  SQLAlchemy DeclarativeBase  持久層  對應資料表、管理 identity 與 session API schema  pydantic BaseModel  HTTP 請求/回應  不信任外部輸入，要驗證、要序列化 （內部 DTO）  dataclass / 直接傳 ORM 物件  service 內部  邊界內已可信，不需重複驗證 新手常犯的錯是把 SQLAlchemy model 直接丟去當 API 回應，或把 pydantic model 拿去存資料庫。三分法讓每一層的契約獨立演進——資料庫加個 updatedat 欄位不會逼 API 改版。 models.py：持久層（SQLAlchemy 2.0） SQLAlchemy 2.0 的 Mapped... 風格跟 JPA 的 annotated entity 神似，差別是型別資訊由 Mapped 帶出、mappedcolumn 補欄位細節。StrEnum（3.11+）讓 enum 值在序列化時自然變成字串。 from future import annotations import enum from datetime import UTC, datetime from sqlalchemy import DateTime, Enum, String from sqlalchemy.orm import DeclarativeBase, Mapped, mappedcolumn class BaseDeclarativeBase: pa"
+  },
+  {
+    "file": "ch18-capstone-project.md",
+    "chapterTitle": "第 18 章：總整專案（Capstone）",
+    "sectionTitle": "API 與 CLI 兩個入口",
+    "sectionId": "api-與-cli-兩個入口",
+    "content": "現在來證明「一份核心、兩種介面」的價值：同樣呼叫 service.createtask，一個透過 HTTP、一個透過命令列。 FastAPI app（main.py） 承接第 16 章，FastAPI 用 Depends 做依賴注入。這裡的關鍵是 getdb 這個 generator dependency——它 yield 一個 session、請求結束後在 finally 關閉，行為等同 Spring 的 request-scoped EntityManager，但機制是 Python 的 generator + context（第 6、12 章）。AnnotatedSession, Dependsgetdb 是 FastAPI 推薦的注入寫法，可重用又對 mypy 友善。 from future import annotations from collections.abc import Iterator from typing import Annotated from fastapi import Depends, FastAPI, HTTPException from sqlalchemy.orm import Session, sessionmaker from tasks.db import makesessionfactory from tasks.models import Status from tasks.schemas import TaskCreate, TaskOut, TaskUpdate from tasks.service import TaskNotFound, createtask, deletetask, gettask, listtasks, updatetask, app = FastAPItitle=\"Tasks API\" fa"
+  },
+  {
+    "file": "ch18-capstone-project.md",
+    "chapterTitle": "第 18 章：總整專案（Capstone）",
+    "sectionTitle": "測試策略",
+    "sectionId": "測試策略",
+    "content": "承接第 13 章，分兩種測試：service 層的單元測試（純邏輯，最多最快）與入口層的整合測試（API / CLI 各一套）。所有測試都跑在 in-memory sqlite 上，零外部相依、毫秒級。 conftest.py：in-memory DB 與 dependency override 這個 conftest.py 是測試基礎建設的核心，三個地方值得細看： from future import annotations from collections.abc import Iterator import pytest from fastapi.testclient import TestClient from sqlalchemy import createengine from sqlalchemy.orm import Session, sessionmaker from sqlalchemy.pool import StaticPool from tasks.main import app, getdb from tasks.models import Base @pytest.fixture def sessionfactory -> sessionmakerSession: engine = createengine \"sqlite:///:memory:\", connectargs={\"checksamethread\": False}, poolclass=StaticPool, Base.metadata.createallengine return sessionmakerbind=engine @pytest.fixture def sessionsessionfactory: sessionmakerSession -> IteratorSes"
+  },
+  {
+    "file": "ch18-capstone-project.md",
+    "chapterTitle": "第 18 章：總整專案（Capstone）",
+    "sectionTitle": "工程品質門檻：ruff + mypy + coverage 全綠",
+    "sectionId": "工程品質門檻ruff-mypy-coverage-全綠",
+    "content": "Java 的品質門檻你熟得很：Checkstyle 管風格、SpotBugs 抓 bug、JaCoCo 卡覆蓋率、編譯器擋型別。Python 把這些換成更少、更快的工具，全部設定收斂在一個 pyproject.toml。 pyproject.toml：單一設定中心 project name = \"tasks\" version = \"0.1.0\" requires-python = \">=3.12\" dependencies = \"fastapi>=0.115\", \"sqlalchemy>=2.0\", \"pydantic>=2.7\", \"click>=8.1\", project.scripts tasks = \"tasks.cli:main\" dependency-groups dev = \"pytest>=8\", \"pytest-cov\", \"ruff\", \"mypy\", \"httpx\", build-system requires = \"hatchling\" build-backend = \"hatchling.build\" tool.ruff line-length = 100 src = \"src\", \"tests\" tool.ruff.lint select = \"E\", \"F\", \"I\", \"UP\", \"B\", \"SIM\" tool.mypy strict = true mypypath = \"src\" tool.pytest.inioptions pythonpath = \"src\" addopts = \"--cov=tasks --cov-report=term-missing --cov-fail-under=85\" 注意 dependency-groups 的 dev 群組——pytest、pytest-cov、ruff、mypy 這些品管工具只在開發/C"
+  },
+  {
+    "file": "ch18-capstone-project.md",
+    "chapterTitle": "第 18 章：總整專案（Capstone）",
+    "sectionTitle": "打包與發佈",
+    "sectionId": "打包與發佈",
+    "content": "承接第 11 章，uv build 同時產 wheel（二進位散佈）與 sdist（原始碼散佈）： $ uv build Building source distribution... Building wheel from source distribution... Successfully built dist/tasks-0.1.0.tar.gz Successfully built dist/tasks-0.1.0-py3-none-any.whl pyproject.toml 裡的 project.scripts 是把 CLI 變成可安裝指令的關鍵——它對照 Maven 的 shade plugin + manifest Main-Class，但更乾淨。tasks = \"tasks.cli:main\" 這行讓 wheel 裡產生一個 console script entry point： $ unzip -p dist/tasks-0.1.0-py3-none-any.whl '/entrypoints.txt' consolescripts tasks = tasks.cli:main 任何人 pip install tasks-0.1.0-py3-none-any.whl 之後，shell 裡就多了一個 tasks 指令，直接 tasks add \"...\" 即可——不必 python -m。版本號統一由 project.version 管理（也可用 hatch-vcs 從 git tag 自動推導）。要發佈到 PyPI，一句 uv publish（或 twine upload dist/）即可，配合 PyPI 的 trusted publishing 還能免 token。 ---"
+  },
+  {
+    "file": "ch18-capstone-project.md",
+    "chapterTitle": "第 18 章：總整專案（Capstone）",
+    "sectionTitle": "收尾：全書 checklist",
+    "sectionId": "收尾全書-checklist",
+    "content": "這個小專案是前十七章的縮影。對照下表，確認每個關鍵觀念都在這裡落了地——這就是你帶走的「資深 Python 工程師檢查表」： 章  觀念  在本專案的落地 --------- 1  uv / pyproject / ruff / mypy 工具鏈  單一 pyproject.toml 收斂全部設定，uv run 驅動一切 2–3  一切皆物件、函式即一等公民  service 是模組層級函式，當作值傳遞、被兩個入口共用 4–5  Pythonic 資料結構與慣用法  comprehension（t.title for t in ...）、with 管理 session 6  迭代器與產生器  getdb 是 generator dependency，yield session、finally 收尾 7–8  類別、@property、協定  SQLAlchemy DeclarativeBase model、StrEnum 9  型別三分（pydantic / dataclass / ORM）  schema / model 各司其職，mypy strict 全綠 10  裝飾器  @app.post、@main.command、@click.passobj 11  src layout、entry point、打包  src/tasks/、project.scripts、uv build 出 wheel 12  例外與防禦  自訂 TaskNotFound、raise ... from exc 保留例外鏈 13  pytest、fixture、覆寫、coverage  in-memory DB fixture、dependencyoverrides、85% 門檻 14  並行模型認知  FastAPI sync endpoint 跑在 threadpool；session "
+  },
+  {
+    "file": "ch18-capstone-project.md",
+    "chapterTitle": "第 18 章：總整專案（Capstone）",
+    "sectionTitle": "本章小結",
+    "sectionId": "本章小結",
+    "content": "1. 分層靠相依方向，不靠註解：service.py 不 import fastapi/click，才能讓「一份核心、兩種入口」成立。這是整個專案最重要的設計決策。 2. 型別三分：pydantic 守 API 邊界（驗證 + 序列化）、SQLAlchemy model 管持久、邊界內傳 ORM 物件或 dataclass。不要混用。 3. 驗證集中在邊界：Fieldminlength=1 讓空 title 在進 service 前就回 422，core 不必寫防禦碼。 4. service 用例外表達失敗：丟自訂 TaskNotFound，由各入口層翻譯成 HTTP 404 或 CLI 非零 exit code，保留例外鏈。 5. 測試靠注入替身：FastAPI 用 dependencyoverrides、click 用 obj=、DB 用 in-memory sqlite + StaticPool。記得 in-memory sqlite 必須用 StaticPool 共用連線，否則「no such table」。 6. 三道門檻全綠：ruff（lint+format）、mypy strict、pytest-cov（--cov-fail-under），全收斂在 pyproject.toml，由 pre-commit 與 GitHub Actions matrix 自動把關。 7. 打包靠 entry point：project.scripts 把 CLI 變成可安裝指令，uv build 出 wheel/sdist，uv publish 上 PyPI。 8. 務實的覆蓋率：核心邏輯逼近 100%、入口層容忍缺口，整體守住 85%。不要為了數字寫沒意義的測試。"
+  },
+  {
+    "file": "ch18-capstone-project.md",
+    "chapterTitle": "第 18 章：總整專案（Capstone）",
+    "sectionTitle": "練習",
+    "sectionId": "練習",
+    "content": "1. 加一層快取：在 service.listtasks 前面加一個記憶體快取（functools.lrucache 不適用於有 session 參數的情況，想想為什麼），並寫測試證明 createtask 後快取會失效。提示：快取要以「是否有寫入」為失效依據，思考它該放在 service 層還是入口層。 2. 補 PUT 與分頁：替 API 加 PUT /tasks/{id}（全量取代，對照 PATCH 的部分更新語意差異）與 GET /tasks?limit=&offset= 分頁。CLI 的 list 也加 --limit。確認新程式碼讓 coverage 不掉到 85% 以下。 3. 把例外翻譯抽成 exception handler：FastAPI 支援 @app.exceptionhandlerTaskNotFound，把 main.py 裡重複的 try/except → 404 收斂成一個全域 handler。比較前後的 endpoint 程式碼，體會「橫切關注點」在 FastAPI 怎麼處理（對照 Spring 的 @ControllerAdvice）。 4. 換成 PostgreSQL（選做）：把 DEFAULTURL 改成 postgresql+psycopg://...，用 testcontainers 或 docker 跑整合測試，in-memory sqlite 留給單元測試。觀察哪些程式碼需要改（提示：理論上只有設定，service/schema 一行都不該動——這就是分層的回報）。 5. CI 加一道安全掃描：在 GitHub Actions workflow 加上 uv run pip-audit（或 bandit）這道關卡，對照 Java 的 OWASP dependency-check。讓它在有已知漏洞相依時 fail。"
+  },
+  {
+    "file": "appendix-a-java-python-cheatsheet.md",
+    "chapterTitle": "附錄 A：Java ↔ Python 速查對照表",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "這是一張「帶走用」的速查表，把你已經內化的 Java 直覺一條一條映射到 Python。它不是教學，而是壓縮過的索引：左欄是你熟悉的 Java，中欄是對應的 Python 寫法，右欄一句話點出差異或陷阱，並用「詳見第 X 章」把你導回正文深入閱讀。使用方式很簡單——當你想用 Java 的某個語法或 API 時，先在這裡查它在 Python 的對應物，再決定要不要翻回正文。最易誤解的幾組對照（Optional<T>、Stream、interface、record、GIL）附了經實際執行驗證的程式碼片段佐證。 > 慣例：本附錄所有 Python 範例皆以 3.12+ 語法撰寫，型別提示用現代寫法（listint、X  None、collections.abc.Callable）。REPL 範例以 >>> 標示並附真實輸出。 ---"
+  },
+  {
+    "file": "appendix-a-java-python-cheatsheet.md",
+    "chapterTitle": "附錄 A：Java ↔ Python 速查對照表",
+    "sectionTitle": "A.1 語法與運算子",
+    "sectionId": "a1-語法與運算子",
+    "content": "Java  Python  說明 / 詳見章 --------- ; 結尾、{} 區塊  換行結尾、: + 縮排  縮排是語法的一部分，不是排版（詳見第 2 章） if c { ... }  if c:  條件不加括號，區塊用縮排 i++ / i--  i += 1 / i -= 1  Python 沒有 ++／-- 整數 /（截斷趨零，-7/2 == -3）  //（向下取整）、/ 為真除法  -7//2 == -4（向負無窮取整）、-7/2 == -3.5（永遠回傳 float）；整數除法用 //（詳見第 2 章） c ? x : y  x if c else y  三元運算子順序不同：值在前、條件在中 switch x { case ... }  match x: case ...:  match 是結構模式比對，可解構 tuple／dict／dataclass，是 switch 的超集 x instanceof Foo  isinstancex, Foo  也接受 tuple：isinstancex, int, str final int x = 1;（區域變數）  無強制；命名慣例 X 或 typing.Final  Python 不阻止重新賦值，只靠慣例；無 final 的封裝哲學詳見第 7 章，typing.Final 屬型別提示工具（不由執行期強制） a < b && b < c  a < b < c  Python 支援連鎖比較，會把 b 只算一次 a && b / a \\\\ b / !a  a and b / a or b / not a  關鍵字而非符號；and/or 回傳運算元本身 a == null  a is None  用 is 比對 None，不用 ==（詳見第 2 章） a.equalsb  a == b  == 走 eq，就是 Java "
+  },
+  {
+    "file": "appendix-a-java-python-cheatsheet.md",
+    "chapterTitle": "附錄 A：Java ↔ Python 速查對照表",
+    "sectionTitle": "A.2 型別與基本資料",
+    "sectionId": "a2-型別與基本資料",
+    "content": "Java  Python  說明 / 詳見章 --------- int / long / BigInteger  int  單一型別，任意精度、永不溢位 double / float  float  即 C 的 double（64-bit）；十進位用 decimal.Decimal boolean  bool  True／False，是 int 的子類別（True + True == 2） String  str  不可變、Unicode；無獨立 char 型別 char  無；長度 1 的 str  \"A\"0 仍是 str（詳見第 2 章） null  None  單例物件，用 is None 檢查 var x = ...  x = ...  不需宣告型別；型別提示可選 x: int = ... Object  object  萬物之根；isinstancex, object 恆真 <T>（泛型）  T + TypeVar 或 3.12 的 class CT  執行期會型別抹除（type erasure），靠 mypy 檢查（詳見第 9 章） Optional<T>  T \\ None  沒有包裝物件，就是聯集型別（詳見 A.5 佐證與第 9、12 章） >>> 2  100                       int 不溢位 1267650600228229401496703205376 >>> True + True                    bool 是 int 的子類別 2 >>> isinstance\"A\", str, len\"A\"   沒有 char，\"A\" 是長度 1 的 str True, 1 思維差異：Python 的 int 不溢位是真正的工程紅利——你在 Java 要為金額、雜湊、組合數操心的 overflow 在這裡消失了（但"
+  },
+  {
+    "file": "appendix-a-java-python-cheatsheet.md",
+    "chapterTitle": "附錄 A：Java ↔ Python 速查對照表",
+    "sectionTitle": "A.3 集合與資料結構",
+    "sectionId": "a3-集合與資料結構",
+    "content": "Java  Python  說明 / 詳見章 --------- ArrayList<E>  list  動態陣列；尾端 append 攤提 O1（詳見第 4 章） HashMap<K,V>  dict  雜湊表；保證插入順序（3.7+ 語言保證） HashSet<E>  set  雜湊集合；字面量 {1, 2, 3} LinkedList / ArrayDeque  collections.deque  雙端佇列，兩端 O1；list 開頭插入是 On int / E  list、或 array.array / numpy.ndarray  一般用 list；數值密集用 numpy（詳見第 17 章） Map.Entry<K,V>  tuple，常見於 dict.items  for k, v in d.items: 直接解包 List.of...（不可變）  tuple... / frozenset...  不可變序列用 tuple，不可變集合用 frozenset Collections.emptyList    空字面量即可；注意別當可變預設參數（附錄 B） Arrays.asList...  ... 或 list...  直接用字面量 StringBuilder  list + \"\".join...  累積字串片段後一次 join，避免 On² PriorityQueue  heapq（對 list 操作）  heapq.heappush/heappop Collections.unmodifiableMap  types.MappingProxyType  唯讀視圖 // Java：StringBuilder 手動串接會留下尾隨分隔符 StringBuilder sb = new StringBuilder; for int n : nums sb.append"
+  },
+  {
+    "file": "appendix-a-java-python-cheatsheet.md",
+    "chapterTitle": "附錄 A：Java ↔ Python 速查對照表",
+    "sectionTitle": "A.4 控制流程與迭代",
+    "sectionId": "a4-控制流程與迭代",
+    "content": "Java  Python  說明 / 詳見章 --------- for int i = 0; i < n; i++  for i in rangen:  range 是惰性序列（詳見第 6 章） for E x : coll  for x in coll:  for-each 是 Python 唯一的 for 帶索引的 for-each  for i, x in enumeratecoll:  enumeratecoll, start=1 可指定起點 同時走兩個集合  for a, b in zipxs, ys:  長度取最短；itertools.ziplongest 補齊 Iterator / Iterable  iter / next（迭代協定）  for 自動呼叫，StopIteration 結束（詳見第 6 章） stream.mapf  fx for x in xs 或 fx for x in xs  generator 惰性、list comprehension 即時 stream.filterp  x for x in xs if px  條件寫在 comprehension 尾端 stream.map.collecttoList  fx for x in xs  一步到位，不需 collector stream.reduce0, a,b->a+b  functools.reduce... 或 sum...  能用內建（sum/max/min/any/all）就別 reduce opt.mapf.orElsed  x = get; fx if x is not None else d  先取得 x，再以條件表達式判斷；無包裝物件（詳見第 9 章） while true { ...; break; }  while True: ...; break  無 do"
+  },
+  {
+    "file": "appendix-a-java-python-cheatsheet.md",
+    "chapterTitle": "附錄 A：Java ↔ Python 速查對照表",
+    "sectionTitle": "A.5 OOP 與型別系統",
+    "sectionId": "a5-oop-與型別系統",
+    "content": "Java  Python  說明 / 詳見章 --------- class Foo { }  class Foo:  無存取修飾子；name 慣例為內部、name 觸發名稱改寫 this  self（明寫的第一參數）  不是關鍵字，是慣例（詳見第 7 章） 建構子 Foo...  def initself, ...  是初始化器；建立物件由 new 負責 static 欄位  類別屬性（class 內、方法外定義）  所有實例共享 static 方法  @staticmethod  無 self／cls 靜態工廠方法  @classmethod（收 cls）  多型友善的替代建構子 getter / setter  @property / @x.setter  先寫公開屬性，需要時再無痛加驗證（詳見第 7 章） record Pointint x, int y  @dataclass  一行生出 init/repr/eq（詳見第 7 章） interface（鴨子型別感）  typing.Protocol（結構子型）  不需顯式 implements，符合形狀即相容（詳見第 8、9 章） interface（名義契約）  abc.ABC + @abstractmethod  需顯式繼承，名義子型 abstract class  abc.ABC  有抽象方法則不可實例化 enum Color { RED, GREEN }  class ColorEnum:  enum.Enum，成員有 .name／.value toString / equals / hashCode  repr / eq / hash  dataclass 可自動生成 extends / implements  class SubBase:  多重繼承用逗號，靠 MRO 解析（詳見第 8 章） super"
+  },
+  {
+    "file": "appendix-a-java-python-cheatsheet.md",
+    "chapterTitle": "附錄 A：Java ↔ Python 速查對照表",
+    "sectionTitle": "A.6 函式式 / Pythonic",
+    "sectionId": "a6-函式式-pythonic",
+    "content": "Java  Python  說明 / 詳見章 --------- a, b -> a + b  lambda a, b: a + b  lambda 限單一運算式；複雜邏輯用 def 方法參考 obj::m  函式物件 obj.m（bound method）  函式是一等公民，直接傳遞（詳見第 3 章） Function<T,R>  CallableT, R（從 collections.abc）  統一用 Callable（詳見第 9 章） Supplier<T>  Callable, T  無參數可呼叫物件 Consumer<T>  CallableT, None Predicate<T>  CallableT, bool @FunctionalInterface  無需  任何 def／lambda 都能傳遞 Stream 惰性管線  generator（yield）  真正惰性、可組合（詳見第 6 章） Comparator.comparingf  key=f（傳給 sorted/max/min）  sortedxs, key=lambda x: x.age Collectors.groupingBy  itertools.groupby（需先排序）或 defaultdict  行為與 Java 不同，留意排序前提 思維差異：Java 的函式式介面是為了讓 lambda 有型別可掛靠；Python 函式天生就是一等物件，不需要 @FunctionalInterface 這層儀式。記住 sorted 的 key= 取代了 Comparator——這是兩邊最頻繁的對照之一。 ---"
+  },
+  {
+    "file": "appendix-a-java-python-cheatsheet.md",
+    "chapterTitle": "附錄 A：Java ↔ Python 速查對照表",
+    "sectionTitle": "A.7 例外與資源",
+    "sectionId": "a7-例外與資源",
+    "content": "Java  Python  說明 / 詳見章 --------- checked exception  無——所有例外都是 unchecked  不必宣告、不強制 catch（詳見第 12 章） throws IOException  無宣告  用 docstring／型別工具溝通可能例外 try-with-resources  with 陳述式（context manager）  enter／exit（詳見第 5、12 章） finally { }  finally:  也有 try/except/else/finally 四段式 catch E e  except E as e:  可 except A, B: 一次抓多型 throw new E  raise E extends Exception  class MyErrorException:  自訂例外繼承 Exception e.initCausec / 建構子帶 cause  raise NewError... from cause  保留例外鏈（cause） e.getCause  e.cause Throwable 階層  BaseException → Exception  一般只攔 Exception，別攔 BaseException try-with-resources → with（佐證）： >>> class Resource: ...     def enterself: print\"acquire\"; return self ...     def exitself, exc: print\"release\"; return False ... >>> with Resource as r: ...     print\"use\" ... acquire use release raise fr"
+  },
+  {
+    "file": "appendix-a-java-python-cheatsheet.md",
+    "chapterTitle": "附錄 A：Java ↔ Python 速查對照表",
+    "sectionTitle": "A.8 並行",
+    "sectionId": "a8-並行",
+    "content": "Java  Python  說明 / 詳見章 --------- new Threadr.start  threading.Threadtarget=fn.start  OS 執行緒，但受 GIL 約束（詳見第 14 章） Runnable  函式（任何 callable）  不需介面 ExecutorService  concurrent.futures.ThreadPoolExecutor  CPU 密集改用 ProcessPoolExecutor Future<T>  concurrent.futures.Future  .result 取值 synchronized  threading.Lock（搭配 with）  with lock: 即臨界區 ReentrantLock  threading.RLock  可重入鎖 CompletableFuture  asyncio + async/await  單執行緒事件迴圈協程（詳見第 14 章） CompletableFuture.allOf  await asyncio.gather...  並行等待多個協程 ThreadLocal<T>  threading.local  執行緒區域儲存 CPU 密集多執行緒加速  改用 multiprocessing  因 GIL，執行緒無法加速 CPU 密集工作 synchronized → Lock（佐證）： >>> import threading >>> lock = threading.Lock; counter = 0 >>> def inc: ...     global counter ...     with lock:            等價於 synchronized 區塊 ...         counter += 1 ... >>> ts = t"
+  },
+  {
+    "file": "appendix-a-java-python-cheatsheet.md",
+    "chapterTitle": "附錄 A：Java ↔ Python 速查對照表",
+    "sectionTitle": "A.9 工程工具鏈",
+    "sectionId": "a9-工程工具鏈",
+    "content": "Java  Python  說明 / 詳見章 --------- Maven / Gradle  uv（或 pip）+ pyproject.toml  uv 速度與鎖檔體驗最佳（詳見第 1、11 章） pom.xml / build.gradle  pyproject.toml  單一標準設定檔，工具共用 本機 JDK 切換  uv python / pyenv  直譯器版本管理 /.m2 倉庫 + classpath  虛擬環境 venv  每專案獨立隔離（詳見第 1 章） JUnit  pytest  assert 即斷言，fixture 取代 @Before（詳見第 13 章） Mockito  unittest.mock（patch/MagicMock）  monkeypatch fixture 亦常用 SLF4J / Logback  logging  標準庫內建，logging.getLoggername（詳見第 12 章） Checkstyle / SpotBugs / PMD  ruff  極快的 linter + formatter，取代多個工具（詳見第 1 章） （無對應）  mypy / pyright  漸進式靜態型別檢查（詳見第 9 章） Spring Boot  FastAPI  型別驅動、Depends 做 DI（詳見第 16 章） Spring DI @Autowired  FastAPI Depends...  函式參數即注入點 JPA / Hibernate  SQLAlchemy 2.0  ORM；Session 對應 EntityManager（詳見第 16 章） Jackson  json（標準庫）/ pydantic  驗證與序列化用 pydantic（詳見第 9、16 章） Bean Validation  pydantic 模"
+  },
+  {
+    "file": "appendix-a-java-python-cheatsheet.md",
+    "chapterTitle": "附錄 A：Java ↔ Python 速查對照表",
+    "sectionTitle": "最關鍵的 10 個思維轉換",
+    "sectionId": "最關鍵的-10-個思維轉換",
+    "content": "1. 沒有編譯器把關——private／final／checked exception 都不存在；嚴謹度靠 mypy + ruff + 測試 + 命名慣例補回（詳見第 9、12、13 章）。 2. Optional<T> 就是 T  None——沒有包裝物件，直接用 is None 分支；別找 .map／.orElse（詳見第 9 章）。 3. Stream 就是 comprehension／generator——... 即時、... 惰性；超過兩層請改用 yield 函式（詳見第 6 章）。 4. interface 一分為二——零侵入用 Protocol（結構子型），強制契約用 abc.ABC（名義子型）（詳見第 8 章）。 5. record／Lombok 就是 @dataclass——一行生出 init／repr／eq，frozen=True 即不可變且可雜湊（詳見第 7 章）。 6. 多執行緒不等於 CPU 平行——GIL 讓執行緒只對 I/O 密集有用；CPU 密集走 multiprocessing（詳見第 14 章）。 7. int 不溢位——任意精度整數讓你不再操心 overflow；精確小數仍用 Decimal（詳見第 2 章）。 8. is vs ==——is 是參考相等（只給 None／singleton 用），== 是值相等（走 eq）（詳見第 2 章）。 9. dict 保證插入順序——不再需要 LinkedHashMap；要不可變改用 tuple／frozenset（詳見第 4 章）。 10. pyproject.toml 是新的 pom.xml——uv 管依賴與環境，型別提示是接上整條現代工具鏈的接口（詳見第 1、11 章）。 > 心法：不要把 Java 的寫法直譯成 Python——先用這張表找到對應的 Python 慣用語，再翻回正文理解「"
+  },
+  {
+    "file": "appendix-b-pitfalls.md",
+    "chapterTitle": "附錄 B：常見陷阱清單（Java 工程師專屬）",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "你已經讀完十八章，知道 Python 怎麼「正確地寫」。但移植十年的 Java 直覺時，有些坑是語法看起來合法、編譯器（mypy）也不一定攔得住、單元測試偶爾才紅一次的那種——它們源自綁定時機（binding time）、身分相等（identity vs equality）、求值時機（evaluation time）與 GIL 等機制差異。本附錄把這些高頻陷阱濃縮成可掃讀的速查表，每一條都附實際跑過的最小重現、機制解釋與正解。建議在 code review 時把結尾的檢查清單貼進 PR 範本。 > 慣例：標注「反模式」或「刻意示範錯誤」的程式碼請勿照抄；每條都有「正解」段落給你帶走。 ---"
+  },
+  {
+    "file": "appendix-b-pitfalls.md",
+    "chapterTitle": "附錄 B：常見陷阱清單（Java 工程師專屬）",
+    "sectionTitle": "B.1 綁定與求值時機",
+    "sectionId": "b1-綁定與求值時機",
+    "content": "陷阱 1：可變預設參數 def fitems= Java 沒有預設參數，你大概用多載（overload）或 Optional 模擬；移植時很自然寫成 def fitems=，以為「每次呼叫沒給就是一個新的空 list」。錯。 > ⚠️ 刻意示範錯誤： > python > def appendtoitem, items=: >     items.appenditem >     return items > > printappendto1 > printappendto2 > printappendto3 > > 實際輸出： > > 1 > 1, 2 > 1, 2, 3 > 為什麼：預設值物件在函式定義期（def 執行時）只建立一次，綁在 function 物件的 defaults 上，被所有呼叫共用。這跟「import-time 副作用」「class body 求值」是同一個機制（程式碼由上而下執行，def 本身是一個敘述）。list 是可變的，於是每次 mutate 都累積在同一個物件上。 正解：用 None 哨兵（sentinel），在函式體內建立新物件： def appendtoitem, items: list  None = None -> list: if items is None: items = items.appenditem return items 詳見第 3 章（可變預設參數、type hints）。 --- 陷阱 2：預設值與型別提示在「定義期」求值 承上，不只 list 會中招。任何寫在預設值位置的運算式都在定義期求值一次，之後恆定不變——這常見於用「現在時間」「讀環境變數」「連資料庫」當預設值。 > ⚠️ 刻意示範錯誤： > python > import time > > def logmsg, ts=time.time: >    "
+  },
+  {
+    "file": "appendix-b-pitfalls.md",
+    "chapterTitle": "附錄 B：常見陷阱清單（Java 工程師專屬）",
+    "sectionTitle": "B.2 身分、相等與數值",
+    "sectionId": "b2-身分相等與數值",
+    "content": "陷阱 4：is 與 == 混用；is 只該用於 None / 哨兵 Java 的 == 比參考、.equals 比內容，你被訓練成「物件一律用 .equals」。到了 Python，== 才是內容比較（會呼叫 eq），is 是身分比較（記憶體同一物件，等同 Java 的 ==）。把兩者對調是常見手滑。 > ⚠️ 刻意示範錯誤與對照： > python > class Weird: >     def eqself, other: >         return True > > w = Weird > printw == None    eq 被呼叫，可能說謊 > printw is None    身分比較，不會被騙 > > 實際輸出： > > True > False > > 接著示範「值一樣 ≠ 同一物件」，但這一段必須在互動式 REPL逐行輸入才看得到，原因見陷阱 5： > python > >>> a = \"hello world this is long\" > >>> b = \"hello world this is long\" > >>> a == b       值相等 > True > >>> a is b       身分比較，跨編譯單元各自建立物件 > False > 為什麼：== 可被 eq 覆寫，連跟 None 比都可能回 True；只有 is 保證問的是「同一個物件嗎」。判斷 None、True、False 或自訂哨兵時務必用 is，因為它們是單例（singleton）。反之，比較內容（字串、數字、容器）一律用 ==——上面 REPL 裡 a is b 回 False 證明「值一樣不代表同一物件」。注意這個 False 只在 REPL（各行獨立編譯）成立；若把同樣兩行寫進一個 .py 腳本，CPython 會在編譯期把兩個相同字面量 inter"
+  },
+  {
+    "file": "appendix-b-pitfalls.md",
+    "chapterTitle": "附錄 B：常見陷阱清單（Java 工程師專屬）",
+    "sectionTitle": "B.3 容器、別名與共享狀態",
+    "sectionId": "b3-容器別名與共享狀態",
+    "content": "陷阱 8：別名與淺拷貝——賦值不複製、0nm 共享同一列 兩個同源的坑放一起看。其一，Java 物件參考賦值也是別名，這點你懂；但 Python 沒有原生型別的 value semantics，連看似輕量的 list/dict 賦值都只是多綁一個名字到同一物件。 > ⚠️ 刻意示範錯誤（賦值即別名）： > python > >>> a = 1, 2, 3 > >>> b = a > >>> b.append4 > >>> a > 1, 2, 3, 4 > 為什麼：b = a 只是讓名字 b 綁到 a 指的同一個 list 物件（name binding，第 2 章）。透過任一名字 mutate 都會反映到另一個。 其二，要初始化二維陣列，Java 寫 new intmn 各列獨立。Python 用 0nm 看起來等價，其實 m 是把同一個內層 list 的參考複製 m 份。 > ⚠️ 刻意示範錯誤（m 共享內層列）： > python > >>> grid = 0  3  2 > >>> grid00 = 9 > >>> grid > 9, 0, 0, 9, 0, 0 > >>> grid0 is grid1 > True > 為什麼： 複製的是元素參考，不是深拷貝；外層兩個元素指向同一個內層 list，改一個就「全改」。copy.copy（淺拷貝）也只複製一層，巢狀容器仍共享： > ⚠️ 對照淺 vs 深： > python > >>> import copy > >>> original = 1, 2, 3, 4 > >>> shallow = copy.copyoriginal > >>> shallow0.append99 > >>> original                        內層被一起改到 > 1, 2, 99, 3, 4 > 正解：要拷貝就"
+  },
+  {
+    "file": "appendix-b-pitfalls.md",
+    "chapterTitle": "附錄 B：常見陷阱清單（Java 工程師專屬）",
+    "sectionTitle": "B.4 語法陷阱",
+    "sectionId": "b4-語法陷阱",
+    "content": "陷阱 11：連鎖比較、and/or 回傳運算元、單元素 tuple 三個獨立但都會讓 Java 人愣住的語法細節： a 連鎖比較：Python 支援 a < b < c，這是數學寫法不是兩個布林。Java 寫 1 < x < 10 根本編譯不過（boolean < int）。 >>> x = 5 >>> 1 < x < 10 True >>> 1 < x <= 5 < 100 True 中間運算元只求值一次，且具短路特性。 b and/or 回傳「運算元」而非 bool：Java 的 &&/ 一定回 boolean；Python 回的是最後決定結果的那個運算元本體。 >>> \"a\" or \"b\" 'a' >>> \"\" or \"fallback\" 'fallback' >>> 0 and 99 0 >>> 2 and 99 99 這常被用作 x = config or default 的慣用法，但若 config 是合法的 falsy 值（0、\"\"、）就會誤判——這時該用 x if x is not None else default。 c 單元素 tuple 一定要逗號：括號不構成 tuple，逗號才構成。 >>> type1 <class 'int'> >>> type1, <class 'tuple'> 漏掉逗號是「函式只想回一個元素的 tuple」「裝飾器/路由設定」最隱晦的 bug 來源。 詳見第 2 章（運算子）、第 5 章（慣用法、f-string、海象）。 ---"
+  },
+  {
+    "file": "appendix-b-pitfalls.md",
+    "chapterTitle": "附錄 B：常見陷阱清單（Java 工程師專屬）",
+    "sectionTitle": "B.5 例外與日誌",
+    "sectionId": "b5-例外與日誌",
+    "content": "陷阱 12：裸 except 吞例外、except 子類順序寫反 Java 有 checked exception 與「子類在前、父類在後」的編譯期檢查；Python 兩者都沒有（第 12 章說明無 checked exception）。寫反順序或裸 except 不會被編譯器擋下。 > ⚠️ 刻意示範錯誤： > python > try: >     raise ValueError\"specific\" > except Exception: >     print\"攔到 Exception\" > except ValueError: >     print\"攔到 ValueError（永遠不會到這）\" > > 實際輸出： > > 攔到 Exception > 為什麼：except 由上而下比對，第一個符合的就贏。ValueError 是 Exception 子類，父類寫在前面就把所有東西攔光，後面的子類分支變成死碼（Python 不會像 Java 那樣編譯期報「已被攔截」）。直譯器與 mypy 都不會攔，但 ruff／pylint 等 linter 可偵測到無法到達的 except（如 ruff 的 B014、pylint 的 W0703／bad-except-order）與過寬攔截，建議納入 CI。 另一半問題是裸 except: 會連 KeyboardInterrupt、SystemExit、MemoryError 都吞掉，讓程式無法被 Ctrl-C 中止、也掩蓋真正的 bug： def parses: try: return ints except:           反模式：吞掉一切 return None 正解：子類在前、父類在後；只攔你能處理的最窄型別；保留例外鏈： try: value = ints except ValueError as exc: r"
+  },
+  {
+    "file": "appendix-b-pitfalls.md",
+    "chapterTitle": "附錄 B：常見陷阱清單（Java 工程師專屬）",
+    "sectionTitle": "B.6 並行與 import",
+    "sectionId": "b6-並行與-import",
+    "content": "陷阱 14：以為 thread 能加速 CPU bound（GIL） Java 的 thread 是真平行，CPU 密集任務開多執行緒就提速。Python 的 CPython 有 GIL（全域直譯器鎖，Global Interpreter Lock）：同一時刻只有一條 thread 在執行 Python bytecode。CPU 密集用 thread 等於沒開。 > 以下為實測（CPython 3.14，兩個各數 2000 萬次的迴圈）： > python > import time > from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor > > def countn: >     total = 0 >     for  in rangen: >         total += 1 >     return total > > N = 20000000 > > def main: >     t0 = time.perfcounter; countN; countN >     printf\"序列        : {time.perfcounter-t0:.2f}s\" >     t0 = time.perfcounter >     with ThreadPoolExecutormaxworkers=2 as ex: >         listex.mapcount, N, N >     printf\"ThreadPool  : {time.perfcounter-t0:.2f}s\" >     t0 = time.perfcounter >     with ProcessPoolExecutormaxworkers=2 as ex: >         listex.m"
+  },
+  {
+    "file": "appendix-b-pitfalls.md",
+    "chapterTitle": "附錄 B：常見陷阱清單（Java 工程師專屬）",
+    "sectionTitle": "B.7 自我檢查清單（Review Checklist）",
+    "sectionId": "b7-自我檢查清單review-checklist",
+    "content": "把這份貼進 PR 範本，逐條掃： -   沒有可變預設參數：函式簽章看到 =、={}、=set、=SomeMutable 一律改成 =None + 函式體建立（陷阱 1）。 -   預設值/型別提示無定義期副作用：預設值不寫 time.time、讀環境、連線等會「凍結」的運算式（陷阱 2）。 -   迴圈內的 lambda/closure 有快照變數：lambda x=x: ... 或別在迴圈裡建會捕捉迴圈變數的 closure（陷阱 3）。 -   is 只用於 None/單例；內容比較一律 ==，不對數字/字串用 is（陷阱 4、5）。 -   浮點不用 ==：金額用 Decimal\"...\"，近似用 math.isclose（陷阱 6）。 -   除法語意確認：要整數用 //，留意負數 floor vs Java truncation，餘數同號規則（陷阱 7）。 -   拷貝是顯式的：賦值=別名；要複製用 .copy/list/deepcopy，沒寫 ...nm（陷阱 8）。 -   實例狀態在 init 用 self. 建立，不在 class body 放可變物件當欄位；dataclass 用 defaultfactory（陷阱 9）。 -   沒有邊迭代邊改容器：改用 comprehension 產生新容器或迭代副本（陷阱 10）。 -   成員測試別對 list 反覆 in：查重／高頻成員測試改用 set/dict（O1），雙端高頻進出用 deque（陷阱 10.5）。 -   語法細節：留意連鎖比較、and/or 回運算元（falsy 值用 is not None）、單元素 tuple 的逗號（陷阱 11）。 -   例外攔得夠窄：無裸 except:；except 子類在前、父類在後；用 raise ... from（陷阱 12）。 -   用 loggin"
+  },
+  {
+    "file": "appendix-c-resources.md",
+    "chapterTitle": "附錄 C：建議學習資源",
+    "sectionTitle": "概覽",
+    "sectionId": "overview",
+    "content": "讀完前 18 章，你已具備把 Python 寫得「像 Python」而非「用 Python 寫 Java」的底氣。但語言與生態系演進快速，真正的進階來自持續閱讀一手資料。這份指南為資深 Java 工程師量身挑選：跳過入門教學的水分，直指官方規格、深度書籍與高密度社群。每項資源都標明「為何值得 / 對應本書哪幾章」，方便你按需取用。 ---"
+  },
+  {
+    "file": "appendix-c-resources.md",
+    "chapterTitle": "附錄 C：建議學習資源",
+    "sectionTitle": "C.1 官方文件（docs.python.org）",
+    "sectionId": "c1-官方文件docspythonorg",
+    "content": "官方文件的品質遠勝多數第三方教學，且永遠與直譯器版本同步。對於習慣讀 JLS（Java Language Specification）與 JavaDoc 的你，這裡是最自然的起點。 文件  網址  為何值得 / 對應章節 ---  ---  --- The Python Tutorial  <https://docs.python.org/3/tutorial/>  官方導覽，半天可通讀。CP 值最高的一份。對應第 2–6 章 Language Reference  <https://docs.python.org/3/reference/>  等同 JLS：name binding、資料模型（data model）、執行模型。讀 datamodel 一章理解魔術方法。對應第 2、7、8、10 章 Library Reference  <https://docs.python.org/3/library/>  標準函式庫聖經。collections、itertools、functools、pathlib、asyncio 都在此。對應第 4、6、14、15 章 Python HOWTOs  <https://docs.python.org/3/howto/>  主題式深入文（logging、sorting、descriptor、regex、enum）。Descriptor HOWTO 必讀。對應第 10、12、15 章 What's New in Python  <https://docs.python.org/3/whatsnew/>  每版變更總覽。建議從 3.10 讀起：3.10 的 pattern matching（match/case）、3.12 的型別參數語法（PEP 695）、3.13 起的 free-threading（PEP 703）。對應第 1、9、14 "
+  },
+  {
+    "file": "appendix-c-resources.md",
+    "chapterTitle": "附錄 C：建議學習資源",
+    "sectionTitle": "C.2 書籍",
+    "sectionId": "c2-書籍",
+    "content": "書名  作者 / 版次  為何值得 / 適合誰 / 對應章節 ---  ---  --- Fluent Python  Luciano Ramalho, 2nd ed, O'Reilly 2022  資深工程師的必讀。深入資料模型、魔術方法、descriptor、並行與型別，正好接續你已掌握的 OOP 直覺。對應第 4、6、7、8、10、14 章 Effective Python  Brett Slatkin, Addison-Wesley  具體建議集，每條 2–4 頁，速讀型。像 Java 的《Effective Java》。3rd ed（125 條，2024）已出，要最新可選第 3 版；本書對照章節以 2nd ed（90 條，2019）為準。 對應第 3、5、6、9、12、13 章 Python Cookbook  David Beazley & Brian K. Jones, 3rd ed, O'Reilly 2013  問題導向食譜，遇到具體任務時查閱。標準庫技巧密集。對應第 4、6、15 章 Robust Python  Patrick Viafore, O'Reilly 2021  為「愛型別的 Java 人」而寫：用型別提示、Protocol、enum、不可變性把大型程式碼庫變得可維護。對應第 8、9、12 章 Architecture Patterns with Python  Harry Percival & Bob Gregory, O'Reilly 2020  從 Spring/DDD 背景轉 Python 的橋樑：Repository、Unit of Work、依賴注入、事件驅動。對應第 11、16、18 章 > 路線提示：若只買一本，選《Fluent Python》。若你最在意「把 Python 寫得跟 Java 一樣穩」，加買《Robust P"
+  },
+  {
+    "file": "appendix-c-resources.md",
+    "chapterTitle": "附錄 C：建議學習資源",
+    "sectionTitle": "C.3 線上教學與部落格",
+    "sectionId": "c3-線上教學與部落格",
+    "content": "- Real Python（<https://realpython.com/>）：品質最穩定的英文教學站，主題涵蓋全面，多數深度文有付費牆但免費內容已足夠。搭配第 13–17 章的實務主題閱讀。 - 官方 Tutorial（見 C.1）：仍是最佳免費起點，不要跳過。 - Raymond Hettinger 的演講：經典 PyCon 講題 \"Transforming Code into Beautiful, Idiomatic Python\"（YouTube 可搜尋）示範如何把 C/Java 式迴圈改寫成 Pythonic 寫法。對應第 5、6 章。他的 \"Beyond PEP 8\" 也值得一看。 - mCoding（James Murphy，YouTube）：短而硬核，講 CPython 內部、型別、慣用法。對應第 2、9、10 章。 - ArjanCodes（YouTube）：物件導向設計、SOLID、設計模式在 Python 的呈現，最貼近 Java 工程師的思考。對應第 7、8、11 章。 下面這類「把命令式迴圈 Pythonic 化」正是 Hettinger 反覆強調的，以 itertools 為例： >>> import itertools >>> listitertools.pairwise1, 2, 3, 4    相鄰配對，免手寫索引 1, 2, 2, 3, 3, 4 >>> k, listg for k, g in itertools.groupby\"aaabbc\" 'a', 'a', 'a', 'a', 'b', 'b', 'b', 'c', 'c' ---"
+  },
+  {
+    "file": "appendix-c-resources.md",
+    "chapterTitle": "附錄 C：建議學習資源",
+    "sectionTitle": "C.4 練習平台",
+    "sectionId": "c4-練習平台",
+    "content": "刻意練習能把「讀懂」變成「寫順」。建議用 Python 重做你熟悉的題目，專注在慣用法而非演算法。 平台  網址  為何值得 / 對應章節 ---  ---  --- Exercism — Python track  <https://exercism.org/tracks/python>  有人工 code review，會糾正你的「Java 腔」。最推薦的起點。對應第 5、7 章 LeetCode  <https://leetcode.com/>  用 Python 重刷熟題，體會切片、collections（Counter/deque）、解包的威力。對應第 4 章 Advent of Code  <https://adventofcode.com/>  每年 12 月的解謎活動，題目適合練解析與資料結構。對應第 4、6、15 章 Codewars  <https://www.codewars.com/>  小型 kata，快速暖身慣用法。對應第 5 章 練習時請同步寫測試，套用第 13 章的 pytest 心法（fixture、參數化、hypothesis 性質測試），把「能跑」升級成「可信」。 ---"
+  },
+  {
+    "file": "appendix-c-resources.md",
+    "chapterTitle": "附錄 C：建議學習資源",
+    "sectionTitle": "C.5 工具官方文件",
+    "sectionId": "c5-工具官方文件",
+    "content": "本書工具鏈的一手文件。遇到設定或行為疑問時，先查官方文件再 Google。 工具  文件  對應章節 ---  ---  --- uv  <https://docs.astral.sh/uv/>  第 1、11、18 章（套件 / 環境 / 專案管理） ruff  <https://docs.astral.sh/ruff/>  第 1 章（lint + format，取代 flake8/black/isort） mypy  <https://mypy.readthedocs.io/>  第 9 章（靜態型別檢查） pytest  <https://docs.pytest.org/>  第 13 章（測試框架） pydantic  <https://docs.pydantic.dev/>  第 9、16、18 章（資料驗證 / 設定） FastAPI  <https://fastapi.tiangolo.com/>  第 16、18 章（Web 框架 + DI） SQLAlchemy  <https://docs.sqlalchemy.org/>  第 16、18 章（ORM，對照 JPA/Hibernate） ---"
+  },
+  {
+    "file": "appendix-c-resources.md",
+    "chapterTitle": "附錄 C：建議學習資源",
+    "sectionTitle": "C.6 社群",
+    "sectionId": "c6-社群",
+    "content": "- Python Discord（<https://discord.com/invite/python>）：活躍即時問答，有專屬幫助頻道。 - r/Python 與 r/learnpython（reddit.com）：前者偏生態系新聞與討論，後者適合提問。 - Stack Overflow python tag（<https://stackoverflow.com/questions/tagged/python>）：搜尋既有答案的首選。 - 電子報：PyCoder's Weekly（<https://pycoders.com/>）與 Python Weekly（<https://www.pythonweekly.com/>），每週彙整重要文章與套件，是低成本保持資訊更新的方式。 ---"
+  },
+  {
+    "file": "appendix-c-resources.md",
+    "chapterTitle": "附錄 C：建議學習資源",
+    "sectionTitle": "C.7 給 Java 工程師的閱讀路線圖",
+    "sectionId": "c7-給-java-工程師的閱讀路線圖",
+    "content": "把上述資源與本書 18 章串成一條 4–8 週的路徑。每階段先讀本書章節建立骨架，再用外部資源補肉。 第 1 週：地基與語感（對應第 1–5 章） 1. 通讀官方 Tutorial（半天到一天）。 2. 本書第 1–5 章：工具鏈、語法、函式、資料結構、Pythonic 慣用法。 3. 開始 Exercism Python track，讓 review 糾正你的 Java 腔。 4. 看 Hettinger 的 \"Transforming Code into Beautiful, Idiomatic Python\"。 第 2–3 週：物件模型與抽象（對應第 6–10 章） 1. 本書第 6–10 章：迭代器、類別、繼承與協定、型別提示、裝飾器與元程式設計。 2. 同步讀 Fluent Python 對應章節（資料模型、魔術方法、descriptor）。 3. 愛型別的話加讀 Robust Python，把 Protocol 與 enum 內化。 4. 閱讀 Descriptor HOWTO 與 PEP 484。 下面是貫穿第 7–9 章的核心對照——以不可變值物件為例，@dataclassfrozen=True, slots=True 對應 Java 的 record（同樣自動產生 equals/hashCode）： >>> from dataclasses import dataclass >>> @dataclassfrozen=True, slots=True ... class Point: ...     x: int ...     y: int ... >>> p = Point1, 2 >>> p Pointx=1, y=2 >>> hashp == hashPoint1, 2    自動產生 hash 與 eq True 對照現代型別提示寫法（listin"
+  }
+]

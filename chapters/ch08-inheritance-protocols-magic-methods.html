@@ -1,0 +1,559 @@
+<h1 id="第-8-章繼承協定與魔術方法">第 8 章：繼承、協定與魔術方法</h1><p>繼承你太熟了，但 Python 在這塊有兩個 Java 沒有的領域要重新學：一是<strong>多重繼承</strong>與它背後的 MRO（方法解析順序），Java 用「單一繼承 + 介面」繞開的問題，Python 正面迎擊；二是<strong>結構型別</strong>（structural typing）的 <code>Protocol</code>，讓你能享受 duck typing 的彈性又拿回靜態檢查。再加上 Python 真正的超能力——<strong>魔術方法</strong>（magic / dunder methods），讓你的物件能用 <code>len()</code>、<code>[]</code>、<code>+</code>、<code>()</code> 這些內建語法。本章也會講為什麼在 Python 裡「組合優於繼承」這句老話更容易落實。</p>
+<hr>
+<h2 id="繼承與-super">繼承與 `super()`</h2><p>基本繼承跟 Java 幾乎一樣，差別在語法細節：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-248" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Animal%3A%0A%20%20%20%20def%20__init__(self%2C%20name%3A%20str)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.name%20%3D%20name%0A%0A%20%20%20%20def%20speak(self)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20return%20%22...%22%0A%0Aclass%20Dog(Animal)%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20class%20Dog(Animal)%20%E2%89%88%20class%20Dog%20extends%20Animal%0A%20%20%20%20def%20__init__(self%2C%20name%3A%20str%2C%20breed%3A%20str)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20super().__init__(name)%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%91%BC%E5%8F%AB%E7%88%B6%E9%A1%9E%E5%88%A5%E7%9A%84%20__init__%0A%20%20%20%20%20%20%20%20self.breed%20%3D%20breed%0A%0A%20%20%20%20def%20speak(self)%20-%3E%20str%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20override%EF%BC%8C%E4%B8%8D%E9%9C%80%E8%A6%81%20%40Override%20%E6%A8%99%E6%B3%A8%0A%20%20%20%20%20%20%20%20return%20%22Woof%22'), 'copy-btn-248')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Animal:
+    def __init__(self, name: str) -&gt; None:
+        self.name = name
+
+    def speak(self) -&gt; str:
+        return "..."
+
+class Dog(Animal):                       # class Dog(Animal) ≈ class Dog extends Animal
+    def __init__(self, name: str, breed: str) -&gt; None:
+        super().__init__(name)           # 呼叫父類別的 __init__
+        self.breed = breed
+
+    def speak(self) -&gt; str:              # override，不需要 @Override 標注
+        return "Woof"</code></pre>
+      </div>
+    <p>幾個對照重點：</p>
+<ul>
+<li><strong><code>super().__init__(name)</code></strong> 對應 Java 的 <code>super(name)</code>。但 Python 3 的 <code>super()</code> 不用帶參數（Python 2 要寫 <code>super(Dog, self)</code>，現在看到那種寫法就知道是舊碼）。</li>
+<li><strong>override 不需要 <code>@Override</code></strong>。Python 沒有這個標注；子類別定義同名方法就覆蓋了。代價是「拼錯方法名變成新方法而非覆蓋」這種錯誤，編譯器不會幫你抓——這正是型別檢查工具（第 9 章）的價值之一。</li>
+<li><strong>沒有 <code>final</code></strong>。任何類別都能被繼承、任何方法都能被覆蓋。</li>
+</ul>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>super()</code> 在單一繼承下就等於 Java 的 <code>super</code>。但下一節你會看到，在多重繼承裡 <code>super()</code> 的意義會超出「父類別」——它其實是「MRO 中的下一個」。</p>
+</div><hr>
+<h2 id="多重繼承與-mro">多重繼承與 MRO</h2><p>Java 嚴禁多重類別繼承（只能 <code>extends</code> 一個類別，但能 <code>implements</code> 多個介面），就是為了躲開「菱形繼承」（diamond problem）的歧義。Python 允許多重繼承，並用 <strong>MRO（Method Resolution Order，方法解析順序）</strong> 明確定義「該找哪個父類別」。</p>
+<p>MRO 由 <strong>C3 線性化演算法</strong>算出，存在 <code>__mro__</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-249" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20A%3A%0A%20%20%20%20def%20greet(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20print(%22A%22)%0A%0Aclass%20B(A)%3A%0A%20%20%20%20def%20greet(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20print(%22B%22)%0A%20%20%20%20%20%20%20%20super().greet()%0A%0Aclass%20C(A)%3A%0A%20%20%20%20def%20greet(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20print(%22C%22)%0A%20%20%20%20%20%20%20%20super().greet()%0A%0Aclass%20D(B%2C%20C)%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%8F%B1%E5%BD%A2%EF%BC%9AD%20%E7%B9%BC%E6%89%BF%20B%E3%80%81C%EF%BC%8C%E5%85%A9%E8%80%85%E9%83%BD%E7%B9%BC%E6%89%BF%20A%0A%20%20%20%20def%20greet(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20print(%22D%22)%0A%20%20%20%20%20%20%20%20super().greet()'), 'copy-btn-249')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class A:
+    def greet(self) -&gt; None:
+        print("A")
+
+class B(A):
+    def greet(self) -&gt; None:
+        print("B")
+        super().greet()
+
+class C(A):
+    def greet(self) -&gt; None:
+        print("C")
+        super().greet()
+
+class D(B, C):                  # 菱形：D 繼承 B、C，兩者都繼承 A
+    def greet(self) -&gt; None:
+        print("D")
+        super().greet()</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-250" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20%5Bcls.__name__%20for%20cls%20in%20D.__mro__%5D%0A%5B%27D%27%2C%20%27B%27%2C%20%27C%27%2C%20%27A%27%2C%20%27object%27%5D%0A%3E%3E%3E%20D().greet()%0AD%0AB%0AC%0AA'), 'copy-btn-250')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; [cls.__name__ for cls in D.__mro__]
+['D', 'B', 'C', 'A', 'object']
+&gt;&gt;&gt; D().greet()
+D
+B
+C
+A</code></pre>
+      </div>
+    <p>停下來看這個輸出的驚人之處：<code>B.greet</code> 裡的 <code>super().greet()</code> <strong>呼叫的是 <code>C.greet</code>，不是 <code>A.greet</code></strong>——即使 <code>B</code> 的程式碼裡 <code>C</code> 連影子都沒有。這就是 Java 工程師最容易誤解的地方：</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>super()</code> 不是「我的父類別」，而是「<strong>MRO 裡排在我後面的下一個類別</strong>」。在多重繼承中，<code>super()</code> 的目標取決於<strong>最終實例的 MRO</strong>，而不是定義 <code>super()</code> 那行所在的類別。把 <code>super()</code> 讀成「parent」會在菱形繼承裡完全猜錯。</p>
+</div><p>這套機制叫<strong>協作式多重繼承</strong>（cooperative multiple inheritance）：每個類別都呼叫 <code>super()</code>，MRO 保證每個類別<strong>只被走訪一次</strong>（上面 <code>A</code> 只印一次，不是 B、C 各帶出一次）。要讓它正確運作，協作鏈上的方法簽章要相容（這也是為什麼多重繼承容易出錯、要謹慎使用）。</p>
+<p>「簽章要相容」在 <code>__init__</code> 上最容易翻車：MRO 上每個類別都要能把參數往下一棒傳，但它們各自需要的參數又不同。標準解法是<strong>每個協作式 <code>__init__</code> 都收 <code>**kwargs</code>，取走自己要的、其餘原封不動往下傳</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-251" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20Any%0A%0Aclass%20Base%3A%0A%20%20%20%20def%20__init__(self%2C%20**kwargs%3A%20Any)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20super().__init__()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%8F%88%E5%B0%BE%EF%BC%9Aobject.__init__%20%E4%B8%8D%E6%94%B6%E5%A4%9A%E9%A4%98%E5%8F%83%E6%95%B8%EF%BC%8C%E5%88%B0%E6%AD%A4%E5%90%83%E4%B9%BE%E6%B7%A8%0A%0Aclass%20SerializableMixin%3A%0A%20%20%20%20def%20__init__(self%2C%20*%2C%20fmt%3A%20str%20%3D%20%22json%22%2C%20**kwargs%3A%20Any)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.fmt%20%3D%20fmt%0A%20%20%20%20%20%20%20%20super().__init__(**kwargs)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8F%96%E8%B5%B0%20fmt%EF%BC%8C%E5%85%B6%E9%A4%98%E5%BE%80%20MRO%20%E4%B8%8B%E4%B8%80%E6%A3%92%E5%82%B3%0A%0Aclass%20TimestampedMixin%3A%0A%20%20%20%20def%20__init__(self%2C%20*%2C%20created_at%3A%20str%20%3D%20%22now%22%2C%20**kwargs%3A%20Any)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.created_at%20%3D%20created_at%0A%20%20%20%20%20%20%20%20super().__init__(**kwargs)%0A%0Aclass%20Document(SerializableMixin%2C%20TimestampedMixin%2C%20Base)%3A%0A%20%20%20%20def%20__init__(self%2C%20title%3A%20str%2C%20**kwargs%3A%20Any)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.title%20%3D%20title%0A%20%20%20%20%20%20%20%20super().__init__(**kwargs)'), 'copy-btn-251')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import Any
+
+class Base:
+    def __init__(self, **kwargs: Any) -&gt; None:
+        super().__init__()                       # 鏈尾：object.__init__ 不收多餘參數，到此吃乾淨
+
+class SerializableMixin:
+    def __init__(self, *, fmt: str = "json", **kwargs: Any) -&gt; None:
+        self.fmt = fmt
+        super().__init__(**kwargs)               # 取走 fmt，其餘往 MRO 下一棒傳
+
+class TimestampedMixin:
+    def __init__(self, *, created_at: str = "now", **kwargs: Any) -&gt; None:
+        self.created_at = created_at
+        super().__init__(**kwargs)
+
+class Document(SerializableMixin, TimestampedMixin, Base):
+    def __init__(self, title: str, **kwargs: Any) -&gt; None:
+        self.title = title
+        super().__init__(**kwargs)</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-252" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20d%20%3D%20Document(%22%E5%A0%B1%E5%91%8A%22%2C%20fmt%3D%22yaml%22%2C%20created_at%3D%222026-06-16%22)%0A%3E%3E%3E%20d.title%2C%20d.fmt%2C%20d.created_at%0A(%27%E5%A0%B1%E5%91%8A%27%2C%20%27yaml%27%2C%20%272026-06-16%27)%0A%3E%3E%3E%20%5Bc.__name__%20for%20c%20in%20Document.__mro__%5D%0A%5B%27Document%27%2C%20%27SerializableMixin%27%2C%20%27TimestampedMixin%27%2C%20%27Base%27%2C%20%27object%27%5D'), 'copy-btn-252')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; d = Document("報告", fmt="yaml", created_at="2026-06-16")
+&gt;&gt;&gt; d.title, d.fmt, d.created_at
+('報告', 'yaml', '2026-06-16')
+&gt;&gt;&gt; [c.__name__ for c in Document.__mro__]
+['Document', 'SerializableMixin', 'TimestampedMixin', 'Base', 'object']</code></pre>
+      </div>
+    <p>關鍵紀律：(1) mixin 用<strong>僅限關鍵字參數</strong>（<code>*</code> 後的 <code>fmt</code>、<code>created_at</code>）避免位置參數對位混亂；(2) 每一棒都 <code>super().__init__(**kwargs)</code> 把剩下的傳下去；(3) 鏈尾要有一個吃乾淨的終點（這裡 <code>Base.__init__</code> 只呼叫無參數的 <code>super().__init__()</code>），否則多餘的 <code>kwargs</code> 傳到 <code>object.__init__</code> 會 <code>TypeError</code>。這套寫法不容易維護，所以實務上<strong>能用組合就別走這條路</strong>——只有當你真的需要可疊加的有狀態 mixin 時才這麼寫。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：多重繼承威力大但複雜。實務上最常見的「乾淨」用法是 <strong>mixin</strong>（後面會講）——用小而專一、不帶狀態的類別疊加能力。一般的「is-a」階層維持單一繼承，能用組合就別硬用多重繼承。</p>
+</div><hr>
+<h2 id="抽象類別abcabc-與-abstractmethod">抽象類別：`abc.ABC` 與 `@abstractmethod`</h2><p>對照 Java 的 <code>abstract class</code>：定義介面契約、強迫子類別實作、自己不能被實例化。Python 用 <code>abc</code> 模組：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-253" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20abc%20import%20ABC%2C%20abstractmethod%0A%0Aclass%20Shape(ABC)%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%B9%BC%E6%89%BF%20ABC%20%E4%BD%BF%E5%AE%83%E6%88%90%E7%82%BA%E6%8A%BD%E8%B1%A1%E5%9F%BA%E5%BA%95%E9%A1%9E%E5%88%A5%0A%20%20%20%20%40abstractmethod%0A%20%20%20%20def%20area(self)%20-%3E%20float%3A%0A%20%20%20%20%20%20%20%20...%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%B2%92%E6%9C%89%E5%AF%A6%E4%BD%9C%EF%BC%8C%E5%AD%90%E9%A1%9E%E5%88%A5%E5%BF%85%E9%A0%88%E6%8F%90%E4%BE%9B%0A%0A%20%20%20%20def%20describe(self)%20-%3E%20str%3A%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%8A%BD%E8%B1%A1%E9%A1%9E%E5%88%A5%E5%8F%AF%E4%BB%A5%E6%9C%89%E5%85%B7%E9%AB%94%E6%96%B9%E6%B3%95%0A%20%20%20%20%20%20%20%20return%20f%22%E9%80%99%E5%80%8B%E5%BD%A2%E7%8B%80%E9%9D%A2%E7%A9%8D%E6%98%AF%20%7Bself.area()%3A.2f%7D%22%0A%0Aclass%20Circle(Shape)%3A%0A%20%20%20%20def%20__init__(self%2C%20radius%3A%20float)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.radius%20%3D%20radius%0A%0A%20%20%20%20def%20area(self)%20-%3E%20float%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%BF%85%E9%A0%88%E5%AF%A6%E4%BD%9C%20area%EF%BC%8C%E5%90%A6%E5%89%87%20Circle%20%E4%B9%9F%E6%98%AF%E6%8A%BD%E8%B1%A1%E7%9A%84%0A%20%20%20%20%20%20%20%20return%203.141592653589793%20*%20self.radius%20**%202'), 'copy-btn-253')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from abc import ABC, abstractmethod
+
+class Shape(ABC):                        # 繼承 ABC 使它成為抽象基底類別
+    @abstractmethod
+    def area(self) -&gt; float:
+        ...                              # 沒有實作，子類別必須提供
+
+    def describe(self) -&gt; str:           # 抽象類別可以有具體方法
+        return f"這個形狀面積是 {self.area():.2f}"
+
+class Circle(Shape):
+    def __init__(self, radius: float) -&gt; None:
+        self.radius = radius
+
+    def area(self) -&gt; float:             # 必須實作 area，否則 Circle 也是抽象的
+        return 3.141592653589793 * self.radius ** 2</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-254" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20Shape()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%B8%8D%E8%83%BD%E5%AF%A6%E4%BE%8B%E5%8C%96%E6%8A%BD%E8%B1%A1%E9%A1%9E%E5%88%A5%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0ATypeError%3A%20Can%27t%20instantiate%20abstract%20class%20Shape%20without%20an%20implementation%20for%20abstract%20method%20%27area%27%0A%3E%3E%3E%20c%20%3D%20Circle(5)%0A%3E%3E%3E%20c.describe()%0A%27%E9%80%99%E5%80%8B%E5%BD%A2%E7%8B%80%E9%9D%A2%E7%A9%8D%E6%98%AF%2078.54%27'), 'copy-btn-254')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; Shape()                              # 不能實例化抽象類別
+Traceback (most recent call last):
+    ...
+TypeError: Can't instantiate abstract class Shape without an implementation for abstract method 'area'
+&gt;&gt;&gt; c = Circle(5)
+&gt;&gt;&gt; c.describe()
+'這個形狀面積是 78.54'</code></pre>
+      </div>
+    <p>跟 Java <code>abstract</code> 行為一致：少實作一個抽象方法，連子類別都不能被實例化。差別只在 Python 是「執行期」在你嘗試 <code>Circle()</code> 時才報錯，不是編譯期。</p>
+<hr>
+<h2 id="protocol結構型別vs-abc名義型別">`Protocol`（結構型別）vs ABC（名義型別）</h2><p>這是 Python 型別世界裡跟 Java 差最多、也最值得學的觀念。先把兩種「型別相容」的哲學講清楚：</p>
+<ul>
+<li><strong>名義型別（nominal typing）</strong>：型別相容看「名字／宣告」。Java 的 <code>class Dog implements Comparable</code> 必須<strong>明寫</strong> <code>implements</code>，編譯器才認。ABC 也是名義的——你得 <code>class Circle(Shape)</code> 或用 <code>Shape.register(...)</code>。</li>
+<li><strong>結構型別（structural typing）</strong>：型別相容看「結構／有沒有對的方法」。<strong>只要長得對就算數</strong>，不需要宣告任何繼承關係。這正是 duck typing（第 5 章）的靜態版本。</li>
+</ul>
+<p>Python 用 <code>typing.Protocol</code> 提供結構型別：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-255" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20Protocol%0A%0Aclass%20Readable(Protocol)%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%AE%9A%E7%BE%A9%E3%80%8C%E7%B5%90%E6%A7%8B%E3%80%8D%EF%BC%9A%E6%9C%89%20read()%20-%3E%20str%20%E5%B0%B1%E7%AE%97%0A%20%20%20%20def%20read(self)%20-%3E%20str%3A%20...%0A%0Adef%20dump(source%3A%20Readable)%20-%3E%20None%3A%20%20%20%20%20%20%23%20%E5%8F%AA%E8%A6%81%E5%82%B3%E9%80%B2%E4%BE%86%E7%9A%84%E6%9D%B1%E8%A5%BF%E6%9C%89%20read()%EF%BC%8C%E5%9E%8B%E5%88%A5%E6%AA%A2%E6%9F%A5%E5%B0%B1%E9%81%8E%0A%20%20%20%20print(source.read())%0A%0Aclass%20File%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%B3%A8%E6%84%8F%EF%BC%9AFile%20%E6%B2%92%E6%9C%89%E7%B9%BC%E6%89%BF%20Readable%EF%BC%81%0A%20%20%20%20def%20read(self)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20return%20%22file%20content%22%0A%0Aclass%20Socket%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%90%8C%E6%A8%A3%E6%B2%92%E7%B9%BC%E6%89%BF%EF%BC%8C%E4%BD%86%E7%B5%90%E6%A7%8B%E7%AC%A6%E5%90%88%0A%20%20%20%20def%20read(self)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20return%20%22socket%20bytes%22%0A%0Adump(File())%20%20%20%20%20%20%20%20%23%20%E2%9C%85%20mypy%20%E6%8E%A5%E5%8F%97%0Adump(Socket())%20%20%20%20%20%20%23%20%E2%9C%85%20mypy%20%E6%8E%A5%E5%8F%97'), 'copy-btn-255')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import Protocol
+
+class Readable(Protocol):                # 定義「結構」：有 read() -&gt; str 就算
+    def read(self) -&gt; str: ...
+
+def dump(source: Readable) -&gt; None:      # 只要傳進來的東西有 read()，型別檢查就過
+    print(source.read())
+
+class File:                              # 注意：File 沒有繼承 Readable！
+    def read(self) -&gt; str:
+        return "file content"
+
+class Socket:                            # 同樣沒繼承，但結構符合
+    def read(self) -&gt; str:
+        return "socket bytes"
+
+dump(File())        # ✅ mypy 接受
+dump(Socket())      # ✅ mypy 接受</code></pre>
+      </div>
+    <p><code>File</code> 與 <code>Socket</code> <strong>完全沒有提到 <code>Readable</code></strong>，但因為它們都有 <code>read(self) -&gt; str</code>，mypy 就認定它們符合 <code>Readable</code>。這在 Java 是做不到的——Java 的介面是名義的，<code>File</code> 一定要 <code>implements Readable</code> 編譯器才讓你傳。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>Protocol</code> ≈ 「不用 implements 的 interface」，概念上接近 Go 的 interface 或 TypeScript 的 structural typing。它讓你能<strong>事後</strong>為「你無法修改的第三方類別」定義契約——只要它結構符合就能用，不必去改它的繼承宣告。</p>
+</div><p>需要在執行期用 <code>isinstance</code> 檢查結構時，加上 <code>@runtime_checkable</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-256" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20Protocol%2C%20runtime_checkable%0A%0A%40runtime_checkable%0Aclass%20Readable(Protocol)%3A%0A%20%20%20%20def%20read(self)%20-%3E%20str%3A%20...%0A%0Aprint(isinstance(File()%2C%20Readable))%20%20%20%20%20%20%23%20True%EF%BC%88%E5%9F%B7%E8%A1%8C%E6%9C%9F%E5%8F%AA%E6%AA%A2%E6%9F%A5%E3%80%8C%E6%9C%89%E6%B2%92%E6%9C%89%20read%E3%80%8D%EF%BC%8C%E4%B8%8D%E6%AA%A2%E6%9F%A5%E7%B0%BD%E7%AB%A0%EF%BC%89'), 'copy-btn-256')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class Readable(Protocol):
+    def read(self) -&gt; str: ...
+
+print(isinstance(File(), Readable))      # True（執行期只檢查「有沒有 read」，不檢查簽章）</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>@runtime_checkable</code> 的 <code>isinstance</code> <strong>不是</strong> Java <code>instanceof</code> 的等價物。它只看「<strong>有沒有叫這個名字的方法</strong>」，不檢查參數、不檢查回傳型別，更不保證簽章相容——所以一個 <code>read()</code> 簽章其實不對的物件照樣會讓 <code>isinstance(..., Readable)</code> 回 <code>True</code>，等你真的呼叫才因簽章不符炸掉。Java 工程師習慣 <code>instanceof</code> 是可靠的型別判斷，這裡反直覺。真正的安全保證來自<strong>靜態</strong> mypy 檢查（它會比對簽章）；<code>runtime_checkable</code> 只是執行期的粗略守門，別拿它當型別正確性的依據。此外它對「資料屬性型 Protocol」的支援也有限，主要設計是給「方法集合」用的。要「描述一個函式需要的能力、讓任何結構符合的物件都能傳進來（含第三方類別）」，用 <strong>Protocol</strong>。Protocol 是把 duck typing 的彈性與靜態檢查的安全感結合的關鍵工具。</p>
+</div><hr>
+<h2 id="魔術方法dunder-methods">魔術方法（dunder methods）</h2><p>魔術方法（magic methods，因前後雙底線又叫 dunder methods）是 Python 的運算子重載與協定機制：實作對應的 dunder，你的物件就能用內建語法。第 7 章的 <code>__init__</code>、<code>__repr__</code>、<code>__eq__</code>、<code>__hash__</code> 都是。這裡再補幾個高頻的，並做成一個完整範例。</p>
+<table>
+<thead>
+<tr>
+<th>你想用的語法</th>
+<th>要實作的 dunder</th>
+<th>Java 對照</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>len(obj)</code></td>
+<td><code>__len__</code></td>
+<td><code>size()</code>（但 Java 不能讓 <code>length</code> 變語法）</td>
+</tr>
+<tr>
+<td><code>obj[key]</code></td>
+<td><code>__getitem__</code> / <code>__setitem__</code></td>
+<td><code>get(i)</code> / <code>set(i, v)</code>，無索引語法</td>
+</tr>
+<tr>
+<td><code>obj()</code></td>
+<td><code>__call__</code></td>
+<td><code>Function.apply</code> / <code>Runnable.run</code></td>
+</tr>
+<tr>
+<td><code>a + b</code></td>
+<td><code>__add__</code></td>
+<td>無運算子重載</td>
+</tr>
+<tr>
+<td><code>a &lt; b</code></td>
+<td><code>__lt__</code></td>
+<td><code>Comparable.compareTo</code></td>
+</tr>
+<tr>
+<td><code>x in obj</code></td>
+<td><code>__contains__</code></td>
+<td><code>contains(x)</code></td>
+</tr>
+<tr>
+<td><code>for x in obj</code></td>
+<td><code>__iter__</code></td>
+<td><code>Iterable.iterator</code>（詳見第 6 章）</td>
+</tr>
+</tbody></table>
+<p>一個能用「<code>+</code>、<code>len()</code>、索引、<code>==</code>、<code>repr</code>」的二維向量：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-257" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20__future__%20import%20annotations%0A%0Aclass%20Vector%3A%0A%20%20%20%20def%20__init__(self%2C%20*components%3A%20float)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self._values%20%3D%20list(components)%0A%0A%20%20%20%20def%20__repr__(self)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20inner%20%3D%20%22%2C%20%22.join(str(v)%20for%20v%20in%20self._values)%0A%20%20%20%20%20%20%20%20return%20f%22Vector(%7Binner%7D)%22%0A%0A%20%20%20%20def%20__len__(self)%20-%3E%20int%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20len(v)%0A%20%20%20%20%20%20%20%20return%20len(self._values)%0A%0A%20%20%20%20def%20__getitem__(self%2C%20index%3A%20int)%20-%3E%20float%3A%20%20%20%20%20%23%20v%5B0%5D%0A%20%20%20%20%20%20%20%20return%20self._values%5Bindex%5D%0A%0A%20%20%20%20def%20__eq__(self%2C%20other%3A%20object)%20-%3E%20bool%3A%20%20%20%20%20%20%20%20%23%20v1%20%3D%3D%20v2%0A%20%20%20%20%20%20%20%20if%20not%20isinstance(other%2C%20Vector)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20return%20NotImplemented%0A%20%20%20%20%20%20%20%20return%20self._values%20%3D%3D%20other._values%0A%0A%20%20%20%20def%20__add__(self%2C%20other%3A%20Vector)%20-%3E%20Vector%3A%20%20%20%20%20%23%20v1%20%2B%20v2%0A%20%20%20%20%20%20%20%20if%20len(self)%20!%3D%20len(other)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20raise%20ValueError(%22%E7%B6%AD%E5%BA%A6%E4%B8%8D%E4%B8%80%E8%87%B4%22)%0A%20%20%20%20%20%20%20%20return%20Vector(*(a%20%2B%20b%20for%20a%2C%20b%20in%20zip(self._values%2C%20other._values)))'), 'copy-btn-257')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from __future__ import annotations
+
+class Vector:
+    def __init__(self, *components: float) -&gt; None:
+        self._values = list(components)
+
+    def __repr__(self) -&gt; str:
+        inner = ", ".join(str(v) for v in self._values)
+        return f"Vector({inner})"
+
+    def __len__(self) -&gt; int:                       # len(v)
+        return len(self._values)
+
+    def __getitem__(self, index: int) -&gt; float:     # v[0]
+        return self._values[index]
+
+    def __eq__(self, other: object) -&gt; bool:        # v1 == v2
+        if not isinstance(other, Vector):
+            return NotImplemented
+        return self._values == other._values
+
+    def __add__(self, other: Vector) -&gt; Vector:     # v1 + v2
+        if len(self) != len(other):
+            raise ValueError("維度不一致")
+        return Vector(*(a + b for a, b in zip(self._values, other._values)))</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-258" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20v1%20%3D%20Vector(1%2C%202%2C%203)%0A%3E%3E%3E%20v2%20%3D%20Vector(10%2C%2020%2C%2030)%0A%3E%3E%3E%20v1%20%2B%20v2%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20__add__%0AVector(11%2C%2022%2C%2033)%0A%3E%3E%3E%20len(v1)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20__len__%0A3%0A%3E%3E%3E%20v1%5B2%5D%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20__getitem__%0A3%0A%3E%3E%3E%20v1%20%3D%3D%20Vector(1%2C%202%2C%203)%20%20%20%20%23%20__eq__%0ATrue'), 'copy-btn-258')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; v1 = Vector(1, 2, 3)
+&gt;&gt;&gt; v2 = Vector(10, 20, 30)
+&gt;&gt;&gt; v1 + v2                  # __add__
+Vector(11, 22, 33)
+&gt;&gt;&gt; len(v1)                  # __len__
+3
+&gt;&gt;&gt; v1[2]                    # __getitem__
+3
+&gt;&gt;&gt; v1 == Vector(1, 2, 3)    # __eq__
+True</code></pre>
+      </div>
+    <p>在 Java 你只能寫 <code>v1.add(v2)</code>、<code>v1.get(2)</code>、<code>v1.size()</code>——語言不准你重載 <code>+</code> 或 <code>[]</code>。Python 讓自訂型別能融入內建語法，數值類別、容器類別寫起來特別自然。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：運算子重載要<strong>克制</strong>。<code>+</code> 對向量、矩陣、金額這種「數學上本來就有加法語意」的型別很自然；但別硬把 <code>+</code> 拿去表達「把使用者加進群組」這種沒有直覺加法語意的操作，那會讓讀者更難懂。語意清楚才重載。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：上面的 <code>Vector</code> 只定義了 <code>__eq__</code> 而沒定義 <code>__hash__</code>，於是 Python 自動把它的 <code>__hash__</code> 設成 <code>None</code>，實例變成<strong>不可雜湊</strong>——<code>hash(Vector(1, 2))</code> 會拋 <code>TypeError: unhashable type: &#39;Vector&#39;</code>，也就不能當 dict 的 key 或放進 set。這是第 7 章 <code>__eq__</code>/<code>__hash__</code> 規則的直接後果，但運算子重載一寫完最容易踩到（你正想把向量丟進 set 去重）。若需要可雜湊，依第 7 章規則一併定義 <code>__hash__</code>（例如 <code>return hash(tuple(self._values))</code>），<strong>前提是物件不可變</strong>——可變物件當 key 會在內容改變後找不回來。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：只實作 <code>__getitem__</code>、<code>__len__</code>，你的物件就已經能被索引、能取長度、甚至能被舊式 for 迴圈迭代。要完整融入 Python 的容器生態，可以繼承 <code>collections.abc</code> 裡的 ABC（如 <code>Sequence</code>、<code>Mapping</code>）——實作少數幾個 dunder，就免費獲得一整組混入方法（如 <code>__contains__</code>、<code>index</code>、<code>count</code>）。</p>
+</div><h3 id="繼承-collectionsabcsequence少實作幾個免費拿一整組">繼承 `collections.abc.Sequence`：少實作幾個、免費拿一整組</h3><p>上面那句「免費獲得一整組混入方法」值得實際看一次。<code>collections.abc.Sequence</code> 是個 ABC：你只要實作 <code>__getitem__</code> 與 <code>__len__</code> 兩個抽象方法，它就用這兩個當基礎，<strong>自動補出</strong> <code>__contains__</code>、<code>__iter__</code>、<code>__reversed__</code>、<code>index</code>、<code>count</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-259" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20__future__%20import%20annotations%0Afrom%20collections.abc%20import%20Sequence%0Afrom%20typing%20import%20overload%0A%0Aclass%20CharGrid(Sequence%5Bstr%5D)%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%B9%BC%E6%89%BF%20Sequence%EF%BC%8C%E5%9E%8B%E5%88%A5%E5%8F%83%E6%95%B8%E6%98%AF%E5%85%83%E7%B4%A0%E5%9E%8B%E5%88%A5%0A%20%20%20%20def%20__init__(self%2C%20*rows%3A%20str)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self._rows%20%3D%20list(rows)%0A%0A%20%20%20%20def%20__len__(self)%20-%3E%20int%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%87%AA%E5%B7%B1%E5%AF%A6%E4%BD%9C%201%0A%20%20%20%20%20%20%20%20return%20len(self._rows)%0A%0A%20%20%20%20%40overload%0A%20%20%20%20def%20__getitem__(self%2C%20index%3A%20int)%20-%3E%20str%3A%20...%0A%20%20%20%20%40overload%0A%20%20%20%20def%20__getitem__(self%2C%20index%3A%20slice)%20-%3E%20Sequence%5Bstr%5D%3A%20...%0A%20%20%20%20def%20__getitem__(self%2C%20index%3A%20int%20%7C%20slice)%20-%3E%20str%20%7C%20Sequence%5Bstr%5D%3A%20%20%23%20%E8%87%AA%E5%B7%B1%E5%AF%A6%E4%BD%9C%202%0A%20%20%20%20%20%20%20%20return%20self._rows%5Bindex%5D'), 'copy-btn-259')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from __future__ import annotations
+from collections.abc import Sequence
+from typing import overload
+
+class CharGrid(Sequence[str]):                 # 繼承 Sequence，型別參數是元素型別
+    def __init__(self, *rows: str) -&gt; None:
+        self._rows = list(rows)
+
+    def __len__(self) -&gt; int:                  # 自己實作 1
+        return len(self._rows)
+
+    @overload
+    def __getitem__(self, index: int) -&gt; str: ...
+    @overload
+    def __getitem__(self, index: slice) -&gt; Sequence[str]: ...
+    def __getitem__(self, index: int | slice) -&gt; str | Sequence[str]:  # 自己實作 2
+        return self._rows[index]</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-260" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20g%20%3D%20CharGrid(%22abc%22%2C%20%22def%22%2C%20%22abc%22)%0A%3E%3E%3E%20%22abc%22%20in%20g%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20__contains__%EF%BC%9A%E5%85%8D%E8%B2%BB%0ATrue%0A%3E%3E%3E%20g.index(%22def%22)%20%20%20%20%20%20%20%20%20%20%23%20index%EF%BC%9A%E5%85%8D%E8%B2%BB%0A1%0A%3E%3E%3E%20g.count(%22abc%22)%20%20%20%20%20%20%20%20%20%20%23%20count%EF%BC%9A%E5%85%8D%E8%B2%BB%0A2%0A%3E%3E%3E%20list(reversed(g))%20%20%20%20%20%20%20%23%20__reversed__%EF%BC%9A%E5%85%8D%E8%B2%BB%0A%5B%27abc%27%2C%20%27def%27%2C%20%27abc%27%5D%0A%3E%3E%3E%20%5Brow%20for%20row%20in%20g%5D%20%20%20%20%20%20%23%20__iter__%EF%BC%9A%E5%85%8D%E8%B2%BB%EF%BC%88%E7%94%A8%20__getitem__%20%E9%80%90%E4%B8%80%E5%8F%96%EF%BC%8C%E7%AC%AC%206%20%E7%AB%A0%E7%9A%84%E8%88%8A%E5%BC%8F%E8%BF%AD%E4%BB%A3%E5%8D%94%E5%AE%9A%EF%BC%89%0A%5B%27abc%27%2C%20%27def%27%2C%20%27abc%27%5D'), 'copy-btn-260')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; g = CharGrid("abc", "def", "abc")
+&gt;&gt;&gt; "abc" in g              # __contains__：免費
+True
+&gt;&gt;&gt; g.index("def")          # index：免費
+1
+&gt;&gt;&gt; g.count("abc")          # count：免費
+2
+&gt;&gt;&gt; list(reversed(g))       # __reversed__：免費
+['abc', 'def', 'abc']
+&gt;&gt;&gt; [row for row in g]      # __iter__：免費（用 __getitem__ 逐一取，第 6 章的舊式迭代協定）
+['abc', 'def', 'abc']</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：這正是 Java 的 <code>AbstractList</code>——你 <code>extends AbstractList</code> 後只要實作 <code>get(int)</code> 與 <code>size()</code>，就免費得到 <code>contains</code>、<code>indexOf</code>、<code>iterator()</code> 等。兩邊都是同一個 OO 設計：<strong>模板方法模式</strong>（template method pattern），父類別用「少數幾個抽象掛鉤」推導出「一整組具體行為」。差別在 Python 的版本同時是個結構面更鬆的工具：<code>Sequence</code> 也支援 <code>register()</code> 與 <code>isinstance</code> 檢查，且它生出的方法直接讓 <code>in</code>、<code>reversed()</code>、<code>for</code> 這些<strong>語法</strong>生效，而 Java 仍是方法呼叫。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：注意上面 <code>__getitem__</code> 為什麼非用 <code>@overload</code> 不可。在 mypy <code>--strict</code> 下，子類別的 <code>__getitem__</code> 簽章必須與 <code>Sequence</code> 的相容——而 <code>Sequence.__getitem__</code> 是<strong>多載</strong>的：傳 <code>int</code> 回單一元素（<code>str</code>）、傳 <code>slice</code> 回子序列（<code>Sequence[str]</code>）。若只寫 <code>def __getitem__(self, index: int) -&gt; str</code>，mypy 會判 override 不相容（<code>Signature of &quot;__getitem__&quot; incompatible with supertype &quot;typing.Sequence&quot;</code>）；就算改成單一函式 <code>def __getitem__(self, index: int | slice) -&gt; str | Sequence[str]</code> 也<strong>還是不相容</strong>——因為那等於宣稱「傳 <code>int</code> 進來也可能回 <code>Sequence[str]</code>」，比父類別承諾的 <code>int -&gt; str</code> 更寬。唯一乾淨過關（mypy 與 pyright 皆然）的寫法是用 <code>@overload</code> 把兩種情況分開精確標注。這提醒你：繼承一個有型別的 ABC，等於承諾履行它<strong>完整</strong>的契約（含切片），不是只實作你眼前想用的那一半。</p>
+</div><h3 id="notimplemented-與反向運算radd">`NotImplemented` 與反向運算：`__radd__`</h3><p>前面 <code>__eq__</code> 在不認得對方型別時 <code>return NotImplemented</code>，<code>__add__</code> 遇到維度不符卻是 <code>raise</code>。為什麼一個回特殊值、一個拋例外？因為 <code>NotImplemented</code> 是運算子協定的核心機制：當<strong>左</strong>運算元的 <code>__add__</code> 回 <code>NotImplemented</code>，Python 不會立刻放棄，而是改試<strong>右</strong>運算元的反向方法 <code>__radd__</code>（reflected add）。這正是 <code>1 + vector</code> 或與 numpy 互動時「誰被呼叫」的答案。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-261" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20__future__%20import%20annotations%0A%0Aclass%20Vector%3A%0A%20%20%20%20def%20__init__(self%2C%20*components%3A%20float)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self._values%20%3D%20list(components)%0A%0A%20%20%20%20def%20__repr__(self)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20inner%20%3D%20%22%2C%20%22.join(str(v)%20for%20v%20in%20self._values)%0A%20%20%20%20%20%20%20%20return%20f%22Vector(%7Binner%7D)%22%0A%0A%20%20%20%20def%20__add__(self%2C%20other%3A%20object)%20-%3E%20Vector%3A%0A%20%20%20%20%20%20%20%20if%20isinstance(other%2C%20Vector)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20return%20Vector(*(a%20%2B%20b%20for%20a%2C%20b%20in%20zip(self._values%2C%20other._values)))%0A%20%20%20%20%20%20%20%20if%20isinstance(other%2C%20(int%2C%20float))%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%90%91%E9%87%8F%20%2B%20%E7%B4%94%E9%87%8F%0A%20%20%20%20%20%20%20%20%20%20%20%20return%20Vector(*(a%20%2B%20other%20for%20a%20in%20self._values))%0A%20%20%20%20%20%20%20%20return%20NotImplemented%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%B8%8D%E8%AA%8D%E5%BE%97%EF%BC%8C%E4%BA%A4%E9%82%84%E7%B5%A6%20Python%0A%0A%20%20%20%20def%20__radd__(self%2C%20other%3A%20object)%20-%3E%20Vector%3A%20%20%20%20%20%20%20%20%20%23%20%E7%B4%94%E9%87%8F%20%2B%20%E5%90%91%E9%87%8F%20%E8%B5%B0%E5%88%B0%E9%80%99%0A%20%20%20%20%20%20%20%20return%20self.__add__(other)'), 'copy-btn-261')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from __future__ import annotations
+
+class Vector:
+    def __init__(self, *components: float) -&gt; None:
+        self._values = list(components)
+
+    def __repr__(self) -&gt; str:
+        inner = ", ".join(str(v) for v in self._values)
+        return f"Vector({inner})"
+
+    def __add__(self, other: object) -&gt; Vector:
+        if isinstance(other, Vector):
+            return Vector(*(a + b for a, b in zip(self._values, other._values)))
+        if isinstance(other, (int, float)):              # 向量 + 純量
+            return Vector(*(a + other for a in self._values))
+        return NotImplemented                            # 不認得，交還給 Python
+
+    def __radd__(self, other: object) -&gt; Vector:         # 純量 + 向量 走到這
+        return self.__add__(other)</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-262" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20v%20%3D%20Vector(1%2C%202%2C%203)%0A%3E%3E%3E%20v%20%2B%2010%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20Vector.__add__%0AVector(11%2C%2012%2C%2013)%0A%3E%3E%3E%2010%20%2B%20v%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20int.__add__(10%2C%20v)%20%E5%9B%9E%20NotImplemented%20%E2%86%92%20%E6%94%B9%E8%A9%A6%20Vector.__radd__%0AVector(11%2C%2012%2C%2013)'), 'copy-btn-262')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; v = Vector(1, 2, 3)
+&gt;&gt;&gt; v + 10                  # Vector.__add__
+Vector(11, 12, 13)
+&gt;&gt;&gt; 10 + v                  # int.__add__(10, v) 回 NotImplemented → 改試 Vector.__radd__
+Vector(11, 12, 13)</code></pre>
+      </div>
+    <p><code>10 + v</code> 時 Python 先問左邊的 <code>int</code>：<code>(10).__add__(v)</code>，<code>int</code> 不認得 <code>Vector</code> 而回 <code>NotImplemented</code>，Python 才轉去呼叫 <code>v.__radd__(10)</code>。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：運算子相關 dunder 對「不認得的型別」要 <code>return NotImplemented</code>（<strong>不是</strong> <code>raise</code>，也不是回 <code>False</code>）。回 <code>NotImplemented</code> 等於告訴 Python「我不會處理，換對方試試」——<code>__eq__</code>、<code>__add__</code>、<code>__lt__</code> 全走這套協作協定。直接 <code>raise</code> 會切斷反向方法的機會；維度不符那種「型別對但值不合法」的情況才該 <code>raise</code>。</p>
+</div><h3 id="比較運算子與-functoolstotalordering">比較運算子與 `functools.total_ordering`</h3><p>Java 實作 <code>Comparable</code> 只要寫一個 <code>compareTo</code>，<code>&lt;</code>、<code>&lt;=</code>、<code>&gt;</code>、<code>&gt;=</code> 全由它推得（雖然你還是得自己用 <code>compareTo(o) &lt; 0</code> 拼）。Python 沒有單一的 <code>compareTo</code>，比較分散在 <code>__lt__</code>、<code>__le__</code>、<code>__gt__</code>、<code>__ge__</code> 四個 dunder。手寫四個很煩，<code>functools.total_ordering</code> 幫你補齊：只要定義 <code>__eq__</code> 與 <code>__lt__</code>，其餘四種比較自動生成。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-263" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20__future__%20import%20annotations%0Aimport%20functools%0A%0A%40functools.total_ordering%0Aclass%20Version%3A%0A%20%20%20%20def%20__init__(self%2C%20major%3A%20int%2C%20minor%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.major%2C%20self.minor%20%3D%20major%2C%20minor%0A%0A%20%20%20%20def%20__eq__(self%2C%20other%3A%20object)%20-%3E%20bool%3A%0A%20%20%20%20%20%20%20%20if%20not%20isinstance(other%2C%20Version)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20return%20NotImplemented%0A%20%20%20%20%20%20%20%20return%20(self.major%2C%20self.minor)%20%3D%3D%20(other.major%2C%20other.minor)%0A%0A%20%20%20%20def%20__lt__(self%2C%20other%3A%20Version)%20-%3E%20bool%3A%20%20%20%20%23%20%E5%85%B7%E9%AB%94%E9%A1%9E%E5%88%A5%E6%AF%94%E8%BC%83%EF%BC%8C%E5%8F%83%E6%95%B8%E6%A8%99%E8%87%AA%E8%BA%AB%E5%9E%8B%E5%88%A5%E5%8D%B3%E5%8F%AF%0A%20%20%20%20%20%20%20%20return%20(self.major%2C%20self.minor)%20%3C%20(other.major%2C%20other.minor)'), 'copy-btn-263')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from __future__ import annotations
+import functools
+
+@functools.total_ordering
+class Version:
+    def __init__(self, major: int, minor: int) -&gt; None:
+        self.major, self.minor = major, minor
+
+    def __eq__(self, other: object) -&gt; bool:
+        if not isinstance(other, Version):
+            return NotImplemented
+        return (self.major, self.minor) == (other.major, other.minor)
+
+    def __lt__(self, other: Version) -&gt; bool:    # 具體類別比較，參數標自身型別即可
+        return (self.major, self.minor) &lt; (other.major, other.minor)</code></pre>
+      </div>
+    <p>（這裡 <code>__lt__</code> 的參數標成具體的 <code>Version</code> 是對的——這是「自己跟自己比」的具體類別。但若哪天你要把 <code>__lt__</code> 寫進一個當作泛型上界的 <code>Protocol</code>（「任何可比較的東西」），參數就得改標 <code>Any</code> 而非具體型別，否則 <code>int</code> 這類內建型別會被擋下。那是另一個脈絡，第 9 章談有界泛型時會詳細解釋為什麼。）</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-264" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20Version(1%2C%202)%20%3C%20Version(1%2C%205)%0ATrue%0A%3E%3E%3E%20Version(1%2C%202)%20%3E%3D%20Version(1%2C%205)%20%20%20%20%20%23%20total_ordering%20%E7%94%B1%20__eq__%20%2B%20__lt__%20%E8%87%AA%E5%8B%95%E8%A3%9C%E5%87%BA%0AFalse'), 'copy-btn-264')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; Version(1, 2) &lt; Version(1, 5)
+True
+&gt;&gt;&gt; Version(1, 2) &gt;= Version(1, 5)     # total_ordering 由 __eq__ + __lt__ 自動補出
+False</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>Comparable.compareTo</code> 是「一個方法定義全序」；<code>total_ordering</code> 則是「定義 <code>__eq__</code> + <code>__lt__</code> 兩個方法，裝飾器幫你展開成六種運算子」。差別在 Python 直接讓你用 <code>&lt;</code>、<code>&gt;=</code> 這些<strong>運算子語法</strong>比較物件，而 Java 永遠是 <code>a.compareTo(b) &lt; 0</code>。代價：<code>total_ordering</code> 生成的方法效能略低於手寫，極熱路徑才需要全部手刻。</p>
+</div><hr>
+<h2 id="mixin-模式">mixin 模式</h2><p>mixin 是「用多重繼承疊加能力」的乾淨用法：一個 mixin 是<strong>小而專一、通常不帶自己的 <code>__init__</code> 狀態</strong>的類別，只提供一組方法，被「混入」其他類別。慣例命名以 <code>Mixin</code> 結尾。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-265" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20json%0Afrom%20typing%20import%20Any%0A%0Aclass%20AsDictMixin%3A%0A%20%20%20%20def%20as_dict(self)%20-%3E%20dict%5Bstr%2C%20Any%5D%3A%0A%20%20%20%20%20%20%20%20return%20self.__dict__%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%81%87%E8%A8%AD%E5%AD%90%E9%A1%9E%E5%88%A5%E7%9A%84%E7%8B%80%E6%85%8B%E9%83%BD%E5%9C%A8%E5%AF%A6%E4%BE%8B%20__dict__%0A%0Aclass%20JSONMixin%3A%0A%20%20%20%20def%20to_json(self)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20%23%20%E4%BE%9D%E8%B3%B4%E3%80%8C%E6%B7%B7%E5%85%A5%E7%9A%84%E5%B0%8D%E8%B1%A1%E4%B9%9F%E6%8F%90%E4%BE%9B%E4%BA%86%20as_dict()%E3%80%8D%E2%80%94%E2%80%94%E9%80%99%E6%98%AF%20mixin%20%E4%B9%8B%E9%96%93%E7%9A%84%E9%9A%B1%E6%80%A7%E5%A5%91%E7%B4%84%0A%20%20%20%20%20%20%20%20return%20json.dumps(self.as_dict())%20%20%23%20type%3A%20ignore%5Battr-defined%5D%0A%0Aclass%20User(AsDictMixin%2C%20JSONMixin)%3A%20%20%20%20%20%20%20%20%23%20%E6%B7%B7%E5%85%A5%E5%85%A9%E7%A8%AE%E8%83%BD%E5%8A%9B%0A%20%20%20%20def%20__init__(self%2C%20name%3A%20str%2C%20age%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.name%20%3D%20name%0A%20%20%20%20%20%20%20%20self.age%20%3D%20age'), 'copy-btn-265')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import json
+from typing import Any
+
+class AsDictMixin:
+    def as_dict(self) -&gt; dict[str, Any]:
+        return self.__dict__               # 假設子類別的狀態都在實例 __dict__
+
+class JSONMixin:
+    def to_json(self) -&gt; str:
+        # 依賴「混入的對象也提供了 as_dict()」——這是 mixin 之間的隱性契約
+        return json.dumps(self.as_dict())  # type: ignore[attr-defined]
+
+class User(AsDictMixin, JSONMixin):        # 混入兩種能力
+    def __init__(self, name: str, age: int) -&gt; None:
+        self.name = name
+        self.age = age</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-266" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20u%20%3D%20User(%22Albert%22%2C%2042)%0A%3E%3E%3E%20u.to_json()%0A%27%7B%22name%22%3A%20%22Albert%22%2C%20%22age%22%3A%2042%7D%27'), 'copy-btn-266')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; u = User("Albert", 42)
+&gt;&gt;&gt; u.to_json()
+'{"name": "Albert", "age": 42}'</code></pre>
+      </div>
+    <p><code>User</code> 自己只管「我有什麼資料」，序列化能力靠 mixin 疊上去。對照 Java：Java 8 之後 interface 的 <strong>default method</strong> 提供了類似「混入行為」的能力（介面帶實作），是最接近 mixin 的對應物——但 Java 的 default method 不能持有狀態，而 Python mixin 可以（雖然慣例上盡量不要）。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：mixin 要遵守幾條紀律：(1) 名字以 <code>Mixin</code> 結尾、職責單一；(2) 盡量別有自己的 <code>__init__</code>；(3) 清楚記載它對「被混入對象」的隱性要求（上例 <code>JSONMixin</code> 要求對方有 <code>as_dict()</code>）。違反這些，多重繼承的複雜度就會反咬你。</p>
+</div><hr>
+<h2 id="組合優於繼承在-python-中的實踐">組合優於繼承在 Python 中的實踐</h2><p>「組合優於繼承」（composition over inheritance）是 OOP 共識，但 Python 的動態特性讓<strong>委派</strong>（delegation）特別好寫，所以更容易落實。基本款就是「持有一個物件、把工作轉發給它」：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-267" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20Engine%3A%0A%20%20%20%20def%20start(self)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20return%20%22%E5%BC%95%E6%93%8E%E5%95%9F%E5%8B%95%22%0A%0Aclass%20Car%3A%0A%20%20%20%20def%20__init__(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self._engine%20%3D%20Engine()%20%20%20%20%20%20%20%20%20%20%23%20%E6%8C%81%E6%9C%89%EF%BC%8C%E8%80%8C%E9%9D%9E%E7%B9%BC%E6%89%BF%0A%0A%20%20%20%20def%20start(self)%20-%3E%20str%3A%0A%20%20%20%20%20%20%20%20return%20self._engine.start()%20%20%20%20%20%20%23%20%E5%A7%94%E6%B4%BE'), 'copy-btn-267')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class Engine:
+    def start(self) -&gt; str:
+        return "引擎啟動"
+
+class Car:
+    def __init__(self) -&gt; None:
+        self._engine = Engine()          # 持有，而非繼承
+
+    def start(self) -&gt; str:
+        return self._engine.start()      # 委派</code></pre>
+      </div>
+    <p>當要轉發的方法很多、不想一個個手寫時，Python 可以用 <code>__getattr__</code> 做<strong>自動委派</strong>——它在「正常屬性查找失敗」時被呼叫：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-268" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20Any%0A%0Aclass%20Logger%3A%0A%20%20%20%20def%20info(self%2C%20msg%3A%20str)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20print(f%22%5BINFO%5D%20%7Bmsg%7D%22)%0A%20%20%20%20def%20error(self%2C%20msg%3A%20str)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20print(f%22%5BERROR%5D%20%7Bmsg%7D%22)%0A%0Aclass%20Service%3A%0A%20%20%20%20def%20__init__(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self._logger%20%3D%20Logger()%0A%0A%20%20%20%20def%20__getattr__(self%2C%20name%3A%20str)%20-%3E%20Any%3A%20%20%20%20%23%20%E5%A7%94%E6%B4%BE%E7%9B%AE%E6%A8%99%E5%9E%8B%E5%88%A5%E4%B8%8D%E5%AE%9A%EF%BC%8C%E6%A8%99%20Any%20%E9%80%9A%E9%81%8E%20mypy%20--strict%0A%20%20%20%20%20%20%20%20%23%20%E5%8F%AA%E6%9C%89%E7%95%B6%20Service%20%E8%87%AA%E5%B7%B1%E6%89%BE%E4%B8%8D%E5%88%B0%E8%A9%B2%E5%B1%AC%E6%80%A7%E6%99%82%E6%89%8D%E6%9C%83%E9%80%B2%E4%BE%86%EF%BC%8C%E8%87%AA%E5%8B%95%E8%BD%89%E7%99%BC%E7%B5%A6%20_logger%0A%20%20%20%20%20%20%20%20return%20getattr(self._logger%2C%20name)'), 'copy-btn-268')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import Any
+
+class Logger:
+    def info(self, msg: str) -&gt; None:
+        print(f"[INFO] {msg}")
+    def error(self, msg: str) -&gt; None:
+        print(f"[ERROR] {msg}")
+
+class Service:
+    def __init__(self) -&gt; None:
+        self._logger = Logger()
+
+    def __getattr__(self, name: str) -&gt; Any:    # 委派目標型別不定，標 Any 通過 mypy --strict
+        # 只有當 Service 自己找不到該屬性時才會進來，自動轉發給 _logger
+        return getattr(self._logger, name)</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-269" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20s%20%3D%20Service()%0A%3E%3E%3E%20s.info(%22started%22)%20%20%20%20%20%20%20%20%23%20Service%20%E6%B2%92%E6%9C%89%20info%EF%BC%8C__getattr__%20%E8%BD%89%E7%99%BC%E7%B5%A6%20_logger%0A%5BINFO%5D%20started%0A%3E%3E%3E%20s.error(%22oops%22)%0A%5BERROR%5D%20oops'), 'copy-btn-269')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; s = Service()
+&gt;&gt;&gt; s.info("started")        # Service 沒有 info，__getattr__ 轉發給 _logger
+[INFO] started
+&gt;&gt;&gt; s.error("oops")
+[ERROR] oops</code></pre>
+      </div>
+    <p>這種「不繼承 Logger，卻能用它所有方法」的彈性，在 Java 要嘛逐一手寫轉發方法、要嘛用動態代理（dynamic proxy）才能達成。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：判準跟 Java 一樣——「is-a」用繼承，「has-a / 用其能力」用組合。Python 額外的好處是：(1) duck typing 讓你不需要為了「能被當某型別用」而硬去繼承（有對的方法就行）；(2) <code>__getattr__</code> 讓委派幾乎零樣板。所以在 Python 裡，遇到「想繼承只是為了重用幾個方法」時，更該停下來想想組合。</p>
+</div><hr>
+<h2 id="本章小結">本章小結</h2><ol>
+<li><strong><code>super()</code> 在 Python 3 不帶參數</strong>，override 不需 <code>@Override</code>，沒有 <code>final</code>——彈性更大，但拼錯方法名這類錯誤要靠型別檢查工具補。</li>
+<li><strong>多重繼承靠 MRO（C3 線性化）解決菱形問題</strong>。<code>super()</code> 的真正意義是「MRO 中的下一個」，不是「我的父類別」——這是多重繼承最大的認知陷阱。</li>
+<li><strong><code>abc.ABC</code> + <code>@abstractmethod</code></strong> 對應 Java <code>abstract class</code>：定義契約、強迫實作、抽象類別不能實例化（執行期報錯）。</li>
+<li><strong>ABC 是名義型別、<code>Protocol</code> 是結構型別</strong>。ABC 要明寫繼承；Protocol 只看「有沒有對的方法」，能事後為第三方類別定契約——Java 介面做不到。<code>@runtime_checkable</code> 的 <code>isinstance</code> 只查方法名是否存在、不查簽章，<strong>不是</strong> Java <code>instanceof</code> 的等價物，安全保證來自靜態 mypy。</li>
+<li><strong>魔術方法讓自訂物件融入內建語法</strong>：<code>__len__</code>、<code>__getitem__</code>、<code>__call__</code>、<code>__add__</code> 等對應 <code>len()</code>、<code>[]</code>、<code>()</code>、<code>+</code>。Java 沒有運算子重載。重載要語意清楚、克制使用。運算子 dunder 對不認得的型別要 <code>return NotImplemented</code>（讓 Python 改試對方的反向方法如 <code>__radd__</code>），比較運算子可用 <code>functools.total_ordering</code> 由 <code>__eq__</code> + <code>__lt__</code> 自動補齊；另記得<strong>自訂 <code>__eq__</code> 而不定 <code>__hash__</code> 會讓實例變不可雜湊</strong>。</li>
+<li><strong>mixin 是多重繼承的乾淨用法</strong>：小而專一、命名以 <code>Mixin</code> 結尾、職責單一，最接近 Java 8 介面的 default method（但 mixin 可帶狀態）。</li>
+<li><strong>組合優於繼承在 Python 更易落實</strong>：<code>__getattr__</code> 讓自動委派幾乎零樣板，duck typing 讓你不必為「能被當某型別用」而強行繼承。</li>
+</ol>
+<hr>
+<h2 id="練習">練習</h2><p><strong>練習 1（看穿 MRO）</strong>
+不要執行，先用紙筆推出下面 <code>D().m()</code> 的輸出與 <code>D.__mro__</code>，再執行驗證。說明 <code>B.m</code> 裡的 <code>super().m()</code> 為什麼會跑到 <code>C.m</code>。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-270" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20A%3A%0A%20%20%20%20def%20m(self)%3A%20print(%22A%22)%0Aclass%20B(A)%3A%0A%20%20%20%20def%20m(self)%3A%20print(%22B%22)%3B%20super().m()%0Aclass%20C(A)%3A%0A%20%20%20%20def%20m(self)%3A%20print(%22C%22)%3B%20super().m()%0Aclass%20D(B%2C%20C)%3A%0A%20%20%20%20def%20m(self)%3A%20print(%22D%22)%3B%20super().m()'), 'copy-btn-270')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">class A:
+    def m(self): print("A")
+class B(A):
+    def m(self): print("B"); super().m()
+class C(A):
+    def m(self): print("C"); super().m()
+class D(B, C):
+    def m(self): print("D"); super().m()</code></pre>
+      </div>
+    <p><strong>練習 2（ABC 強制契約）</strong>
+用 <code>abc.ABC</code> 定義一個 <code>Repository</code> 抽象類別，含抽象方法 <code>get(id: int)</code> 與 <code>save(item)</code>，並提供一個具體方法 <code>get_or_raise(id)</code>（找不到就 raise）。寫一個只實作了 <code>get</code> 卻忘了 <code>save</code> 的子類別，觀察實例化時的錯誤訊息，並修好它。</p>
+<p><strong>練習 3（ABC 換成 Protocol）</strong>
+把練習 2 的 <code>Repository</code> 改寫成 <code>Protocol</code>，並寫一個函式 <code>backup(repo: Repository)</code>。接著寫一個<strong>沒有繼承 <code>Repository</code></strong> 但結構符合的 <code>InMemoryRepo</code>，把它傳進 <code>backup</code>。說明這跟練習 2 的 ABC 版在「相容性如何判定」上的本質差別。</p>
+<p><strong>練習 4（魔術方法做一個區間型別）</strong>
+實作一個 <code>Range(start, end)</code>，支援：<code>len(r)</code>（長度）、<code>x in r</code>（<code>__contains__</code>，判斷是否落在區間）、<code>r == Range(...)</code>（<code>__eq__</code>）、<code>repr(r)</code>（顯示成 <code>Range(1, 5)</code>）。寫幾行驗證每個語法。</p>
+<p><strong>練習 5（組合 + 自動委派）</strong>
+你有一個第三方的 <code>dict</code>，想做一個 <code>TrackedDict</code>：每次 <code>__setitem__</code> 都印出「set key=...」，但其餘所有 dict 操作（<code>len</code>、<code>in</code>、<code>get</code>、<code>keys</code>…）照常運作。用「持有一個 dict + <code>__getattr__</code> 委派」實作，而不是繼承 <code>dict</code>。說明為什麼這裡用組合比繼承 <code>dict</code> 更安全（提示：繼承內建型別時，內部方法不一定會回頭呼叫你覆寫的 <code>__setitem__</code>）。</p>

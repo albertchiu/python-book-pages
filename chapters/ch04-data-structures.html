@@ -1,0 +1,599 @@
+<h1 id="第-4-章核心資料結構深入">第 4 章：核心資料結構深入</h1><p>身為 Java 工程師，你對 <code>ArrayList</code>、<code>HashMap</code>、<code>HashSet</code> 的內部實作、攤還複雜度與並行陷阱瞭若指掌。本章不會教你「list 是什麼」，而是帶你把這份直覺<strong>重新校準</strong>到 Python 上：哪些假設依然成立（<code>list</code> 就是動態陣列）、哪些會反咬你一口（<code>[[0]*3]*3</code> 不是你以為的二維陣列、賦值永遠是共享參考）。更重要的是，Python 把切片、解包、<code>collections</code> 模組這些「語法糖」做到了 Java 望塵莫及的密度——學會它們，你寫的程式碼會短一半而且更清楚。</p>
+<h2 id="四大結構與內部實作">四大結構與內部實作</h2><p>Python 的內建容器只有四個核心成員：<code>list</code>、<code>tuple</code>、<code>dict</code>、<code>set</code>。先把它們對應回你熟悉的 Java 世界，再深入內部。</p>
+<table>
+<thead>
+<tr>
+<th>Python</th>
+<th>最接近的 Java</th>
+<th>底層結構</th>
+<th>關鍵差異</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>list</code></td>
+<td><code>ArrayList</code></td>
+<td>動態陣列（指標陣列）</td>
+<td>異質、可放任何物件</td>
+</tr>
+<tr>
+<td><code>tuple</code></td>
+<td><code>record</code> / 唯讀陣列</td>
+<td>不可變定長陣列</td>
+<td>可當 dict key、無 Java 直接對應</td>
+</tr>
+<tr>
+<td><code>dict</code></td>
+<td><code>LinkedHashMap</code></td>
+<td>開放定址雜湊表</td>
+<td><strong>3.7+ 保證插入順序</strong></td>
+</tr>
+<tr>
+<td><code>set</code></td>
+<td><code>HashSet</code></td>
+<td>開放定址雜湊表（無值）</td>
+<td>內建集合運算子 <code>| &amp; - ^</code></td>
+</tr>
+</tbody></table>
+<h3 id="list動態陣列但裝的是指標">list：動態陣列，但裝的是指標</h3><p><code>list</code> 跟 <code>ArrayList</code> 一樣是動態陣列，背後是一塊連續記憶體，滿了就重新配置一塊更大的（CPython 的成長因子約 1.125 倍，比 Java 的 1.5 倍保守）。因此 <code>append</code> 是攤還（amortized）O(1)，隨機存取 <code>a[i]</code> 是 O(1)。</p>
+<p>關鍵差異在於：Java 的 <code>ArrayList&lt;Integer&gt;</code> 雖然也是裝參考，但有泛型約束；Python 的 <code>list</code> 是一塊 <code>PyObject*</code> 指標陣列，<strong>完全異質</strong>——同一個 list 可以混放 <code>int</code>、<code>str</code>、另一個 <code>list</code>。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-104" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9A%E5%9E%8B%E5%88%A5%E9%BD%8A%E4%B8%80%EF%BC%8C%E5%85%83%E7%B4%A0%E6%98%AF%20boxed%20Integer%20%E7%9A%84%E5%8F%83%E8%80%83%0AList%3CInteger%3E%20nums%20%3D%20new%20ArrayList%3C%3E(List.of(1%2C%202%2C%203))%3B%0Anums.add(4)%3B'), 'copy-btn-104')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：型別齊一，元素是 boxed Integer 的參考
+List&lt;Integer&gt; nums = new ArrayList&lt;&gt;(List.of(1, 2, 3));
+nums.add(4);</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 的同質性來自<strong>編譯期泛型檢查</strong>；因型別抹除（type erasure），執行期其實底層也是 <code>Object[]</code>，但編譯器不讓你混放。Python 則是<strong>執行期</strong>就真的異質，本質差異在此。</p>
+</div>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-105" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20Python%EF%BC%9A%E5%8F%AF%E7%95%B0%E8%B3%AA%EF%BC%8Clist%20%E6%9C%AC%E8%BA%AB%E6%98%AF%E6%8C%87%E5%90%91%E5%90%84%E7%89%A9%E4%BB%B6%E7%9A%84%E6%8C%87%E6%A8%99%E9%99%A3%E5%88%97%0Aitems%20%3D%20%5B1%2C%20%22two%22%2C%203.0%2C%20%5B4%2C%205%5D%5D%0Aitems.append(object())'), 'copy-btn-105')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># Python：可異質，list 本身是指向各物件的指標陣列
+items = [1, "two", 3.0, [4, 5]]
+items.append(object())</code></pre>
+      </div>
+    <p>你可以從 <code>sys.getsizeof</code> 觀察到 over-allocation（預先多配置空間）的痕跡：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-106" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20sys%0A%3E%3E%3E%20l%20%3D%20%5B%5D%0A%3E%3E%3E%20last%20%3D%20-1%0A%3E%3E%3E%20for%20i%20in%20range(10)%3A%0A...%20%20%20%20%20sz%20%3D%20sys.getsizeof(l)%0A...%20%20%20%20%20if%20sz%20!%3D%20last%3A%0A...%20%20%20%20%20%20%20%20%20print(f%22len%3D%7Bi%3A%3E2%7D%20%20bytes%3D%7Bsz%7D%22)%0A...%20%20%20%20%20%20%20%20%20last%20%3D%20sz%0A...%20%20%20%20%20l.append(i)%0A...%0Alen%3D%200%20%20bytes%3D56%0Alen%3D%201%20%20bytes%3D88%0Alen%3D%205%20%20bytes%3D120%0Alen%3D%209%20%20bytes%3D184'), 'copy-btn-106')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import sys
+&gt;&gt;&gt; l = []
+&gt;&gt;&gt; last = -1
+&gt;&gt;&gt; for i in range(10):
+...     sz = sys.getsizeof(l)
+...     if sz != last:
+...         print(f"len={i:&gt;2}  bytes={sz}")
+...         last = sz
+...     l.append(i)
+...
+len= 0  bytes=56
+len= 1  bytes=88
+len= 5  bytes=120
+len= 9  bytes=184</code></pre>
+      </div>
+    <p>長度從 0 變 1 時容量跳到能容納約 4 個元素，避免每次 append 都重配置——這就是攤還 O(1) 的來源，跟 <code>ArrayList</code> 同理。</p>
+<blockquote><p>補充：前述「約 1.125 倍」是<strong>大型 list 的漸進成長率</strong>；小容量時為避免頻繁重配置，實際首次配置會一次給數個槽位（如上方示範 <code>len=1</code> 即配 4 槽），所以前幾步的實際跳躍會比 1.125 倍大（容量序列約為 0→4→8→16→24→32→40→52…）。</p>
+</blockquote><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>list.insert(0, x)</code> 與 <code>list.pop(0)</code> 是 <strong>O(n)</strong>，因為要搬移後面所有元素，跟 <code>ArrayList</code> 一樣。需要雙端操作請用 <code>collections.deque</code>（見後文），別把 list 當佇列用。</p>
+</div><h3 id="tuple不可變序列java-沒有的型別">tuple：不可變序列，Java 沒有的型別</h3><p><code>tuple</code> 是不可變的定長序列。Java 裡沒有直接對應——你會用 <code>record</code>、陣列，或硬湊一個 <code>Pair</code> 類別。Python 的 tuple 有兩大用途：</p>
+<ol>
+<li><strong>異質固定紀錄</strong>：<code>(name, age, email)</code>，像沒有欄位名的輕量 record。</li>
+<li><strong>可當 dict key / set 元素</strong>：因為不可變所以可雜湊（hashable）。</li>
+</ol>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-107" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20point%20%3D%20(3%2C%204)%20%20%20%20%20%20%20%20%20%20%23%20%E5%90%8C%E8%B3%AA%E5%BA%A7%E6%A8%99%0A%3E%3E%3E%20record%20%3D%20(%22Alice%22%2C%2030)%20%20%23%20%E7%95%B0%E8%B3%AA%E7%B4%80%E9%8C%84%0A%3E%3E%3E%20cache%20%3D%20%7B(1%2C%202)%3A%20%22a%22%2C%20(3%2C%204)%3A%20%22b%22%7D%20%20%20%23%20tuple%20%E7%95%B6%20key%0A%3E%3E%3E%20cache%5B(1%2C%202)%5D%0A%27a%27'), 'copy-btn-107')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; point = (3, 4)          # 同質座標
+&gt;&gt;&gt; record = ("Alice", 30)  # 異質紀錄
+&gt;&gt;&gt; cache = {(1, 2): "a", (3, 4): "b"}   # tuple 當 key
+&gt;&gt;&gt; cache[(1, 2)]
+'a'</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：tuple ≈ 不可變的匿名 <code>record</code>，但連欄位名都沒有。需要欄位名時用 <code>namedtuple</code> 或 <code>@dataclass</code>（詳見第 7 章）。</p>
+</div><p>不可變不代表「裡面的東西不能變」——tuple 只凍結了「它持有哪些參考」，若元素本身是 list 仍可變（這點與 hashability 的關係見下一節）。</p>
+<h3 id="dict開放定址雜湊表且保證順序">dict：開放定址雜湊表，且保證順序</h3><p><code>dict</code> 是 Python 的心臟（連物件的屬性都是用 dict 存的）。它是雜湊表，平均 O(1) 的插入、查詢、刪除。但有兩個地方會顛覆你的 Java 直覺：</p>
+<p><strong>第一，CPython 用開放定址（open addressing）而非鏈結（chaining）。</strong> Java 的 <code>HashMap</code> 在 bucket 衝突時掛一條鏈結串列（單一 bucket 的鏈結長度達到 8 且表容量 ≥ 64 時，該 bucket 會由鏈結串列轉成紅黑樹；容量不足則先擴容）；CPython 則是探測下一個槽位。這讓 dict 對 CPU cache 更友善。</p>
+<p><strong>第二，從 3.7 起，dict 保證保留插入順序</strong>，這是語言規格的一部分，不是實作細節。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-108" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20d%20%3D%20%7B%7D%0A%3E%3E%3E%20d%5B%22z%22%5D%20%3D%201%3B%20d%5B%22a%22%5D%20%3D%202%3B%20d%5B%22m%22%5D%20%3D%203%0A%3E%3E%3E%20list(d)%0A%5B%27z%27%2C%20%27a%27%2C%20%27m%27%5D%20%20%20%20%20%20%20%20%20%20%23%20%E6%8F%92%E5%85%A5%E9%A0%86%E5%BA%8F%EF%BC%8C%E4%B8%8D%E6%98%AF%E5%AD%97%E6%AF%8D%E5%BA%8F%E4%B9%9F%E4%B8%8D%E6%98%AF%E9%9B%9C%E6%B9%8A%E5%BA%8F'), 'copy-btn-108')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; d = {}
+&gt;&gt;&gt; d["z"] = 1; d["a"] = 2; d["m"] = 3
+&gt;&gt;&gt; list(d)
+['z', 'a', 'm']          # 插入順序，不是字母序也不是雜湊序</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-109" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9AHashMap%20%E4%B8%8D%E4%BF%9D%E8%AD%89%E9%A0%86%E5%BA%8F%EF%BC%8C%E8%A6%81%E6%9C%89%E5%BA%8F%E5%BE%97%E6%8F%9B%20LinkedHashMap%0AMap%3CString%2C%20Integer%3E%20hm%20%3D%20new%20HashMap%3C%3E()%3B%20%20%20%2F%2F%20%E9%A0%86%E5%BA%8F%E6%9C%AA%E5%AE%9A%E7%BE%A9%0AMap%3CString%2C%20Integer%3E%20lhm%20%3D%20new%20LinkedHashMap%3C%3E()%3B%20%20%2F%2F%20%E6%89%8D%E6%9C%89%E6%8F%92%E5%85%A5%E9%A0%86%E5%BA%8F'), 'copy-btn-109')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：HashMap 不保證順序，要有序得換 LinkedHashMap
+Map&lt;String, Integer&gt; hm = new HashMap&lt;&gt;();   // 順序未定義
+Map&lt;String, Integer&gt; lhm = new LinkedHashMap&lt;&gt;();  // 才有插入順序</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：Python 的 <code>dict</code> 等於 Java 的 <code>LinkedHashMap</code>——<strong>永遠有插入順序，且沒有額外成本</strong>。你不需要為了「有序」去找別的型別。其底層自 3.6 起採用「緊湊 dict（compact dict）」設計，把實際 entry 連續存在一個陣列裡，雜湊表只存索引，所以順序天然被保留，記憶體也更省。</p>
+</div><h3 id="set雜湊集合與集合運算子">set：雜湊集合與集合運算子</h3><p><code>set</code> 就是沒有值的 <code>dict</code>——同樣的雜湊表，成員測試 <code>x in s</code> 是平均 O(1)。它真正勝過 Java 的地方是內建運算子：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-110" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20a%20%3D%20%7B1%2C%202%2C%203%7D%0A%3E%3E%3E%20b%20%3D%20%7B2%2C%203%2C%204%7D%0A%3E%3E%3E%20a%20%7C%20b%20%20%20%20%20%20%23%20%E8%81%AF%E9%9B%86%20union%0A%7B1%2C%202%2C%203%2C%204%7D%0A%3E%3E%3E%20a%20%26%20b%20%20%20%20%20%20%23%20%E4%BA%A4%E9%9B%86%20intersection%0A%7B2%2C%203%7D%0A%3E%3E%3E%20a%20-%20b%20%20%20%20%20%20%23%20%E5%B7%AE%E9%9B%86%20difference%0A%7B1%7D%0A%3E%3E%3E%20a%20%5E%20b%20%20%20%20%20%20%23%20%E5%B0%8D%E7%A8%B1%E5%B7%AE%20symmetric%20difference%0A%7B1%2C%204%7D'), 'copy-btn-110')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; a = {1, 2, 3}
+&gt;&gt;&gt; b = {2, 3, 4}
+&gt;&gt;&gt; a | b      # 聯集 union
+{1, 2, 3, 4}
+&gt;&gt;&gt; a &amp; b      # 交集 intersection
+{2, 3}
+&gt;&gt;&gt; a - b      # 差集 difference
+{1}
+&gt;&gt;&gt; a ^ b      # 對稱差 symmetric difference
+{1, 4}</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-111" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9A%E6%AF%8F%E5%80%8B%E9%81%8B%E7%AE%97%E9%83%BD%E8%A6%81%E4%B8%80%E8%A1%8C%20mutating%20%E6%96%B9%E6%B3%95%EF%BC%8C%E9%82%84%E6%9C%83%E6%94%B9%E5%88%B0%E5%8E%9F%E9%9B%86%E5%90%88%0ASet%3CInteger%3E%20union%20%3D%20new%20HashSet%3C%3E(a)%3B%20union.addAll(b)%3B%0ASet%3CInteger%3E%20inter%20%3D%20new%20HashSet%3C%3E(a)%3B%20inter.retainAll(b)%3B%0ASet%3CInteger%3E%20diff%20%20%3D%20new%20HashSet%3C%3E(a)%3B%20diff.removeAll(b)%3B'), 'copy-btn-111')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：每個運算都要一行 mutating 方法，還會改到原集合
+Set&lt;Integer&gt; union = new HashSet&lt;&gt;(a); union.addAll(b);
+Set&lt;Integer&gt; inter = new HashSet&lt;&gt;(a); inter.retainAll(b);
+Set&lt;Integer&gt; diff  = new HashSet&lt;&gt;(a); diff.removeAll(b);</code></pre>
+      </div>
+    <p>Python 的運算子回傳<strong>新集合</strong>、不改原物件；對應的 in-place 版本是 <code>|=</code>、<code>&amp;=</code>、<code>-=</code>、<code>^=</code>。注意空集合只能用 <code>set()</code> 建立，<code>{}</code> 是空 dict。</p>
+<h3 id="時間複雜度對照表">時間複雜度對照表</h3><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>list</th>
+<th>dict</th>
+<th>set</th>
+<th>對照 Java</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>索引存取 <code>a[i]</code></td>
+<td>O(1)</td>
+<td>—</td>
+<td>—</td>
+<td><code>ArrayList.get</code></td>
+</tr>
+<tr>
+<td>末端新增 <code>append</code></td>
+<td>O(1) 攤還</td>
+<td>—</td>
+<td>—</td>
+<td><code>ArrayList.add</code></td>
+</tr>
+<tr>
+<td>中段插入/刪除</td>
+<td>O(n)</td>
+<td>—</td>
+<td>—</td>
+<td><code>ArrayList.add(i,..)</code></td>
+</tr>
+<tr>
+<td>成員測試 <code>x in c</code></td>
+<td><strong>O(n)</strong></td>
+<td>O(1) 平均</td>
+<td>O(1) 平均</td>
+<td><code>contains</code></td>
+</tr>
+<tr>
+<td>key 查詢/插入/刪除</td>
+<td>—</td>
+<td>O(1) 平均</td>
+<td>O(1) 平均</td>
+<td><code>HashMap</code> 操作</td>
+</tr>
+<tr>
+<td>取長度 <code>len</code></td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td><code>size()</code></td>
+</tr>
+</tbody></table>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>x in my_list</code> 是 <strong>O(n) 線性掃描</strong>！Java 工程師常下意識用 list 做查重，在大量資料下會變災難。要做成員測試，請改用 <code>set</code> 或 <code>dict</code>，把 O(n) 降成 O(1)。</p>
+</div><h2 id="可變-vs-不可變">可變 vs 不可變</h2><p>這是 Python 型別系統最重要的二分法，也是 Java 工程師最常踩坑的地方。</p>
+<table>
+<thead>
+<tr>
+<th>不可變（immutable）</th>
+<th>可變（mutable）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>int</code>、<code>float</code>、<code>bool</code>、<code>complex</code></td>
+<td><code>list</code></td>
+</tr>
+<tr>
+<td><code>str</code>、<code>bytes</code></td>
+<td><code>dict</code></td>
+</tr>
+<tr>
+<td><code>tuple</code>、<code>frozenset</code></td>
+<td><code>set</code></td>
+</tr>
+<tr>
+<td><code>None</code></td>
+<td>大多數自訂物件</td>
+</tr>
+</tbody></table>
+<p>對照 Java：<code>String</code> 不可變你很熟；<code>record</code> 是 shallow immutability（欄位參考不可變，但指向的物件可變）；<code>Collections.unmodifiableList</code> 是包一層唯讀視圖。Python 的不可變型別更徹底——它們連身份（identity）都可能被直譯器共享重用（小整數快取，詳見第 2 章）。</p>
+<h3 id="為什麼不可變才能當-key">為什麼「不可變」才能當 key</h3><p>dict 的 key 與 set 的元素<strong>必須是 hashable</strong>：物件要有穩定的 <code>__hash__</code>，且在生命週期內雜湊值不變。可變物件若能改變內容，雜湊值就會漂移，放進雜湊表後就再也找不到——所以 Python 直接禁止可變物件當 key。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-112" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20%7B(1%2C%202)%3A%20%22ok%22%7D%20%20%20%20%20%20%20%20%20%20%23%20tuple%20%E4%B8%8D%E5%8F%AF%E8%AE%8A%EF%BC%8C%E5%8F%AF%E7%95%B6%20key%0A%7B(1%2C%202)%3A%20%27ok%27%7D%0A%3E%3E%3E%20%7B%5B1%2C%202%5D%3A%20%22boom%22%7D%20%20%20%20%20%20%20%20%23%20%E9%80%99%E6%9C%83%E5%87%BA%E9%8C%AF%EF%BC%9Alist%20%E5%8F%AF%E8%AE%8A%EF%BC%8C%E4%B8%8D%E5%8F%AF%E9%9B%9C%E6%B9%8A%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20...%0ATypeError%3A%20unhashable%20type%3A%20%27list%27'), 'copy-btn-112')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; {(1, 2): "ok"}          # tuple 不可變，可當 key
+{(1, 2): 'ok'}
+&gt;&gt;&gt; {[1, 2]: "boom"}        # 這會出錯：list 可變，不可雜湊
+Traceback (most recent call last):
+  ...
+TypeError: unhashable type: 'list'</code></pre>
+      </div>
+    <blockquote><p>註：Python 3.14 起此訊息擴充為 <code>cannot use &#39;list&#39; as a dict key (unhashable type: &#39;list&#39;)</code>，語意相同。</p>
+</blockquote>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-113" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%20%E6%B2%92%E6%9C%89%E5%BC%B7%E5%88%B6%E9%80%99%E6%A2%9D%E8%A6%8F%E5%89%87%E2%80%94%E2%80%94%E4%BD%A0%E5%8F%AF%E4%BB%A5%E6%8B%BF%E5%8F%AF%E8%AE%8A%E7%9A%84%20ArrayList%20%E7%95%B6%20HashMap%20%E7%9A%84%20key%EF%BC%8C%0A%2F%2F%20%E4%BD%86%E4%B8%80%E6%97%A6%E6%94%B9%E5%8B%95%E5%AE%83%E7%9A%84%E5%85%A7%E5%AE%B9%EF%BC%8ChashCode%20%E8%AE%8A%E4%BA%86%EF%BC%8C%E5%B0%B1%E5%86%8D%E4%B9%9F%20get%20%E4%B8%8D%E5%88%B0%E2%80%94%E2%80%94%E5%90%8C%E6%A8%A3%E7%9A%84%E5%9D%91%EF%BC%8C%E5%8F%AA%E6%98%AF%E4%B8%8D%E5%A0%B1%E9%8C%AF%0AMap%3CList%3CInteger%3E%2C%20String%3E%20m%20%3D%20new%20HashMap%3C%3E()%3B%0Am.put(new%20ArrayList%3C%3E(List.of(1%2C%202))%2C%20%22ok%22)%3B%20%20%2F%2F%20%E5%90%88%E6%B3%95%E4%BD%86%E5%8D%B1%E9%9A%AA'), 'copy-btn-113')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java 沒有強制這條規則——你可以拿可變的 ArrayList 當 HashMap 的 key，
+// 但一旦改動它的內容，hashCode 變了，就再也 get 不到——同樣的坑，只是不報錯
+Map&lt;List&lt;Integer&gt;, String&gt; m = new HashMap&lt;&gt;();
+m.put(new ArrayList&lt;&gt;(List.of(1, 2)), "ok");  // 合法但危險</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：Python 把「可變物件不能當 key」變成<strong>語言層級的硬性錯誤</strong>，比 Java 安全。需要把一組可變資料當 key 時，先轉成 tuple 或 <code>frozenset</code>。</p>
+</div><p>注意：tuple 雖不可變，但若它<strong>內含</strong>可變元素，整個 tuple 就變得不可雜湊：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-114" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20hash((1%2C%202))%20%20%20%20%20%20%20%20%23%20ok%EF%BC%88%E5%AF%A6%E9%9A%9B%E6%95%B8%E5%80%BC%E4%BE%9D%E5%B9%B3%E5%8F%B0%E8%88%87%20hash%20seed%20%E8%80%8C%E7%95%B0%EF%BC%89%0A8409376899596376432%0A%3E%3E%3E%20hash((1%2C%20%5B2%2C%203%5D))%20%20%20%23%20%E9%80%99%E6%9C%83%E5%87%BA%E9%8C%AF%EF%BC%9A%E5%85%A7%E5%90%AB%20list%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20...%0ATypeError%3A%20unhashable%20type%3A%20%27list%27'), 'copy-btn-114')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; hash((1, 2))        # ok（實際數值依平台與 hash seed 而異）
+8409376899596376432
+&gt;&gt;&gt; hash((1, [2, 3]))   # 這會出錯：內含 list
+Traceback (most recent call last):
+  ...
+TypeError: unhashable type: 'list'</code></pre>
+      </div>
+    <h3 id="賦值是共享參考不是拷貝">賦值是共享參考，不是拷貝</h3><p>延續第 2 章的 name binding：<code>a = b</code> 只是讓兩個名字綁到同一個物件，<strong>從不複製</strong>。這對 Java 工程師其實不陌生（物件變數本就是參考），但 Python 沒有 primitive，所以連「看起來像數字」的東西都是物件。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-115" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20a%20%3D%20%5B1%2C%202%2C%203%5D%0A%3E%3E%3E%20b%20%3D%20a%20%20%20%20%20%20%20%20%20%20%20%20%23%20b%20%E8%88%87%20a%20%E6%8C%87%E5%90%91%E5%90%8C%E4%B8%80%E5%80%8B%20list%0A%3E%3E%3E%20b.append(4)%0A%3E%3E%3E%20a%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20a%20%E4%B9%9F%E8%A2%AB%E6%94%B9%E4%BA%86%0A%5B1%2C%202%2C%203%2C%204%5D%0A%3E%3E%3E%20a%20is%20b%0ATrue'), 'copy-btn-115')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; a = [1, 2, 3]
+&gt;&gt;&gt; b = a            # b 與 a 指向同一個 list
+&gt;&gt;&gt; b.append(4)
+&gt;&gt;&gt; a                # a 也被改了
+[1, 2, 3, 4]
+&gt;&gt;&gt; a is b
+True</code></pre>
+      </div>
+    <p>不可變物件不受此困擾，因為你「改不動」它——任何「修改」其實都是重新綁定到新物件。要真正複製可變物件，請用切片 <code>a[:]</code>、<code>list(a)</code>、或 <code>copy</code> 模組（見本章最後一節）。</p>
+<h2 id="切片slicing">切片（slicing）</h2><p>切片是 Python 序列的殺手級語法，語法是 <code>seq[start:stop:step]</code>，三個都可省略。對照 Java 的 <code>subList</code>、<code>Arrays.copyOfRange</code>、<code>StringBuilder.reverse</code>，你會立刻感受到密度差距。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-116" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20a%20%3D%20%5B0%2C%201%2C%202%2C%203%2C%204%2C%205%2C%206%2C%207%2C%208%2C%209%5D%0A%3E%3E%3E%20a%5B2%3A5%5D%20%20%20%20%20%20%23%20%E7%B4%A2%E5%BC%95%202%20%E5%88%B0%204%EF%BC%88stop%20%E4%B8%8D%E5%90%AB%EF%BC%89%0A%5B2%2C%203%2C%204%5D%0A%3E%3E%3E%20a%5B%3A3%5D%20%20%20%20%20%20%20%23%20%E9%96%8B%E9%A0%AD%E5%88%B0%E7%B4%A2%E5%BC%95%202%0A%5B0%2C%201%2C%202%5D%0A%3E%3E%3E%20a%5B7%3A%5D%20%20%20%20%20%20%20%23%20%E7%B4%A2%E5%BC%95%207%20%E5%88%B0%E7%B5%90%E5%B0%BE%0A%5B7%2C%208%2C%209%5D%0A%3E%3E%3E%20a%5B-3%3A%5D%20%20%20%20%20%20%23%20%E8%B2%A0%E7%B4%A2%E5%BC%95%EF%BC%9A%E5%80%92%E6%95%B8%E4%B8%89%E5%80%8B%0A%5B7%2C%208%2C%209%5D%0A%3E%3E%3E%20a%5B%3A%3A2%5D%20%20%20%20%20%20%23%20step%3D2%EF%BC%8C%E6%AF%8F%E9%9A%94%E4%B8%80%E5%80%8B%0A%5B0%2C%202%2C%204%2C%206%2C%208%5D%0A%3E%3E%3E%20a%5B%3A%3A-1%5D%20%20%20%20%20%23%20step%3D-1%EF%BC%8C%E5%8F%8D%E8%BD%89%E6%95%B4%E5%80%8B%E5%BA%8F%E5%88%97%0A%5B9%2C%208%2C%207%2C%206%2C%205%2C%204%2C%203%2C%202%2C%201%2C%200%5D%0A%3E%3E%3E%20a%5B5%3A1%3A-1%5D%20%20%20%23%20%E5%8F%8D%E5%90%91%E5%88%87%E7%89%87%0A%5B5%2C%204%2C%203%2C%202%5D'), 'copy-btn-116')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; a = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+&gt;&gt;&gt; a[2:5]      # 索引 2 到 4（stop 不含）
+[2, 3, 4]
+&gt;&gt;&gt; a[:3]       # 開頭到索引 2
+[0, 1, 2]
+&gt;&gt;&gt; a[7:]       # 索引 7 到結尾
+[7, 8, 9]
+&gt;&gt;&gt; a[-3:]      # 負索引：倒數三個
+[7, 8, 9]
+&gt;&gt;&gt; a[::2]      # step=2，每隔一個
+[0, 2, 4, 6, 8]
+&gt;&gt;&gt; a[::-1]     # step=-1，反轉整個序列
+[9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+&gt;&gt;&gt; a[5:1:-1]   # 反向切片
+[5, 4, 3, 2]</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-117" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9A%E6%AF%8F%E5%80%8B%E9%83%BD%E8%A6%81%E4%B8%8D%E5%90%8C%E7%9A%84%20API%EF%BC%8C%E5%8F%8D%E8%BD%89%E9%82%84%E5%BE%97%20Collections.reverse%EF%BC%88%E4%B8%94%E6%9C%83%E6%94%B9%E5%8B%95%E5%8E%9F%20list%EF%BC%89%0AList%3CInteger%3E%20sub%20%3D%20a.subList(2%2C%205)%3B%20%20%20%20%20%20%20%20%20%20%2F%2F%20%E8%80%8C%E4%B8%94%E6%98%AF%20view%EF%BC%8C%E4%B8%8D%E6%98%AF%E6%96%B0%20list%0Aint%5B%5D%20copy%20%3D%20Arrays.copyOfRange(arr%2C%202%2C%205)%3B%20%20%20%2F%2F%20%E9%99%A3%E5%88%97%E7%89%88'), 'copy-btn-117')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：每個都要不同的 API，反轉還得 Collections.reverse（且會改動原 list）
+List&lt;Integer&gt; sub = a.subList(2, 5);          // 而且是 view，不是新 list
+int[] copy = Arrays.copyOfRange(arr, 2, 5);   // 陣列版</code></pre>
+      </div>
+    <h3 id="切片回傳新物件a-是淺拷貝慣用法">切片回傳新物件——`a[:]` 是淺拷貝慣用法</h3><p>對 <code>list</code> 而言，切片<strong>永遠回傳一個新的 list</strong>（淺拷貝），不像 Java <code>subList</code> 回傳的是會連動原 list 的 view。<code>a[:]</code> 因此成為複製整個 list 的經典慣用法：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-118" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20a%20%3D%20%5B1%2C%202%2C%203%5D%0A%3E%3E%3E%20b%20%3D%20a%5B%3A%5D%20%20%20%20%20%20%20%20%23%20%E6%B7%BA%E6%8B%B7%E8%B2%9D%EF%BC%9A%E6%96%B0%20list%EF%BC%8C%E4%BD%86%E5%85%83%E7%B4%A0%E4%BB%8D%E6%98%AF%E5%85%B1%E4%BA%AB%E5%8F%83%E8%80%83%0A%3E%3E%3E%20b%5B0%5D%20%3D%2099%0A%3E%3E%3E%20a%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8E%9F%20list%20%E4%B8%8D%E5%8F%97%E5%BD%B1%E9%9F%BF%0A%5B1%2C%202%2C%203%5D%0A%3E%3E%3E%20a%20is%20b%0AFalse'), 'copy-btn-118')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; a = [1, 2, 3]
+&gt;&gt;&gt; b = a[:]        # 淺拷貝：新 list，但元素仍是共享參考
+&gt;&gt;&gt; b[0] = 99
+&gt;&gt;&gt; a               # 原 list 不受影響
+[1, 2, 3]
+&gt;&gt;&gt; a is b
+False</code></pre>
+      </div>
+    <h3 id="切片賦值可變長度的就地手術">切片賦值：可變長度的就地手術</h3><p>切片可以放在等號左邊，做就地替換、插入、刪除——甚至改變長度，這是 Java 完全沒有的能力：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-119" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20b%20%3D%20%5B1%2C%202%2C%203%2C%204%2C%205%5D%0A%3E%3E%3E%20b%5B1%3A4%5D%20%3D%20%5B20%2C%2030%5D%20%20%20%20%23%20%E7%94%A8%202%20%E5%80%8B%E5%85%83%E7%B4%A0%E5%8F%96%E4%BB%A3%203%20%E5%80%8B%EF%BC%8C%E9%95%B7%E5%BA%A6%E7%B8%AE%E7%9F%AD%0A%3E%3E%3E%20b%0A%5B1%2C%2020%2C%2030%2C%205%5D%0A%0A%3E%3E%3E%20c%20%3D%20%5B1%2C%202%2C%203%5D%0A%3E%3E%3E%20c%5B1%3A1%5D%20%3D%20%5B8%2C%209%5D%20%20%20%20%20%20%23%20stop%3D%3Dstart%20%E7%9A%84%E7%A9%BA%E5%88%87%E7%89%87%EF%BC%9A%E7%B4%94%E6%8F%92%E5%85%A5%0A%3E%3E%3E%20c%0A%5B1%2C%208%2C%209%2C%202%2C%203%5D%0A%0A%3E%3E%3E%20d%20%3D%20%5B1%2C%202%2C%203%2C%204%2C%205%5D%0A%3E%3E%3E%20d%5B%3A%3A2%5D%20%3D%20%5B0%2C%200%2C%200%5D%20%20%20%23%20%E5%B0%8D%E6%AD%A5%E9%80%B2%E5%88%87%E7%89%87%E8%B3%A6%E5%80%BC%EF%BC%88%E5%85%A9%E9%82%8A%E9%95%B7%E5%BA%A6%E5%BF%85%E9%A0%88%E7%9B%B8%E7%AD%89%EF%BC%89%0A%3E%3E%3E%20d%0A%5B0%2C%202%2C%200%2C%204%2C%200%5D'), 'copy-btn-119')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; b = [1, 2, 3, 4, 5]
+&gt;&gt;&gt; b[1:4] = [20, 30]    # 用 2 個元素取代 3 個，長度縮短
+&gt;&gt;&gt; b
+[1, 20, 30, 5]
+
+&gt;&gt;&gt; c = [1, 2, 3]
+&gt;&gt;&gt; c[1:1] = [8, 9]      # stop==start 的空切片：純插入
+&gt;&gt;&gt; c
+[1, 8, 9, 2, 3]
+
+&gt;&gt;&gt; d = [1, 2, 3, 4, 5]
+&gt;&gt;&gt; d[::2] = [0, 0, 0]   # 對步進切片賦值（兩邊長度必須相等）
+&gt;&gt;&gt; d
+[0, 2, 0, 4, 0]</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>a[:] = new_values</code> 會<strong>就地替換 list 的全部內容但保留同一個物件</strong>——所有持有該 list 參考的其他名字都會看到更新。這和 <code>a = new_values</code>（重新綁定，其他名字看不到）語意完全不同，是個常被忽略的精細武器。</p>
+</div><h2 id="解包unpacking">解包（unpacking）</h2><p>解包是 Python 把「結構拆解到變數」做到極致的語法糖，Java 至今沒有對等物。</p>
+<h3 id="多重賦值與交換">多重賦值與交換</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-120" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20a%2C%20b%20%3D%201%2C%202%0A%3E%3E%3E%20a%2C%20b%20%3D%20b%2C%20a%20%20%20%20%20%20%23%20%E4%BA%A4%E6%8F%9B%EF%BC%8C%E4%B8%8D%E9%9C%80%20temp%20%E8%AE%8A%E6%95%B8%0A%3E%3E%3E%20a%2C%20b%0A(2%2C%201)'), 'copy-btn-120')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; a, b = 1, 2
+&gt;&gt;&gt; a, b = b, a      # 交換，不需 temp 變數
+&gt;&gt;&gt; a, b
+(2, 1)</code></pre>
+      </div>
+    <p>右側先求值成一個 tuple <code>(b, a)</code>，再拆解綁定到左側——所以交換是原子的、無需中介變數。Java 得寫 <code>int t = a; a = b; b = t;</code>。</p>
+<h3 id="星號解包抓取剩餘">星號解包：抓取剩餘</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-121" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20first%2C%20*rest%20%3D%20%5B1%2C%202%2C%203%2C%204%5D%0A%3E%3E%3E%20first%2C%20rest%0A(1%2C%20%5B2%2C%203%2C%204%5D)%0A%3E%3E%3E%20*init%2C%20last%20%3D%20%5B1%2C%202%2C%203%2C%204%5D%0A%3E%3E%3E%20init%2C%20last%0A(%5B1%2C%202%2C%203%5D%2C%204)%0A%3E%3E%3E%20head%2C%20*mid%2C%20tail%20%3D%20%5B1%2C%202%2C%203%2C%204%2C%205%5D%0A%3E%3E%3E%20head%2C%20mid%2C%20tail%0A(1%2C%20%5B2%2C%203%2C%204%5D%2C%205)'), 'copy-btn-121')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; first, *rest = [1, 2, 3, 4]
+&gt;&gt;&gt; first, rest
+(1, [2, 3, 4])
+&gt;&gt;&gt; *init, last = [1, 2, 3, 4]
+&gt;&gt;&gt; init, last
+([1, 2, 3], 4)
+&gt;&gt;&gt; head, *mid, tail = [1, 2, 3, 4, 5]
+&gt;&gt;&gt; head, mid, tail
+(1, [2, 3, 4], 5)</code></pre>
+      </div>
+    <p><code>*name</code> 會貪婪地吞掉「其餘」元素變成一個 list，且一次賦值只能有一個星號目標。這在處理「頭尾固定、中間不定」的資料時極為順手。</p>
+<h3 id="巢狀解包">巢狀解包</h3><p>解包可以對應任意巢狀結構，直接拆到位：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-122" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20(a%2C%20b)%2C%20(c%2C%20d)%20%3D%20(1%2C%202)%2C%20(3%2C%204)%0A%3E%3E%3E%20a%2C%20b%2C%20c%2C%20d%0A(1%2C%202%2C%203%2C%204)%0A%3E%3E%3E%20for%20name%2C%20(lo%2C%20hi)%20in%20%5B(%22x%22%2C%20(0%2C%2010))%2C%20(%22y%22%2C%20(5%2C%2020))%5D%3A%0A...%20%20%20%20%20print(name%2C%20lo%2C%20hi)%0A...%0Ax%200%2010%0Ay%205%2020'), 'copy-btn-122')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; (a, b), (c, d) = (1, 2), (3, 4)
+&gt;&gt;&gt; a, b, c, d
+(1, 2, 3, 4)
+&gt;&gt;&gt; for name, (lo, hi) in [("x", (0, 10)), ("y", (5, 20))]:
+...     print(name, lo, hi)
+...
+x 0 10
+y 5 20</code></pre>
+      </div>
+    <h3 id="在函式呼叫時展開-與-">在函式呼叫時展開：`*` 與 `**`</h3><p>解包也用於把序列/字典「攤平」成參數，對照第 3 章的 <code>*args</code>、<code>**kwargs</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-123" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20def%20line(x1%2C%20y1%2C%20x2%2C%20y2)%3A%0A...%20%20%20%20%20return%20f%22(%7Bx1%7D%2C%7By1%7D)%20-%3E%20(%7Bx2%7D%2C%7By2%7D)%22%0A...%0A%3E%3E%3E%20p1%20%3D%20(0%2C%200)%0A%3E%3E%3E%20p2%20%3D%20(3%2C%204)%0A%3E%3E%3E%20line(*p1%2C%20*p2)%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%8A%8A%E5%85%A9%E5%80%8B%20tuple%20%E5%B1%95%E9%96%8B%E6%88%90%204%20%E5%80%8B%E4%BD%8D%E7%BD%AE%E5%8F%83%E6%95%B8%0A%27(0%2C0)%20-%3E%20(3%2C4)%27%0A%0A%3E%3E%3E%20defaults%20%3D%20%7B%22x1%22%3A%200%2C%20%22y1%22%3A%200%7D%0A%3E%3E%3E%20overrides%20%3D%20%7B%22x2%22%3A%203%2C%20%22y2%22%3A%204%7D%0A%3E%3E%3E%20line(**defaults%2C%20**overrides)%20%20%20%23%20%E6%8A%8A%20dict%20%E5%B1%95%E9%96%8B%E6%88%90%E9%97%9C%E9%8D%B5%E5%AD%97%E5%8F%83%E6%95%B8%0A%27(0%2C0)%20-%3E%20(3%2C4)%27%0A%0A%3E%3E%3E%20merged%20%3D%20%7B**defaults%2C%20**overrides%7D%20%20%20%23%20%E5%90%88%E4%BD%B5%E5%85%A9%E5%80%8B%20dict%EF%BC%88%E5%BE%8C%E8%80%85%E8%A6%86%E8%93%8B%E5%89%8D%E8%80%85%EF%BC%89%0A%3E%3E%3E%20merged%0A%7B%27x1%27%3A%200%2C%20%27y1%27%3A%200%2C%20%27x2%27%3A%203%2C%20%27y2%27%3A%204%7D'), 'copy-btn-123')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; def line(x1, y1, x2, y2):
+...     return f"({x1},{y1}) -&gt; ({x2},{y2})"
+...
+&gt;&gt;&gt; p1 = (0, 0)
+&gt;&gt;&gt; p2 = (3, 4)
+&gt;&gt;&gt; line(*p1, *p2)            # 把兩個 tuple 展開成 4 個位置參數
+'(0,0) -&gt; (3,4)'
+
+&gt;&gt;&gt; defaults = {"x1": 0, "y1": 0}
+&gt;&gt;&gt; overrides = {"x2": 3, "y2": 4}
+&gt;&gt;&gt; line(**defaults, **overrides)   # 把 dict 展開成關鍵字參數
+'(0,0) -&gt; (3,4)'
+
+&gt;&gt;&gt; merged = {**defaults, **overrides}   # 合併兩個 dict（後者覆蓋前者）
+&gt;&gt;&gt; merged
+{'x1': 0, 'y1': 0, 'x2': 3, 'y2': 4}</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 只有 varargs（<code>f(arr)</code> 還得確保型別與位置匹配，且無法展開到具名參數）。Python 的 <code>*</code>/<code>**</code> 展開涵蓋位置與關鍵字兩個維度，是寫轉發函式（forwarding）與合併設定的利器。從 3.9 起合併 dict 也可用 <code>defaults | overrides</code>。</p>
+</div><h2 id="collections-模組">collections 模組</h2><p>內建四大結構是地基，<code>collections</code> 模組則是你每天該用、卻常被 Java 工程師忽略的「上層工具箱」。它們能消滅大量樣板程式碼。</p>
+<h3 id="defaultdict消滅-getordefault-computeifabsent-樣板">defaultdict：消滅 getOrDefault / computeIfAbsent 樣板</h3><p>分組（grouping）是最常見的場景。Java 你會寫 <code>map.computeIfAbsent(key, k -&gt; new ArrayList&lt;&gt;()).add(v)</code>；Python 的 <code>defaultdict</code> 讓你連這行都省了：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-124" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20collections%20import%20defaultdict%0A%3E%3E%3E%20groups%20%3D%20defaultdict(list)%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%BC%BA%20key%20%E6%99%82%E8%87%AA%E5%8B%95%E5%BB%BA%E4%B8%80%E5%80%8B%E7%A9%BA%20list%0A%3E%3E%3E%20for%20word%20in%20%5B%22apple%22%2C%20%22banana%22%2C%20%22avocado%22%2C%20%22cherry%22%5D%3A%0A...%20%20%20%20%20groups%5Bword%5B0%5D%5D.append(word)%0A...%0A%3E%3E%3E%20dict(groups)%0A%7B%27a%27%3A%20%5B%27apple%27%2C%20%27avocado%27%5D%2C%20%27b%27%3A%20%5B%27banana%27%5D%2C%20%27c%27%3A%20%5B%27cherry%27%5D%7D'), 'copy-btn-124')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from collections import defaultdict
+&gt;&gt;&gt; groups = defaultdict(list)           # 缺 key 時自動建一個空 list
+&gt;&gt;&gt; for word in ["apple", "banana", "avocado", "cherry"]:
+...     groups[word[0]].append(word)
+...
+&gt;&gt;&gt; dict(groups)
+{'a': ['apple', 'avocado'], 'b': ['banana'], 'c': ['cherry']}</code></pre>
+      </div>
+    <p><code>defaultdict(int)</code> 可做計數、<code>defaultdict(set)</code> 可做去重分組。建構子接受一個「無參工廠函式」，缺 key 時呼叫它產生預設值。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：對 <code>defaultdict</code> 做<strong>讀取</strong>也會觸發建立！<code>groups[&quot;zzz&quot;]</code> 即使只是想查，也會憑空插入一個空 list。要純查詢請用 <code>groups.get(&quot;zzz&quot;)</code> 或先 <code>in</code> 測試。</p>
+</div><h3 id="counter計數神器">Counter：計數神器</h3><p>需要統計次數時，別再手刻 <code>Map&lt;K, Integer&gt;</code> 配 <code>merge(k, 1, Integer::sum)</code> 了：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-125" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20collections%20import%20Counter%0A%3E%3E%3E%20c%20%3D%20Counter(%22abracadabra%22)%0A%3E%3E%3E%20c%0ACounter(%7B%27a%27%3A%205%2C%20%27b%27%3A%202%2C%20%27r%27%3A%202%2C%20%27c%27%3A%201%2C%20%27d%27%3A%201%7D)%0A%3E%3E%3E%20c.most_common(2)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%9C%80%E5%B8%B8%E8%A6%8B%E7%9A%84%E5%85%A9%E5%80%8B%0A%5B(%27a%27%2C%205)%2C%20(%27b%27%2C%202)%5D%0A%3E%3E%3E%20c%5B%22z%22%5D%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%B8%8D%E5%AD%98%E5%9C%A8%E7%9A%84%20key%20%E5%9B%9E%E5%82%B3%200%EF%BC%8C%E4%B8%8D%E5%A0%B1%20KeyError%0A0%0A%3E%3E%3E%20Counter(%22aab%22)%20%2B%20Counter(%22abc%22)%20%20%20%23%20Counter%20%E4%B9%8B%E9%96%93%E5%8F%AF%E5%81%9A%E7%AE%97%E8%A1%93%0ACounter(%7B%27a%27%3A%203%2C%20%27b%27%3A%202%2C%20%27c%27%3A%201%7D)'), 'copy-btn-125')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from collections import Counter
+&gt;&gt;&gt; c = Counter("abracadabra")
+&gt;&gt;&gt; c
+Counter({'a': 5, 'b': 2, 'r': 2, 'c': 1, 'd': 1})
+&gt;&gt;&gt; c.most_common(2)              # 最常見的兩個
+[('a', 5), ('b', 2)]
+&gt;&gt;&gt; c["z"]                        # 不存在的 key 回傳 0，不報 KeyError
+0
+&gt;&gt;&gt; Counter("aab") + Counter("abc")   # Counter 之間可做算術
+Counter({'a': 3, 'b': 2, 'c': 1})</code></pre>
+      </div>
+    <p><code>Counter</code> 是 <code>dict</code> 的子類，還支援 <code>+</code>、<code>-</code>、<code>&amp;</code>（取 min）、<code>|</code>（取 max）等多重集合運算，做詞頻、投票統計、庫存合併時極其順手。</p>
+<h3 id="deque真正的-o1-雙端佇列">deque：真正的 O(1) 雙端佇列</h3><p>前面提過 <code>list.pop(0)</code> 是 O(n)。需要 queue 或 stack 的雙端操作時，用 <code>deque</code>（對照 Java <code>ArrayDeque</code>），兩端的 append/pop 都是 O(1)：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-126" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20collections%20import%20deque%0A%3E%3E%3E%20dq%20%3D%20deque(%5B1%2C%202%2C%203%5D%2C%20maxlen%3D3)%20%20%20%23%20%E5%8F%AF%E9%81%B8%20maxlen%EF%BC%8C%E6%BB%BF%E4%BA%86%E8%87%AA%E5%8B%95%E6%93%A0%E6%8E%89%E5%8F%A6%E4%B8%80%E7%AB%AF%0A%3E%3E%3E%20dq.appendleft(0)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%B7%A6%E7%AB%AF%E5%8A%A0%E5%85%A5%EF%BC%8C%E5%8F%B3%E7%AB%AF%203%20%E8%A2%AB%E6%93%A0%E5%87%BA%0A%3E%3E%3E%20dq%0Adeque(%5B0%2C%201%2C%202%5D%2C%20maxlen%3D3)%0A%3E%3E%3E%20dq.append(9)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8F%B3%E7%AB%AF%E5%8A%A0%E5%85%A5%EF%BC%8C%E5%B7%A6%E7%AB%AF%200%20%E8%A2%AB%E6%93%A0%E5%87%BA%0A%3E%3E%3E%20dq%0Adeque(%5B1%2C%202%2C%209%5D%2C%20maxlen%3D3)%0A%3E%3E%3E%20dq.popleft()%0A1'), 'copy-btn-126')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from collections import deque
+&gt;&gt;&gt; dq = deque([1, 2, 3], maxlen=3)   # 可選 maxlen，滿了自動擠掉另一端
+&gt;&gt;&gt; dq.appendleft(0)                   # 左端加入，右端 3 被擠出
+&gt;&gt;&gt; dq
+deque([0, 1, 2], maxlen=3)
+&gt;&gt;&gt; dq.append(9)                       # 右端加入，左端 0 被擠出
+&gt;&gt;&gt; dq
+deque([1, 2, 9], maxlen=3)
+&gt;&gt;&gt; dq.popleft()
+1</code></pre>
+      </div>
+    <p><code>maxlen</code> 讓 deque 變成天然的「滑動視窗 / 環形緩衝區（ring buffer）」，做最近 N 筆紀錄、移動平均特別方便——Java 得自己管理容量。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>deque</code> 的隨機存取 <code>dq[i]</code> 是 <strong>O(n)</strong>（它是雙向鏈結結構，不是陣列）。需要頻繁索引就用 list；需要雙端進出就用 deque，別搞反。</p>
+</div><h3 id="namedtuple欄位有名字的輕量不可變紀錄">namedtuple：欄位有名字的輕量不可變紀錄</h3><p>在 <code>@dataclass</code>（Python 3.7+）普及前，<code>namedtuple</code> 是建立輕量不可變紀錄的標準作法，至今仍因為「就是個 tuple、極省記憶體、可解包」而常用：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-127" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20collections%20import%20namedtuple%0A%3E%3E%3E%20Point%20%3D%20namedtuple(%22Point%22%2C%20%5B%22x%22%2C%20%22y%22%5D)%0A%3E%3E%3E%20p%20%3D%20Point(3%2C%204)%0A%3E%3E%3E%20p.x%2C%20p.y%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%85%B7%E5%90%8D%E5%AD%98%E5%8F%96%0A(3%2C%204)%0A%3E%3E%3E%20px%2C%20py%20%3D%20p%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%BB%8D%E5%8F%AF%E5%83%8F%20tuple%20%E4%B8%80%E6%A8%A3%E8%A7%A3%E5%8C%85%0A%3E%3E%3E%20p._replace(x%3D99)%20%20%20%20%20%20%20%20%20%20%23%20%E4%B8%8D%E5%8F%AF%E8%AE%8A%EF%BC%8C%E6%89%80%E4%BB%A5%E3%80%8C%E4%BF%AE%E6%94%B9%E3%80%8D%E5%9B%9E%E5%82%B3%E6%96%B0%E7%89%A9%E4%BB%B6%0APoint(x%3D99%2C%20y%3D4)%0A%3E%3E%3E%20p%20%3D%3D%20(3%2C%204)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%9C%AC%E8%B3%AA%E4%BB%8D%E6%98%AF%20tuple%EF%BC%8C%E5%8F%AF%E8%88%87%E6%99%AE%E9%80%9A%20tuple%20%E6%AF%94%E8%BC%83%0ATrue'), 'copy-btn-127')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from collections import namedtuple
+&gt;&gt;&gt; Point = namedtuple("Point", ["x", "y"])
+&gt;&gt;&gt; p = Point(3, 4)
+&gt;&gt;&gt; p.x, p.y                  # 具名存取
+(3, 4)
+&gt;&gt;&gt; px, py = p                # 仍可像 tuple 一樣解包
+&gt;&gt;&gt; p._replace(x=99)          # 不可變，所以「修改」回傳新物件
+Point(x=99, y=4)
+&gt;&gt;&gt; p == (3, 4)               # 本質仍是 tuple，可與普通 tuple 比較
+True</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>namedtuple</code> ≈ 一個欄位唯讀的 <code>record</code>，但更輕（沒有 class 的完整開銷）。需要方法、預設值或型別提示時，請升級到 <code>@dataclass</code> 或 <code>typing.NamedTuple</code>（詳見第 7 章）。</p>
+</div><h2 id="淺拷貝-vs-深拷貝">淺拷貝 vs 深拷貝</h2><p>這是本章最容易出血的主題。Java 工程師都吃過 <code>clone()</code> 是淺拷貝的虧——複製了外層，內層物件卻還是共享參考。Python 的規則一致，但因為到處都是參考、又有 <code>*</code> 重複運算子，坑更深。</p>
+<h3 id="copycopy-vs-copydeepcopy">`copy.copy` vs `copy.deepcopy`</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-128" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20copy%0A%3E%3E%3E%20original%20%3D%20%5B%5B1%2C%202%5D%2C%20%5B3%2C%204%5D%5D%0A%3E%3E%3E%20shallow%20%3D%20copy.copy(original)%20%20%20%20%20%20%20%20%23%20%E6%B7%BA%E6%8B%B7%E8%B2%9D%EF%BC%9A%E6%96%B0%E5%A4%96%E5%B1%A4%EF%BC%8C%E5%85%A7%E5%B1%A4%20list%20%E5%85%B1%E4%BA%AB%0A%3E%3E%3E%20deep%20%3D%20copy.deepcopy(original)%20%20%20%20%20%20%20%23%20%E6%B7%B1%E6%8B%B7%E8%B2%9D%EF%BC%9A%E9%81%9E%E8%BF%B4%E8%A4%87%E8%A3%BD%E6%89%80%E6%9C%89%E5%B1%A4%0A%3E%3E%3E%20original%5B0%5D%5B0%5D%20%3D%2099%0A%3E%3E%3E%20shallow%0A%5B%5B99%2C%202%5D%2C%20%5B3%2C%204%5D%5D%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%A2%AB%E9%80%A3%E5%8B%95%EF%BC%81%E5%85%A7%E5%B1%A4%E6%98%AF%E5%90%8C%E4%B8%80%E5%80%8B%20list%0A%3E%3E%3E%20deep%0A%5B%5B1%2C%202%5D%2C%20%5B3%2C%204%5D%5D%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%AE%8C%E5%85%A8%E7%8D%A8%E7%AB%8B'), 'copy-btn-128')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import copy
+&gt;&gt;&gt; original = [[1, 2], [3, 4]]
+&gt;&gt;&gt; shallow = copy.copy(original)        # 淺拷貝：新外層，內層 list 共享
+&gt;&gt;&gt; deep = copy.deepcopy(original)       # 深拷貝：遞迴複製所有層
+&gt;&gt;&gt; original[0][0] = 99
+&gt;&gt;&gt; shallow
+[[99, 2], [3, 4]]                        # 被連動！內層是同一個 list
+&gt;&gt;&gt; deep
+[[1, 2], [3, 4]]                         # 完全獨立</code></pre>
+      </div>
+    <p><code>copy.copy</code>（等同 <code>original[:]</code> 或 <code>list(original)</code>）只複製最外層容器，裡面的元素仍是<strong>共享參考</strong>。只有 <code>copy.deepcopy</code> 會遞迴複製整棵物件樹（它還能正確處理循環參考）。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>copy.copy</code> ≈ <code>ArrayList</code> 的 copy 建構子或 <code>clone()</code>（淺）；<code>copy.deepcopy</code> ≈ 你得自己手刻、或靠序列化往返（serialize round-trip）才能達成的深拷貝。Python 一行就有。</p>
+</div><h3 id="經典陷阱033-的共享-row">經典陷阱：`[[0]*3]*3` 的共享 row</h3><p>這是面試與線上事故的常客。你想建一個 3×3 全零矩陣，直覺寫成 <code>[[0]*3]*3</code>——結果改一格，整欄一起變：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-129" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20grid%20%3D%20%5B%5B0%5D%20*%203%5D%20*%203%0A%3E%3E%3E%20grid%0A%5B%5B0%2C%200%2C%200%5D%2C%20%5B0%2C%200%2C%200%5D%2C%20%5B0%2C%200%2C%200%5D%5D%20%20%20%20%20%20%20%20%23%20%E7%9C%8B%E8%B5%B7%E4%BE%86%E6%B2%92%E5%95%8F%E9%A1%8C%0A%3E%3E%3E%20grid%5B0%5D%5B0%5D%20%3D%201%0A%3E%3E%3E%20grid%0A%5B%5B1%2C%200%2C%200%5D%2C%20%5B1%2C%200%2C%200%5D%2C%20%5B1%2C%200%2C%200%5D%5D%20%20%20%20%20%20%20%20%23%20%E4%B8%89%E5%88%97%E5%90%8C%E6%99%82%E8%AE%8A%E4%BA%86%EF%BC%81'), 'copy-btn-129')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; grid = [[0] * 3] * 3
+&gt;&gt;&gt; grid
+[[0, 0, 0], [0, 0, 0], [0, 0, 0]]        # 看起來沒問題
+&gt;&gt;&gt; grid[0][0] = 1
+&gt;&gt;&gt; grid
+[[1, 0, 0], [1, 0, 0], [1, 0, 0]]        # 三列同時變了！</code></pre>
+      </div>
+    <p>原因：<code>[x] * 3</code> 是把<strong>同一個參考</strong>複製三份，不是複製三個物件。<code>[0] * 3</code> 裡的 <code>0</code> 是不可變的，所以無害；但<strong>外層</strong> <code>[inner] * 3</code> 把同一個 inner list 的參考放了三次——三個 row 其實是同一個物件：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-130" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20grid%5B0%5D%20is%20grid%5B1%5D%20is%20grid%5B2%5D%0ATrue%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%B8%89%E5%88%97%E6%98%AF%E5%90%8C%E4%B8%80%E5%80%8B%20list%EF%BC%81'), 'copy-btn-130')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; grid[0] is grid[1] is grid[2]
+True                                      # 三列是同一個 list！</code></pre>
+      </div>
+    <p>正確做法是用 list comprehension（詳見第 5 章），每次迴圈都產生<strong>全新</strong>的 inner list：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-131" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20grid%20%3D%20%5B%5B0%5D%20*%203%20for%20_%20in%20range(3)%5D%20%20%20%20%23%20%E6%AF%8F%E5%80%8B%20row%20%E9%83%BD%E6%98%AF%E6%96%B0%20list%0A%3E%3E%3E%20grid%5B0%5D%5B0%5D%20%3D%201%0A%3E%3E%3E%20grid%0A%5B%5B1%2C%200%2C%200%5D%2C%20%5B0%2C%200%2C%200%5D%2C%20%5B0%2C%200%2C%200%5D%5D%20%20%20%20%20%20%20%20%20%23%20%E6%AD%A3%E7%A2%BA%EF%BC%8C%E4%BA%92%E4%B8%8D%E5%B9%B2%E6%93%BE%0A%3E%3E%3E%20grid%5B0%5D%20is%20grid%5B1%5D%0AFalse'), 'copy-btn-131')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; grid = [[0] * 3 for _ in range(3)]    # 每個 row 都是新 list
+&gt;&gt;&gt; grid[0][0] = 1
+&gt;&gt;&gt; grid
+[[1, 0, 0], [0, 0, 0], [0, 0, 0]]         # 正確，互不干擾
+&gt;&gt;&gt; grid[0] is grid[1]
+False</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>*</code> 重複運算子對「容器中放可變物件」是淺層複製參考。建立巢狀結構時，<strong>永遠用 comprehension <code>[... for _ in range(n)]</code></strong>，不要用 <code>[mutable] * n</code>。內層元素若不可變（int、str、tuple）則 <code>*</code> 安全無虞。</p>
+</div><p>同樣的陷阱也會以「可變預設參數」的形式出現在函式簽章（<code>def f(items=[])</code>），那是第 3 章討論過的另一面相，根因相同：一個可變物件被多處共享。</p>
+<h2 id="本章小結">本章小結</h2><ul>
+<li><strong>四大結構各有底層</strong>：<code>list</code> 是動態陣列（append 攤還 O(1)、中段操作 O(n)）；<code>dict</code>/<code>set</code> 是開放定址雜湊表（平均 O(1)）；<code>tuple</code> 是不可變序列，Java 無直接對應。</li>
+<li><strong><code>dict</code> 保證插入順序</strong>（3.7+ 規格保證），等於免費的 <code>LinkedHashMap</code>，不必為了有序另尋型別。</li>
+<li><strong><code>x in a_list</code> 是 O(n)</strong>——成員測試請改用 <code>set</code>/<code>dict</code>，這是 Java 工程師最常見的效能盲點。</li>
+<li><strong>可變 vs 不可變是核心二分法</strong>：只有不可變（int/str/tuple/frozenset）才 hashable，才能當 dict key / set 元素。賦值永遠是共享參考，不複製。</li>
+<li><strong>切片回傳新 list</strong>：<code>a[:]</code> 是淺拷貝慣用法、<code>a[::-1]</code> 反轉、切片賦值能就地改長度——比 Java 的 <code>subList</code>/<code>copyOfRange</code> 強大太多。</li>
+<li><strong>解包是 Java 沒有的語法糖</strong>：<code>a, b = b, a</code> 交換、<code>first, *rest</code> 抓剩餘、<code>*</code>/<code>**</code> 在呼叫時展開、<code>{**d1, **d2}</code> 合併 dict。</li>
+<li><strong><code>collections</code> 消滅樣板</strong>：<code>defaultdict</code> 取代 <code>computeIfAbsent</code>、<code>Counter</code> 取代手動計數、<code>deque</code> 提供真 O(1) 雙端佇列、<code>namedtuple</code> 是輕量唯讀紀錄。</li>
+<li><strong><code>copy.copy</code> 是淺、<code>copy.deepcopy</code> 是深</strong>；<code>[[0]*3]*3</code> 會讓三列共享同一個物件，建巢狀結構一律用 comprehension。</li>
+</ul>
+<h2 id="練習">練習</h2><ol>
+<li><p><strong>把 list 查重改 Pythonic</strong>：你接手一段 Java 風格的程式碼，對一個長度上萬的 list 反覆做 <code>if x in big_list</code>。請改寫成 O(1) 成員測試，並說明資料結構的選擇與複雜度變化。
+<em>提示：哪個結構的 <code>in</code> 是平均 O(1)？建立它的一次性成本是多少？</em></p>
+</li>
+<li><p><strong>反轉與抽樣</strong>：給定 <code>a = list(range(20))</code>，只用切片寫出：(a) 反轉整個 list、(b) 取出所有奇數索引的元素、(c) 取最後 5 個元素的反向序列。不要用迴圈或 <code>reversed()</code>。
+<em>提示：<code>a[start:stop:step]</code>，負 step 代表反向。</em></p>
+</li>
+<li><p><strong>分組統計</strong>：給一串 <code>(部門, 薪資)</code> tuple，請用 <code>defaultdict</code> 把每個部門的薪資收集成 list，再用一行算出各部門平均。接著改用 <code>Counter</code> 統計每個部門的人數。
+<em>提示：<code>defaultdict(list)</code> 收集、<code>Counter</code> 計數；解包 <code>for dept, salary in data</code>。</em></p>
+</li>
+<li><p><strong>手動踩坑再修復</strong>：用 <code>[[None]*4]*4</code> 建一個 4×4 棋盤並把 <code>board[1][1]</code> 設成 <code>&quot;Q&quot;</code>，觀察輸出。解釋為什麼壞掉，再用 comprehension 寫出正確版本，並用 <code>is</code> 驗證各 row 是不同物件。
+<em>提示：<code>grid[0] is grid[1]</code> 應為 <code>False</code>。</em></p>
+</li>
+<li><p><strong>淺拷貝失靈</strong>：有一個巢狀設定 <code>config = {&quot;db&quot;: {&quot;host&quot;: &quot;localhost&quot;, &quot;ports&quot;: [5432]}}</code>。用 <code>copy.copy</code> 複製後修改副本的 <code>[&quot;db&quot;][&quot;ports&quot;]</code>，觀察原 config 是否被波及。改用 <code>copy.deepcopy</code> 再試一次，並說明何時該用哪一個。
+<em>提示：淺拷貝只複製最外層 dict，內層 dict 與 list 仍共享參考。</em></p>
+</li>
+</ol>

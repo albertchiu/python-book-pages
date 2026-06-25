@@ -1,0 +1,929 @@
+<h1 id="附錄-ajava-python-速查對照表">附錄 A：Java ↔ Python 速查對照表</h1><p>這是一張「帶走用」的速查表，把你已經內化的 Java 直覺一條一條映射到 Python。它<strong>不是教學</strong>，而是壓縮過的索引：左欄是你熟悉的 Java，中欄是對應的 Python 寫法，右欄一句話點出差異或陷阱，並用「詳見第 X 章」把你導回正文深入閱讀。使用方式很簡單——當你想用 Java 的某個語法或 API 時，先在這裡查它在 Python 的對應物，再決定要不要翻回正文。最易誤解的幾組對照（<code>Optional&lt;T&gt;</code>、Stream、interface、record、GIL）附了<strong>經實際執行驗證</strong>的程式碼片段佐證。</p>
+<blockquote><p>慣例：本附錄所有 Python 範例皆以 3.12+ 語法撰寫，型別提示用現代寫法（<code>list[int]</code>、<code>X | None</code>、<code>collections.abc.Callable</code>）。REPL 範例以 <code>&gt;&gt;&gt;</code> 標示並附真實輸出。</p>
+</blockquote><hr>
+<h2 id="a1-語法與運算子">A.1 語法與運算子</h2><table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>說明 / 詳見章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>;</code> 結尾、<code>{}</code> 區塊</td>
+<td>換行結尾、<code>:</code> + 縮排</td>
+<td>縮排是語法的一部分，不是排版（詳見第 2 章）</td>
+</tr>
+<tr>
+<td><code>if (c) { ... }</code></td>
+<td><code>if c:</code></td>
+<td>條件不加括號，區塊用縮排</td>
+</tr>
+<tr>
+<td><code>i++</code> / <code>i--</code></td>
+<td><code>i += 1</code> / <code>i -= 1</code></td>
+<td>Python <strong>沒有</strong> <code>++</code>／<code>--</code></td>
+</tr>
+<tr>
+<td>整數 <code>/</code>（截斷趨零，<code>-7/2 == -3</code>）</td>
+<td><code>//</code>（向下取整）、<code>/</code> 為真除法</td>
+<td><code>-7//2 == -4</code>（向負無窮取整）、<code>-7/2 == -3.5</code>（永遠回傳 float）；整數除法用 <code>//</code>（詳見第 2 章）</td>
+</tr>
+<tr>
+<td><code>c ? x : y</code></td>
+<td><code>x if c else y</code></td>
+<td>三元運算子順序不同：值在前、條件在中</td>
+</tr>
+<tr>
+<td><code>switch (x) { case ... }</code></td>
+<td><code>match x: case ...:</code></td>
+<td><code>match</code> 是結構模式比對，可解構 tuple／dict／dataclass，是 switch 的超集</td>
+</tr>
+<tr>
+<td><code>x instanceof Foo</code></td>
+<td><code>isinstance(x, Foo)</code></td>
+<td>也接受 tuple：<code>isinstance(x, (int, str))</code></td>
+</tr>
+<tr>
+<td><code>final int x = 1;</code>（區域變數）</td>
+<td>無強制；命名慣例 <code>X</code> 或 <code>typing.Final</code></td>
+<td>Python 不阻止重新賦值，只靠慣例；無 <code>final</code> 的封裝哲學詳見第 7 章，<code>typing.Final</code> 屬型別提示工具（不由執行期強制）</td>
+</tr>
+<tr>
+<td><code>a &lt; b &amp;&amp; b &lt; c</code></td>
+<td><code>a &lt; b &lt; c</code></td>
+<td>Python 支援連鎖比較，會把 <code>b</code> 只算一次</td>
+</tr>
+<tr>
+<td><code>a &amp;&amp; b</code> / <code>a || b</code> / <code>!a</code></td>
+<td><code>a and b</code> / <code>a or b</code> / <code>not a</code></td>
+<td>關鍵字而非符號；<code>and</code>/<code>or</code> 回傳運算元本身</td>
+</tr>
+<tr>
+<td><code>a == null</code></td>
+<td><code>a is None</code></td>
+<td>用 <code>is</code> 比對 <code>None</code>，不用 <code>==</code>（詳見第 2 章）</td>
+</tr>
+<tr>
+<td><code>a.equals(b)</code></td>
+<td><code>a == b</code></td>
+<td><code>==</code> 走 <code>__eq__</code>，就是 Java 的 <code>equals</code></td>
+</tr>
+<tr>
+<td><code>a == b</code>（參考相等）</td>
+<td><code>a is b</code></td>
+<td><code>is</code> 才是參考（identity）比對</td>
+</tr>
+<tr>
+<td><code>System.out.println(x)</code></td>
+<td><code>print(x)</code></td>
+<td>內建函式，預設換行；<code>print(x, end=&quot;&quot;)</code> 不換行</td>
+</tr>
+<tr>
+<td><code>String.format(&quot;%d&quot;, n)</code></td>
+<td><code>f&quot;{n}&quot;</code>（f-string）</td>
+<td>f-string 是首選格式化方式（詳見第 5 章）</td>
+</tr>
+</tbody></table>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-555" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%0Aint%20x%20%3D%205%3B%0AString%20r%20%3D%20(x%20%25%202%20%3D%3D%200)%20%3F%20%22even%22%20%3A%20%22odd%22%3B%0Aboolean%20ok%20%3D%201%20%3C%20x%20%26%26%20x%20%3C%2010%3B'), 'copy-btn-555')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java
+int x = 5;
+String r = (x % 2 == 0) ? "even" : "odd";
+boolean ok = 1 &lt; x &amp;&amp; x &lt; 10;</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-556" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20Python%EF%BC%88%E9%A9%97%E8%AD%89%E8%BC%B8%E5%87%BA%E8%A6%8B%E8%A8%BB%E8%A7%A3%EF%BC%89%0Ax%20%3D%205%0Ar%20%3D%20%22even%22%20if%20x%20%25%202%20%3D%3D%200%20else%20%22odd%22%20%20%20%23%20%27odd%27%0Aok%20%3D%201%20%3C%20x%20%3C%2010%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20True'), 'copy-btn-556')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># Python（驗證輸出見註解）
+x = 5
+r = "even" if x % 2 == 0 else "odd"   # 'odd'
+ok = 1 &lt; x &lt; 10                        # True</code></pre>
+      </div>
+    <p><strong>思維差異</strong>：Python 沒有編譯期把關（<code>final</code>、checked exception 都不存在），紀律靠命名慣例、型別提示與 <code>mypy</code>／<code>ruff</code> 等工具補回——你的工程嚴謹度要從「編譯器強制」轉成「工具鏈＋約定」。<code>match-case</code> 不是 switch 的翻版，它能解構 tuple、dict、dataclass，務必當成新工具學。</p>
+<hr>
+<h2 id="a2-型別與基本資料">A.2 型別與基本資料</h2><table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>說明 / 詳見章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>int</code> / <code>long</code> / <code>BigInteger</code></td>
+<td><code>int</code></td>
+<td>單一型別，<strong>任意精度、永不溢位</strong></td>
+</tr>
+<tr>
+<td><code>double</code> / <code>float</code></td>
+<td><code>float</code></td>
+<td>即 C 的 double（64-bit）；十進位用 <code>decimal.Decimal</code></td>
+</tr>
+<tr>
+<td><code>boolean</code></td>
+<td><code>bool</code></td>
+<td><code>True</code>／<code>False</code>，是 <code>int</code> 的子類別（<code>True + True == 2</code>）</td>
+</tr>
+<tr>
+<td><code>String</code></td>
+<td><code>str</code></td>
+<td>不可變、Unicode；無獨立 char 型別</td>
+</tr>
+<tr>
+<td><code>char</code></td>
+<td>無；長度 1 的 <code>str</code></td>
+<td><code>&quot;A&quot;[0]</code> 仍是 <code>str</code>（詳見第 2 章）</td>
+</tr>
+<tr>
+<td><code>null</code></td>
+<td><code>None</code></td>
+<td>單例物件，用 <code>is None</code> 檢查</td>
+</tr>
+<tr>
+<td><code>var x = ...</code></td>
+<td><code>x = ...</code></td>
+<td>不需宣告型別；型別提示可選 <code>x: int = ...</code></td>
+</tr>
+<tr>
+<td><code>Object</code></td>
+<td><code>object</code></td>
+<td>萬物之根；<code>isinstance(x, object)</code> 恆真</td>
+</tr>
+<tr>
+<td><code>&lt;T&gt;</code>（泛型）</td>
+<td><code>[T]</code> + <code>TypeVar</code> 或 3.12 的 <code>class C[T]</code></td>
+<td>執行期會型別抹除（type erasure），靠 mypy 檢查（詳見第 9 章）</td>
+</tr>
+<tr>
+<td><code>Optional&lt;T&gt;</code></td>
+<td><code>T | None</code></td>
+<td>沒有包裝物件，就是聯集型別（詳見 A.5 佐證與第 9、12 章）</td>
+</tr>
+</tbody></table>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-557" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%202%20**%20100%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20int%20%E4%B8%8D%E6%BA%A2%E4%BD%8D%0A1267650600228229401496703205376%0A%3E%3E%3E%20True%20%2B%20True%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20bool%20%E6%98%AF%20int%20%E7%9A%84%E5%AD%90%E9%A1%9E%E5%88%A5%0A2%0A%3E%3E%3E%20isinstance(%22A%22%2C%20str)%2C%20len(%22A%22)%20%20%23%20%E6%B2%92%E6%9C%89%20char%EF%BC%8C%22A%22%20%E6%98%AF%E9%95%B7%E5%BA%A6%201%20%E7%9A%84%20str%0A(True%2C%201)'), 'copy-btn-557')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; 2 ** 100                      # int 不溢位
+1267650600228229401496703205376
+&gt;&gt;&gt; True + True                   # bool 是 int 的子類別
+2
+&gt;&gt;&gt; isinstance("A", str), len("A")  # 沒有 char，"A" 是長度 1 的 str
+(True, 1)</code></pre>
+      </div>
+    <p><strong>思維差異</strong>：Python 的 <code>int</code> 不溢位是真正的工程紅利——你在 Java 要為金額、雜湊、組合數操心的 overflow 在這裡消失了（但精確小數仍要用 <code>Decimal</code>，浮點數的坑兩邊一樣）。型別提示是「給人與工具看的註解」，執行期<strong>不強制</strong>，這跟 Java 泛型由編譯器強制截然不同。</p>
+<hr>
+<h2 id="a3-集合與資料結構">A.3 集合與資料結構</h2><table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>說明 / 詳見章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ArrayList&lt;E&gt;</code></td>
+<td><code>list</code></td>
+<td>動態陣列；尾端 append 攤提 O(1)（詳見第 4 章）</td>
+</tr>
+<tr>
+<td><code>HashMap&lt;K,V&gt;</code></td>
+<td><code>dict</code></td>
+<td>雜湊表；<strong>保證插入順序</strong>（3.7+ 語言保證）</td>
+</tr>
+<tr>
+<td><code>HashSet&lt;E&gt;</code></td>
+<td><code>set</code></td>
+<td>雜湊集合；字面量 <code>{1, 2, 3}</code></td>
+</tr>
+<tr>
+<td><code>LinkedList</code> / <code>ArrayDeque</code></td>
+<td><code>collections.deque</code></td>
+<td>雙端佇列，兩端 O(1)；<code>list</code> 開頭插入是 O(n)</td>
+</tr>
+<tr>
+<td><code>int[]</code> / <code>E[]</code></td>
+<td><code>list</code>、或 <code>array.array</code> / <code>numpy.ndarray</code></td>
+<td>一般用 <code>list</code>；數值密集用 numpy（詳見第 17 章）</td>
+</tr>
+<tr>
+<td><code>Map.Entry&lt;K,V&gt;</code></td>
+<td><code>tuple</code>，常見於 <code>dict.items()</code></td>
+<td><code>for k, v in d.items():</code> 直接解包</td>
+</tr>
+<tr>
+<td><code>List.of(...)</code>（不可變）</td>
+<td><code>tuple(...)</code> / <code>frozenset(...)</code></td>
+<td>不可變序列用 tuple，不可變集合用 frozenset</td>
+</tr>
+<tr>
+<td><code>Collections.emptyList()</code></td>
+<td><code>[]</code></td>
+<td>空字面量即可；注意別當可變預設參數（附錄 B）</td>
+</tr>
+<tr>
+<td><code>Arrays.asList(...)</code></td>
+<td><code>[...]</code> 或 <code>list(...)</code></td>
+<td>直接用字面量</td>
+</tr>
+<tr>
+<td><code>StringBuilder</code></td>
+<td><code>list</code> + <code>&quot;&quot;.join(...)</code></td>
+<td>累積字串片段後一次 join，避免 O(n²)</td>
+</tr>
+<tr>
+<td><code>PriorityQueue</code></td>
+<td><code>heapq</code>（對 list 操作）</td>
+<td><code>heapq.heappush/heappop</code></td>
+</tr>
+<tr>
+<td><code>Collections.unmodifiableMap</code></td>
+<td><code>types.MappingProxyType</code></td>
+<td>唯讀視圖</td>
+</tr>
+</tbody></table>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-558" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9AStringBuilder%20%E6%89%8B%E5%8B%95%E4%B8%B2%E6%8E%A5%E6%9C%83%E7%95%99%E4%B8%8B%E5%B0%BE%E9%9A%A8%E5%88%86%E9%9A%94%E7%AC%A6%0AStringBuilder%20sb%20%3D%20new%20StringBuilder()%3B%0Afor%20(int%20n%20%3A%20nums)%20sb.append(n).append(%22%2C%20%22)%3B%0A%2F%2F%20sb%20%E7%B5%90%E6%9E%9C%EF%BC%9A%221%2C%202%2C%203%2C%204%2C%205%2C%206%2C%20%22%EF%BC%88%E6%B3%A8%E6%84%8F%E5%B0%BE%E7%AB%AF%E5%A4%9A%E4%B8%80%E5%80%8B%20%22%2C%20%22%EF%BC%89%0A%0A%2F%2F%20%E6%85%A3%E7%94%A8%E6%B3%95%EF%BC%9A%E7%94%A8%20String.join%EF%BC%8C%E5%88%86%E9%9A%94%E7%AC%A6%E5%8F%AA%E6%8F%92%E5%9C%A8%E5%85%83%E7%B4%A0%E4%B9%8B%E9%96%93%E3%80%81%E7%84%A1%E5%B0%BE%E9%9A%A8%0AString%20r%20%3D%20String.join(%22%2C%20%22%2C%0A%20%20%20%20Arrays.stream(nums).mapToObj(String%3A%3AvalueOf).toArray(String%5B%5D%3A%3Anew))%3B%0A%2F%2F%20r%20%E7%B5%90%E6%9E%9C%EF%BC%9A%221%2C%202%2C%203%2C%204%2C%205%2C%206%22'), 'copy-btn-558')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：StringBuilder 手動串接會留下尾隨分隔符
+StringBuilder sb = new StringBuilder();
+for (int n : nums) sb.append(n).append(", ");
+// sb 結果："1, 2, 3, 4, 5, 6, "（注意尾端多一個 ", "）
+
+// 慣用法：用 String.join，分隔符只插在元素之間、無尾隨
+String r = String.join(", ",
+    Arrays.stream(nums).mapToObj(String::valueOf).toArray(String[]::new));
+// r 結果："1, 2, 3, 4, 5, 6"</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-559" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20Python%EF%BC%9A%E7%B4%AF%E7%A9%8D%E5%88%B0%20list%20%E5%86%8D%20join%EF%BC%88%E9%A9%97%E8%AD%89%EF%BC%9A%271%2C%202%2C%203%2C%204%2C%205%2C%206%27%EF%BC%89%0Aparts%20%3D%20%5Bstr(n)%20for%20n%20in%20nums%5D%0Aresult%20%3D%20%22%2C%20%22.join(parts)%20%20%20%23%20join%20%E5%8F%AA%E6%8A%8A%E5%88%86%E9%9A%94%E7%AC%A6%E6%94%BE%E5%9C%A8%E5%85%83%E7%B4%A0%E4%B9%8B%E9%96%93%EF%BC%8C%E4%B8%8D%E7%95%99%E5%B0%BE%E9%9A%A8%E9%80%97%E8%99%9F'), 'copy-btn-559')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># Python：累積到 list 再 join（驗證：'1, 2, 3, 4, 5, 6'）
+parts = [str(n) for n in nums]
+result = ", ".join(parts)   # join 只把分隔符放在元素之間，不留尾隨逗號</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-560" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20collections%20import%20deque%0A%3E%3E%3E%20dq%20%3D%20deque(%5B1%2C%202%2C%203%5D)%3B%20dq.appendleft(0)%3B%20dq.append(4)%0A%3E%3E%3E%20dq%0Adeque(%5B0%2C%201%2C%202%2C%203%2C%204%5D)%0A%3E%3E%3E%20dq.popleft()%2C%20dq.pop()%20%20%20%20%20%20%20%20%23%20%E5%85%A9%E7%AB%AF%E7%9A%86%20O(1)%0A(0%2C%204)'), 'copy-btn-560')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from collections import deque
+&gt;&gt;&gt; dq = deque([1, 2, 3]); dq.appendleft(0); dq.append(4)
+&gt;&gt;&gt; dq
+deque([0, 1, 2, 3, 4])
+&gt;&gt;&gt; dq.popleft(), dq.pop()        # 兩端皆 O(1)
+(0, 4)</code></pre>
+      </div>
+    <p><strong>思維差異</strong>：<code>dict</code> 保證插入順序，所以你不再需要 <code>LinkedHashMap</code>；要排序就用 <code>sorted(d.items())</code>。Python 沒有原生不可變 <code>List</code>／<code>Map</code>——要不可變就改用 <code>tuple</code>／<code>frozenset</code>，或在 dataclass 上用 <code>frozen=True</code>。</p>
+<hr>
+<h2 id="a4-控制流程與迭代">A.4 控制流程與迭代</h2><table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>說明 / 詳見章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>for (int i = 0; i &lt; n; i++)</code></td>
+<td><code>for i in range(n):</code></td>
+<td><code>range</code> 是惰性序列（詳見第 6 章）</td>
+</tr>
+<tr>
+<td><code>for (E x : coll)</code></td>
+<td><code>for x in coll:</code></td>
+<td>for-each 是 Python 唯一的 for</td>
+</tr>
+<tr>
+<td>帶索引的 for-each</td>
+<td><code>for i, x in enumerate(coll):</code></td>
+<td><code>enumerate(coll, start=1)</code> 可指定起點</td>
+</tr>
+<tr>
+<td>同時走兩個集合</td>
+<td><code>for a, b in zip(xs, ys):</code></td>
+<td>長度取最短；<code>itertools.zip_longest</code> 補齊</td>
+</tr>
+<tr>
+<td><code>Iterator</code> / <code>Iterable</code></td>
+<td><code>__iter__</code> / <code>__next__</code>（迭代協定）</td>
+<td><code>for</code> 自動呼叫，<code>StopIteration</code> 結束（詳見第 6 章）</td>
+</tr>
+<tr>
+<td><code>stream.map(f)</code></td>
+<td><code>(f(x) for x in xs)</code> 或 <code>[f(x) for x in xs]</code></td>
+<td>generator 惰性、list comprehension 即時</td>
+</tr>
+<tr>
+<td><code>stream.filter(p)</code></td>
+<td><code>[x for x in xs if p(x)]</code></td>
+<td>條件寫在 comprehension 尾端</td>
+</tr>
+<tr>
+<td><code>stream.map().collect(toList())</code></td>
+<td><code>[f(x) for x in xs]</code></td>
+<td>一步到位，不需 collector</td>
+</tr>
+<tr>
+<td><code>stream.reduce(0, (a,b)-&gt;a+b)</code></td>
+<td><code>functools.reduce(...)</code> 或 <code>sum(...)</code></td>
+<td>能用內建（<code>sum</code>/<code>max</code>/<code>min</code>/<code>any</code>/<code>all</code>）就別 reduce</td>
+</tr>
+<tr>
+<td><code>opt.map(f).orElse(d)</code></td>
+<td><code>x = get(); f(x) if x is not None else d</code></td>
+<td>先取得 <code>x</code>，再以條件表達式判斷；無包裝物件（詳見第 9 章）</td>
+</tr>
+<tr>
+<td><code>while (true) { ...; break; }</code></td>
+<td><code>while True: ...; break</code></td>
+<td>無 do-while；用 <code>while True</code> + <code>break</code></td>
+</tr>
+</tbody></table>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-561" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%20Stream%EF%BC%9A%E5%81%B6%E6%95%B8%E7%9A%84%E5%B9%B3%E6%96%B9%0AList%3CInteger%3E%20r%20%3D%20nums.stream()%0A%20%20%20%20.filter(n%20-%3E%20n%20%25%202%20%3D%3D%200)%0A%20%20%20%20.map(n%20-%3E%20n%20*%20n)%0A%20%20%20%20.collect(Collectors.toList())%3B'), 'copy-btn-561')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java Stream：偶數的平方
+List&lt;Integer&gt; r = nums.stream()
+    .filter(n -&gt; n % 2 == 0)
+    .map(n -&gt; n * n)
+    .collect(Collectors.toList());</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-562" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20Python%20comprehension%EF%BC%88%E9%A9%97%E8%AD%89%EF%BC%9A%5B4%2C%2016%2C%2036%5D%EF%BC%89%0Ar%20%3D%20%5Bn%20*%20n%20for%20n%20in%20nums%20if%20n%20%25%202%20%3D%3D%200%5D'), 'copy-btn-562')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># Python comprehension（驗證：[4, 16, 36]）
+r = [n * n for n in nums if n % 2 == 0]</code></pre>
+      </div>
+    <p><strong>思維差異</strong>：comprehension 是 Python 的「Stream」，但它<strong>即時求值</strong>並回傳 list；要惰性（對應 Stream 的 lazy pipeline）就把 <code>[]</code> 換成 <code>()</code> 變成 generator。別硬把多層 Stream 直譯成巢狀 comprehension——超過兩層就拆成具名的 generator 函式（<code>yield</code>），可讀性遠勝（詳見第 6 章）。</p>
+<hr>
+<h2 id="a5-oop-與型別系統">A.5 OOP 與型別系統</h2><table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>說明 / 詳見章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>class Foo { }</code></td>
+<td><code>class Foo:</code></td>
+<td>無存取修飾子；<code>_name</code> 慣例為內部、<code>__name</code> 觸發名稱改寫</td>
+</tr>
+<tr>
+<td><code>this</code></td>
+<td><code>self</code>（明寫的第一參數）</td>
+<td>不是關鍵字，是慣例（詳見第 7 章）</td>
+</tr>
+<tr>
+<td>建構子 <code>Foo(...)</code></td>
+<td><code>def __init__(self, ...)</code></td>
+<td>是初始化器；建立物件由 <code>__new__</code> 負責</td>
+</tr>
+<tr>
+<td><code>static</code> 欄位</td>
+<td>類別屬性（class 內、方法外定義）</td>
+<td>所有實例共享</td>
+</tr>
+<tr>
+<td><code>static</code> 方法</td>
+<td><code>@staticmethod</code></td>
+<td>無 <code>self</code>／<code>cls</code></td>
+</tr>
+<tr>
+<td>靜態工廠方法</td>
+<td><code>@classmethod</code>（收 <code>cls</code>）</td>
+<td>多型友善的替代建構子</td>
+</tr>
+<tr>
+<td>getter / setter</td>
+<td><code>@property</code> / <code>@x.setter</code></td>
+<td>先寫公開屬性，需要時再無痛加驗證（詳見第 7 章）</td>
+</tr>
+<tr>
+<td><code>record Point(int x, int y)</code></td>
+<td><code>@dataclass</code></td>
+<td>一行生出 <code>__init__</code>/<code>__repr__</code>/<code>__eq__</code>（詳見第 7 章）</td>
+</tr>
+<tr>
+<td><code>interface</code>（鴨子型別感）</td>
+<td><code>typing.Protocol</code>（結構子型）</td>
+<td>不需顯式 implements，符合形狀即相容（詳見第 8、9 章）</td>
+</tr>
+<tr>
+<td><code>interface</code>（名義契約）</td>
+<td><code>abc.ABC</code> + <code>@abstractmethod</code></td>
+<td>需顯式繼承，名義子型</td>
+</tr>
+<tr>
+<td><code>abstract class</code></td>
+<td><code>abc.ABC</code></td>
+<td>有抽象方法則不可實例化</td>
+</tr>
+<tr>
+<td><code>enum Color { RED, GREEN }</code></td>
+<td><code>class Color(Enum):</code></td>
+<td><code>enum.Enum</code>，成員有 <code>.name</code>／<code>.value</code></td>
+</tr>
+<tr>
+<td><code>toString</code> / <code>equals</code> / <code>hashCode</code></td>
+<td><code>__repr__</code> / <code>__eq__</code> / <code>__hash__</code></td>
+<td>dataclass 可自動生成</td>
+</tr>
+<tr>
+<td><code>extends</code> / <code>implements</code></td>
+<td><code>class Sub(Base):</code></td>
+<td>多重繼承用逗號，靠 MRO 解析（詳見第 8 章）</td>
+</tr>
+<tr>
+<td><code>super.method()</code></td>
+<td><code>super().method()</code></td>
+<td>依 C3 MRO，比 Java 的單一父類別更微妙</td>
+</tr>
+</tbody></table>
+<p><strong>record → @dataclass（佐證）</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-563" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20dataclasses%20import%20dataclass%0A%3E%3E%3E%20%40dataclass(frozen%3DTrue)%0A...%20class%20Point%3A%0A...%20%20%20%20%20x%3A%20int%0A...%20%20%20%20%20y%3A%20int%0A...%0A%3E%3E%3E%20p%2C%20q%20%3D%20Point(1%2C%202)%2C%20Point(1%2C%202)%0A%3E%3E%3E%20p%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20__repr__%20%E8%87%AA%E5%8B%95%E7%94%9F%E6%88%90%0APoint(x%3D1%2C%20y%3D2)%0A%3E%3E%3E%20p%20%3D%3D%20q%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20__eq__%20%E6%8C%89%E5%80%BC%E6%AF%94%E8%BC%83%0ATrue%0A%3E%3E%3E%20hash(p)%20%3D%3D%20hash(q)%20%20%20%20%20%20%23%20frozen%3DTrue%20%E6%89%8D%E5%8F%AF%E9%9B%9C%E6%B9%8A%0ATrue'), 'copy-btn-563')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from dataclasses import dataclass
+&gt;&gt;&gt; @dataclass(frozen=True)
+... class Point:
+...     x: int
+...     y: int
+...
+&gt;&gt;&gt; p, q = Point(1, 2), Point(1, 2)
+&gt;&gt;&gt; p                       # __repr__ 自動生成
+Point(x=1, y=2)
+&gt;&gt;&gt; p == q                  # __eq__ 按值比較
+True
+&gt;&gt;&gt; hash(p) == hash(q)      # frozen=True 才可雜湊
+True</code></pre>
+      </div>
+    <p><strong>interface → Protocol（佐證，結構子型）</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-564" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20typing%20import%20Protocol%0A%3E%3E%3E%20class%20Closeable(Protocol)%3A%0A...%20%20%20%20%20def%20close(self)%20-%3E%20None%3A%20...%0A...%0A%3E%3E%3E%20class%20MyFile%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%B2%92%E6%9C%89%E5%AF%AB%20implements%20Closeable%0A...%20%20%20%20%20def%20close(self)%20-%3E%20None%3A%20print(%22closed%22)%0A...%0A%3E%3E%3E%20def%20shutdown(c%3A%20Closeable)%20-%3E%20None%3A%20c.close()%0A%3E%3E%3E%20shutdown(MyFile())%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%BD%A2%E7%8B%80%E7%9B%B8%E7%AC%A6%E5%8D%B3%E7%9B%B8%E5%AE%B9%0Aclosed'), 'copy-btn-564')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from typing import Protocol
+&gt;&gt;&gt; class Closeable(Protocol):
+...     def close(self) -&gt; None: ...
+...
+&gt;&gt;&gt; class MyFile:                      # 沒有寫 implements Closeable
+...     def close(self) -&gt; None: print("closed")
+...
+&gt;&gt;&gt; def shutdown(c: Closeable) -&gt; None: c.close()
+&gt;&gt;&gt; shutdown(MyFile())                 # 形狀相符即相容
+closed</code></pre>
+      </div>
+    <p><strong>思維差異</strong>：Python 的 <code>interface</code> 有兩種對應——要「形狀相容、零侵入」用 <code>Protocol</code>（結構子型，鴨子型別的型別化）；要「強制顯式契約」用 <code>abc.ABC</code>。資深 Java 工程師最常踩的坑是把 <code>Optional&lt;T&gt;</code> 想成包裝物件，Python 沒有這層——直接用 <code>T | None</code> 並以 <code>is None</code> 分支處理。</p>
+<hr>
+<h2 id="a6-函式式-pythonic">A.6 函式式 / Pythonic</h2><table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>說明 / 詳見章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>(a, b) -&gt; a + b</code></td>
+<td><code>lambda a, b: a + b</code></td>
+<td>lambda 限單一運算式；複雜邏輯用 <code>def</code></td>
+</tr>
+<tr>
+<td>方法參考 <code>obj::m</code></td>
+<td>函式物件 <code>obj.m</code>（bound method）</td>
+<td>函式是一等公民，直接傳遞（詳見第 3 章）</td>
+</tr>
+<tr>
+<td><code>Function&lt;T,R&gt;</code></td>
+<td><code>Callable[[T], R]</code>（從 <code>collections.abc</code>）</td>
+<td>統一用 <code>Callable</code>（詳見第 9 章）</td>
+</tr>
+<tr>
+<td><code>Supplier&lt;T&gt;</code></td>
+<td><code>Callable[[], T]</code></td>
+<td>無參數可呼叫物件</td>
+</tr>
+<tr>
+<td><code>Consumer&lt;T&gt;</code></td>
+<td><code>Callable[[T], None]</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Predicate&lt;T&gt;</code></td>
+<td><code>Callable[[T], bool]</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>@FunctionalInterface</code></td>
+<td>無需</td>
+<td>任何 <code>def</code>／<code>lambda</code> 都能傳遞</td>
+</tr>
+<tr>
+<td>Stream 惰性管線</td>
+<td>generator（<code>yield</code>）</td>
+<td>真正惰性、可組合（詳見第 6 章）</td>
+</tr>
+<tr>
+<td><code>Comparator.comparing(f)</code></td>
+<td><code>key=f</code>（傳給 <code>sorted</code>/<code>max</code>/<code>min</code>）</td>
+<td><code>sorted(xs, key=lambda x: x.age)</code></td>
+</tr>
+<tr>
+<td><code>Collectors.groupingBy</code></td>
+<td><code>itertools.groupby</code>（需先排序）或 <code>defaultdict</code></td>
+<td>行為與 Java 不同，留意排序前提</td>
+</tr>
+</tbody></table>
+<p><strong>思維差異</strong>：Java 的函式式介面是為了讓 lambda 有型別可掛靠；Python 函式天生就是一等物件，不需要 <code>@FunctionalInterface</code> 這層儀式。記住 <code>sorted</code> 的 <code>key=</code> 取代了 <code>Comparator</code>——這是兩邊最頻繁的對照之一。</p>
+<hr>
+<h2 id="a7-例外與資源">A.7 例外與資源</h2><table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>說明 / 詳見章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>checked exception</td>
+<td>無——<strong>所有例外都是 unchecked</strong></td>
+<td>不必宣告、不強制 catch（詳見第 12 章）</td>
+</tr>
+<tr>
+<td><code>throws IOException</code></td>
+<td>無宣告</td>
+<td>用 docstring／型別工具溝通可能例外</td>
+</tr>
+<tr>
+<td>try-with-resources</td>
+<td><code>with</code> 陳述式（context manager）</td>
+<td><code>__enter__</code>／<code>__exit__</code>（詳見第 5、12 章）</td>
+</tr>
+<tr>
+<td><code>finally { }</code></td>
+<td><code>finally:</code></td>
+<td>也有 <code>try/except/else/finally</code> 四段式</td>
+</tr>
+<tr>
+<td><code>catch (E e)</code></td>
+<td><code>except E as e:</code></td>
+<td>可 <code>except (A, B):</code> 一次抓多型</td>
+</tr>
+<tr>
+<td><code>throw new E()</code></td>
+<td><code>raise E()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>extends Exception</code></td>
+<td><code>class MyError(Exception):</code></td>
+<td>自訂例外繼承 <code>Exception</code></td>
+</tr>
+<tr>
+<td><code>e.initCause(c)</code> / 建構子帶 cause</td>
+<td><code>raise NewError(...) from cause</code></td>
+<td>保留例外鏈（<code>__cause__</code>）</td>
+</tr>
+<tr>
+<td><code>e.getCause()</code></td>
+<td><code>e.__cause__</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Throwable</code> 階層</td>
+<td><code>BaseException</code> → <code>Exception</code></td>
+<td>一般只攔 <code>Exception</code>，別攔 <code>BaseException</code></td>
+</tr>
+</tbody></table>
+<p><strong>try-with-resources → with（佐證）</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-565" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20class%20Resource%3A%0A...%20%20%20%20%20def%20__enter__(self)%3A%20print(%22acquire%22)%3B%20return%20self%0A...%20%20%20%20%20def%20__exit__(self%2C%20*exc)%3A%20print(%22release%22)%3B%20return%20False%0A...%0A%3E%3E%3E%20with%20Resource()%20as%20r%3A%0A...%20%20%20%20%20print(%22use%22)%0A...%0Aacquire%0Ause%0Arelease'), 'copy-btn-565')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; class Resource:
+...     def __enter__(self): print("acquire"); return self
+...     def __exit__(self, *exc): print("release"); return False
+...
+&gt;&gt;&gt; with Resource() as r:
+...     print("use")
+...
+acquire
+use
+release</code></pre>
+      </div>
+    <p><strong>raise from（佐證，保留 cause）</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-566" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20class%20ConfigError(Exception)%3A%20pass%0A%3E%3E%3E%20try%3A%0A...%20%20%20%20%20try%3A%0A...%20%20%20%20%20%20%20%20%20int(%22oops%22)%0A...%20%20%20%20%20except%20ValueError%20as%20e%3A%0A...%20%20%20%20%20%20%20%20%20raise%20ConfigError(%22bad%20config%22)%20from%20e%0A...%20except%20ConfigError%20as%20ce%3A%0A...%20%20%20%20%20print(type(ce).__name__%2C%20%22%3C-%22%2C%20type(ce.__cause__).__name__)%0A...%0AConfigError%20%3C-%20ValueError'), 'copy-btn-566')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; class ConfigError(Exception): pass
+&gt;&gt;&gt; try:
+...     try:
+...         int("oops")
+...     except ValueError as e:
+...         raise ConfigError("bad config") from e
+... except ConfigError as ce:
+...     print(type(ce).__name__, "&lt;-", type(ce.__cause__).__name__)
+...
+ConfigError &lt;- ValueError</code></pre>
+      </div>
+    <p><strong>思維差異</strong>：沒有 checked exception 意味著編譯器不會逼你處理錯誤——這把責任完全交給你與測試。對外 API 邊界要明確記錄會拋什麼，並用 <code>raise ... from ...</code> 保留根因鏈（對應 Java 的 <code>initCause</code>），否則 traceback 會遺失上下文。</p>
+<hr>
+<h2 id="a8-並行">A.8 並行</h2><table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>說明 / 詳見章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>new Thread(r).start()</code></td>
+<td><code>threading.Thread(target=fn).start()</code></td>
+<td>OS 執行緒，但受 GIL 約束（詳見第 14 章）</td>
+</tr>
+<tr>
+<td><code>Runnable</code></td>
+<td>函式（任何 callable）</td>
+<td>不需介面</td>
+</tr>
+<tr>
+<td><code>ExecutorService</code></td>
+<td><code>concurrent.futures.ThreadPoolExecutor</code></td>
+<td>CPU 密集改用 <code>ProcessPoolExecutor</code></td>
+</tr>
+<tr>
+<td><code>Future&lt;T&gt;</code></td>
+<td><code>concurrent.futures.Future</code></td>
+<td><code>.result()</code> 取值</td>
+</tr>
+<tr>
+<td><code>synchronized</code></td>
+<td><code>threading.Lock</code>（搭配 <code>with</code>）</td>
+<td><code>with lock:</code> 即臨界區</td>
+</tr>
+<tr>
+<td><code>ReentrantLock</code></td>
+<td><code>threading.RLock</code></td>
+<td>可重入鎖</td>
+</tr>
+<tr>
+<td><code>CompletableFuture</code></td>
+<td><code>asyncio</code> + <code>async</code>/<code>await</code></td>
+<td>單執行緒事件迴圈協程（詳見第 14 章）</td>
+</tr>
+<tr>
+<td><code>CompletableFuture.allOf</code></td>
+<td><code>await asyncio.gather(...)</code></td>
+<td>並行等待多個協程</td>
+</tr>
+<tr>
+<td><code>ThreadLocal&lt;T&gt;</code></td>
+<td><code>threading.local()</code></td>
+<td>執行緒區域儲存</td>
+</tr>
+<tr>
+<td>CPU 密集多執行緒加速</td>
+<td>改用 <code>multiprocessing</code></td>
+<td>因 GIL，執行緒無法加速 CPU 密集工作</td>
+</tr>
+</tbody></table>
+<p><strong>synchronized → Lock（佐證）</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-567" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20threading%0A%3E%3E%3E%20lock%20%3D%20threading.Lock()%3B%20counter%20%3D%200%0A%3E%3E%3E%20def%20inc()%3A%0A...%20%20%20%20%20global%20counter%0A...%20%20%20%20%20with%20lock%3A%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%AD%89%E5%83%B9%E6%96%BC%20synchronized%20%E5%8D%80%E5%A1%8A%0A...%20%20%20%20%20%20%20%20%20counter%20%2B%3D%201%0A...%0A%3E%3E%3E%20ts%20%3D%20%5Bthreading.Thread(target%3Dinc)%20for%20_%20in%20range(100)%5D%0A%3E%3E%3E%20for%20t%20in%20ts%3A%20t.start()%0A%3E%3E%3E%20for%20t%20in%20ts%3A%20t.join()%0A%3E%3E%3E%20counter%0A100'), 'copy-btn-567')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import threading
+&gt;&gt;&gt; lock = threading.Lock(); counter = 0
+&gt;&gt;&gt; def inc():
+...     global counter
+...     with lock:           # 等價於 synchronized 區塊
+...         counter += 1
+...
+&gt;&gt;&gt; ts = [threading.Thread(target=inc) for _ in range(100)]
+&gt;&gt;&gt; for t in ts: t.start()
+&gt;&gt;&gt; for t in ts: t.join()
+&gt;&gt;&gt; counter
+100</code></pre>
+      </div>
+    <p><strong>CompletableFuture → asyncio.gather（佐證，並行）</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-568" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20asyncio%0A%3E%3E%3E%20async%20def%20fetch(name%2C%20d)%3A%0A...%20%20%20%20%20await%20asyncio.sleep(d)%3B%20return%20f%22%7Bname%7D%20done%22%0A...%0A%3E%3E%3E%20async%20def%20main()%3A%0A...%20%20%20%20%20return%20await%20asyncio.gather(%0A...%20%20%20%20%20%20%20%20%20fetch(%22A%22%2C%200.1)%2C%20fetch(%22B%22%2C%200.1)%2C%20fetch(%22C%22%2C%200.1))%0A...%0A%3E%3E%3E%20asyncio.run(main())%20%20%20%20%20%20%23%20%E7%B4%84%200.1s%EF%BC%8C%E4%B8%8D%E6%98%AF%200.3s%0A%5B%27A%20done%27%2C%20%27B%20done%27%2C%20%27C%20done%27%5D'), 'copy-btn-568')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import asyncio
+&gt;&gt;&gt; async def fetch(name, d):
+...     await asyncio.sleep(d); return f"{name} done"
+...
+&gt;&gt;&gt; async def main():
+...     return await asyncio.gather(
+...         fetch("A", 0.1), fetch("B", 0.1), fetch("C", 0.1))
+...
+&gt;&gt;&gt; asyncio.run(main())      # 約 0.1s，不是 0.3s
+['A done', 'B done', 'C done']</code></pre>
+      </div>
+    <p><strong>GIL：執行緒不加速 CPU 密集工作（佐證）</strong>。下面這段可自行重跑，比較同一段純計算「序列跑兩次」vs.「兩個執行緒並行」：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-569" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20time%2C%20threading%0A%0Adef%20count(n)%3A%0A%20%20%20%20while%20n%20%3E%200%3A%0A%20%20%20%20%20%20%20%20n%20-%3D%201%0A%0AN%20%3D%2020_000_000%0A%0At0%20%3D%20time.perf_counter()%0Acount(N)%3B%20count(N)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%BA%8F%E5%88%97%0Aseq%20%3D%20time.perf_counter()%20-%20t0%0A%0At0%20%3D%20time.perf_counter()%0Ats%20%3D%20%5Bthreading.Thread(target%3Dcount%2C%20args%3D(N%2C))%20for%20_%20in%20range(2)%5D%0Afor%20t%20in%20ts%3A%20t.start()%0Afor%20t%20in%20ts%3A%20t.join()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%85%A9%E5%9F%B7%E8%A1%8C%E7%B7%92%E4%B8%A6%E8%A1%8C%0Apar%20%3D%20time.perf_counter()%20-%20t0%0A%0Aprint(f%22sequential%3A%20%7Bseq%3A.2f%7Ds%22)%0Aprint(f%222%20threads%3A%20%20%7Bpar%3A.2f%7Ds%22)%0Aprint(f%22speedup%3A%20%20%20%20%7Bseq%2Fpar%3A.2f%7Dx%22)'), 'copy-btn-569')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import time, threading
+
+def count(n):
+    while n &gt; 0:
+        n -= 1
+
+N = 20_000_000
+
+t0 = time.perf_counter()
+count(N); count(N)                       # 序列
+seq = time.perf_counter() - t0
+
+t0 = time.perf_counter()
+ts = [threading.Thread(target=count, args=(N,)) for _ in range(2)]
+for t in ts: t.start()
+for t in ts: t.join()                    # 兩執行緒並行
+par = time.perf_counter() - t0
+
+print(f"sequential: {seq:.2f}s")
+print(f"2 threads:  {par:.2f}s")
+print(f"speedup:    {seq/par:.2f}x")</code></pre>
+      </div>
+    <p>某次單機輸出（數字依硬體而異，重點是 speedup ≈ 1.0，<strong>不是</strong>精確值）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-570" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('sequential%3A%200.35s%0A2%20threads%3A%20%200.35s%0Aspeedup%3A%20%20%20%201.02x%20%20%20%23%20%E6%8E%A5%E8%BF%91%201.0%EF%BC%8CGIL%20%E6%8A%8A%20CPU%20%E5%AF%86%E9%9B%86%E5%B7%A5%E4%BD%9C%E5%BA%8F%E5%88%97%E5%8C%96%E4%BA%86'), 'copy-btn-570')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">sequential: 0.35s
+2 threads:  0.35s
+speedup:    1.02x   # 接近 1.0，GIL 把 CPU 密集工作序列化了</code></pre>
+      </div>
+    <p><strong>思維差異</strong>：這是 Java 工程師最大的認知衝擊——在 Java 裡多執行緒就是 CPU 平行的同義詞，在 CPython 裡（GIL 仍預設啟用，free-threading 為 3.13+ 的選用建置）<strong>執行緒只對 I/O 密集有用</strong>。CPU 密集要靠 <code>multiprocessing</code> 或 C 擴充。決策樹：I/O 密集且量大 → <code>asyncio</code>；I/O 密集且想沿用既有阻塞程式碼 → 執行緒池；CPU 密集 → 行程池（詳見第 14 章）。</p>
+<hr>
+<h2 id="a9-工程工具鏈">A.9 工程工具鏈</h2><table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>說明 / 詳見章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Maven / Gradle</td>
+<td><code>uv</code>（或 <code>pip</code>）+ <code>pyproject.toml</code></td>
+<td><code>uv</code> 速度與鎖檔體驗最佳（詳見第 1、11 章）</td>
+</tr>
+<tr>
+<td><code>pom.xml</code> / <code>build.gradle</code></td>
+<td><code>pyproject.toml</code></td>
+<td>單一標準設定檔，工具共用</td>
+</tr>
+<tr>
+<td>本機 JDK 切換</td>
+<td><code>uv python</code> / <code>pyenv</code></td>
+<td>直譯器版本管理</td>
+</tr>
+<tr>
+<td><code>~/.m2</code> 倉庫 + classpath</td>
+<td>虛擬環境 <code>venv</code></td>
+<td>每專案獨立隔離（詳見第 1 章）</td>
+</tr>
+<tr>
+<td>JUnit</td>
+<td><code>pytest</code></td>
+<td><code>assert</code> 即斷言，fixture 取代 <code>@Before</code>（詳見第 13 章）</td>
+</tr>
+<tr>
+<td>Mockito</td>
+<td><code>unittest.mock</code>（<code>patch</code>/<code>MagicMock</code>）</td>
+<td><code>monkeypatch</code> fixture 亦常用</td>
+</tr>
+<tr>
+<td>SLF4J / Logback</td>
+<td><code>logging</code></td>
+<td>標準庫內建，<code>logging.getLogger(__name__)</code>（詳見第 12 章）</td>
+</tr>
+<tr>
+<td>Checkstyle / SpotBugs / PMD</td>
+<td><code>ruff</code></td>
+<td>極快的 linter + formatter，取代多個工具（詳見第 1 章）</td>
+</tr>
+<tr>
+<td>（無對應）</td>
+<td><code>mypy</code> / <code>pyright</code></td>
+<td>漸進式靜態型別檢查（詳見第 9 章）</td>
+</tr>
+<tr>
+<td>Spring Boot</td>
+<td>FastAPI</td>
+<td>型別驅動、<code>Depends</code> 做 DI（詳見第 16 章）</td>
+</tr>
+<tr>
+<td>Spring DI <code>@Autowired</code></td>
+<td>FastAPI <code>Depends(...)</code></td>
+<td>函式參數即注入點</td>
+</tr>
+<tr>
+<td>JPA / Hibernate</td>
+<td>SQLAlchemy 2.0</td>
+<td>ORM；<code>Session</code> 對應 <code>EntityManager</code>（詳見第 16 章）</td>
+</tr>
+<tr>
+<td>Jackson</td>
+<td><code>json</code>（標準庫）/ <code>pydantic</code></td>
+<td>驗證與序列化用 pydantic（詳見第 9、16 章）</td>
+</tr>
+<tr>
+<td>Bean Validation</td>
+<td><code>pydantic</code> 模型</td>
+<td>型別即驗證</td>
+</tr>
+<tr>
+<td>Apache POI</td>
+<td><code>openpyxl</code></td>
+<td>讀寫 Excel（詳見第 17 章）</td>
+</tr>
+<tr>
+<td>Jsoup</td>
+<td><code>BeautifulSoup</code></td>
+<td>HTML 解析（詳見第 17 章）</td>
+</tr>
+<tr>
+<td><code>RestTemplate</code> / <code>HttpClient</code></td>
+<td><code>requests</code> / <code>httpx</code></td>
+<td><code>httpx</code> 支援 async（詳見第 17 章）</td>
+</tr>
+<tr>
+<td>Quartz / <code>@Scheduled</code></td>
+<td><code>schedule</code> / <code>APScheduler</code> / cron</td>
+<td>腳本排程（詳見第 17 章）</td>
+</tr>
+<tr>
+<td><code>mvn package</code>（jar）</td>
+<td><code>uv build</code>（wheel/sdist）</td>
+<td>打包與發佈（詳見第 18 章）</td>
+</tr>
+<tr>
+<td>JaCoCo</td>
+<td><code>coverage</code>（<code>pytest-cov</code>）</td>
+<td>覆蓋率（詳見第 13、18 章）</td>
+</tr>
+</tbody></table>
+<p><strong>思維差異</strong>：Python 的工具鏈正在收斂到「<code>pyproject.toml</code> 為核心、<code>uv</code> + <code>ruff</code> + <code>mypy</code> + <code>pytest</code> 四件套」。對 Java 老手而言，最值得內化的轉變是：<strong>型別提示不是裝飾，而是接上 mypy、pydantic、FastAPI 整條工具鏈的接口</strong>——把你在 Java 享受的編譯期保障，用漸進式型別一塊一塊賺回來。</p>
+<hr>
+<h2 id="最關鍵的-10-個思維轉換">最關鍵的 10 個思維轉換</h2><ol>
+<li><strong>沒有編譯器把關</strong>——<code>private</code>／<code>final</code>／checked exception 都不存在；嚴謹度靠 <code>mypy</code> + <code>ruff</code> + 測試 + 命名慣例補回（詳見第 9、12、13 章）。</li>
+<li><strong><code>Optional&lt;T&gt;</code> 就是 <code>T | None</code></strong>——沒有包裝物件，直接用 <code>is None</code> 分支；別找 <code>.map()</code>／<code>.orElse()</code>（詳見第 9 章）。</li>
+<li><strong>Stream 就是 comprehension／generator</strong>——<code>[...]</code> 即時、<code>(...)</code> 惰性；超過兩層請改用 <code>yield</code> 函式（詳見第 6 章）。</li>
+<li><strong><code>interface</code> 一分為二</strong>——零侵入用 <code>Protocol</code>（結構子型），強制契約用 <code>abc.ABC</code>（名義子型）（詳見第 8 章）。</li>
+<li><strong>record／Lombok 就是 <code>@dataclass</code></strong>——一行生出 <code>__init__</code>／<code>__repr__</code>／<code>__eq__</code>，<code>frozen=True</code> 即不可變且可雜湊（詳見第 7 章）。</li>
+<li><strong>多執行緒不等於 CPU 平行</strong>——GIL 讓執行緒只對 I/O 密集有用；CPU 密集走 <code>multiprocessing</code>（詳見第 14 章）。</li>
+<li><strong><code>int</code> 不溢位</strong>——任意精度整數讓你不再操心 overflow；精確小數仍用 <code>Decimal</code>（詳見第 2 章）。</li>
+<li><strong><code>is</code> vs <code>==</code></strong>——<code>is</code> 是參考相等（只給 <code>None</code>／singleton 用），<code>==</code> 是值相等（走 <code>__eq__</code>）（詳見第 2 章）。</li>
+<li><strong><code>dict</code> 保證插入順序</strong>——不再需要 <code>LinkedHashMap</code>；要不可變改用 <code>tuple</code>／<code>frozenset</code>（詳見第 4 章）。</li>
+<li><strong><code>pyproject.toml</code> 是新的 <code>pom.xml</code></strong>——<code>uv</code> 管依賴與環境，型別提示是接上整條現代工具鏈的接口（詳見第 1、11 章）。</li>
+</ol>
+<blockquote><p>心法：不要把 Java 的寫法直譯成 Python——先用這張表找到對應的 Python 慣用語，再翻回正文理解「Python 為什麼這樣想」。當對照表與你的 Java 直覺衝突時，通常是 Python 在提醒你有更簡潔的寫法。</p>
+</blockquote>

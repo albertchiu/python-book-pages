@@ -1,0 +1,930 @@
+<h1 id="第-18-章總整專案capstone">第 18 章：總整專案（Capstone）</h1><p>前十七章把工具一件件交到你手上：型別系統、Pythonic 寫法、類別與協定、pydantic、SQLAlchemy、FastAPI、click、pytest、ruff、mypy。但工具不是專案。一個資深 Java 工程師交付的是「一個結構清楚、有測試、CI 全綠、可被 <code>pip install</code> 的東西」，不是一堆能跑的 script。這一章我們把所有零件組成一個小而完整的服務——一個任務清單（task list），同時提供 <strong>REST API</strong> 與 <strong>CLI</strong> 兩個入口，共用同一份核心邏輯，並通過 ruff + mypy strict + coverage 三道品質門檻。重點不在功能多，而在<strong>分層、邊界、與工程紀律如何在 Python 裡落地</strong>。本章所有核心程式碼（API、service、CLI、測試）都已實際跑通，你可以照著做出一模一樣的成品。</p>
+<hr>
+<h2 id="專案規格與架構">專案規格與架構</h2><p>需求很小，刻意如此：一個任務有 <code>title</code> 與 <code>status</code>（todo / doing / done），支援增刪改查與依狀態篩選。麻雀雖小，但它逼你面對每個真實專案都會遇到的決策：資料模型放哪？驗證在哪一層？API 跟 CLI 怎麼共用邏輯？怎麼測？</p>
+<h3 id="src-layout-目錄樹">src layout 目錄樹</h3><p>承接第 11 章，我們用 src layout——原始碼放進 <code>src/</code>，強迫測試走「已安裝的套件」路徑，避免「在專案根目錄剛好 import 得到、打包後卻壞掉」的假陽性。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-536" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('tasks%2F%0A%E2%94%9C%E2%94%80%E2%94%80%20pyproject.toml%0A%E2%94%9C%E2%94%80%E2%94%80%20src%2F%0A%E2%94%82%20%20%20%E2%94%94%E2%94%80%E2%94%80%20tasks%2F%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20__init__.py%20%20%20%20%20%20%23%20__version__%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20models.py%20%20%20%20%20%20%20%20%23%20SQLAlchemy%20ORM%20model%EF%BC%88%E6%8C%81%E4%B9%85%E5%B1%A4%EF%BC%89%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20schemas.py%20%20%20%20%20%20%20%23%20pydantic%20schema%EF%BC%88API%20%E9%82%8A%E7%95%8C%EF%BC%89%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20db.py%20%20%20%20%20%20%20%20%20%20%20%20%23%20engine%20%2F%20session%20%E5%B7%A5%E5%BB%A0%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20service.py%20%20%20%20%20%20%20%23%20%E6%A0%B8%E5%BF%83%E5%95%86%E6%A5%AD%E9%82%8F%E8%BC%AF%EF%BC%88%E7%84%A1%E6%A1%86%E6%9E%B6%E7%9B%B8%E4%BE%9D%EF%BC%89%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20main.py%20%20%20%20%20%20%20%20%20%20%23%20FastAPI%20app%EF%BC%88HTTP%20%E5%85%A5%E5%8F%A3%EF%BC%89%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%94%E2%94%80%E2%94%80%20cli.py%20%20%20%20%20%20%20%20%20%20%20%23%20click%20CLI%EF%BC%88%E5%91%BD%E4%BB%A4%E5%88%97%E5%85%A5%E5%8F%A3%EF%BC%89%0A%E2%94%94%E2%94%80%E2%94%80%20tests%2F%0A%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20conftest.py%20%20%20%20%20%20%20%20%20%20%23%20fixture%EF%BC%9Ain-memory%20DB%E3%80%81TestClient%0A%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20test_service.py%20%20%20%20%20%20%23%20%E5%96%AE%E5%85%83%E6%B8%AC%E8%A9%A6%EF%BC%88service%20%E5%B1%A4%EF%BC%89%0A%20%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20test_api.py%20%20%20%20%20%20%20%20%20%20%23%20%E6%95%B4%E5%90%88%E6%B8%AC%E8%A9%A6%EF%BC%88FastAPI%20TestClient%EF%BC%89%0A%20%20%20%20%E2%94%94%E2%94%80%E2%94%80%20test_cli.py%20%20%20%20%20%20%20%20%20%20%23%20%E6%95%B4%E5%90%88%E6%B8%AC%E8%A9%A6%EF%BC%88click%20CliRunner%EF%BC%89'), 'copy-btn-536')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">tasks/
+├── pyproject.toml
+├── src/
+│   └── tasks/
+│       ├── __init__.py      # __version__
+│       ├── models.py        # SQLAlchemy ORM model（持久層）
+│       ├── schemas.py       # pydantic schema（API 邊界）
+│       ├── db.py            # engine / session 工廠
+│       ├── service.py       # 核心商業邏輯（無框架相依）
+│       ├── main.py          # FastAPI app（HTTP 入口）
+│       └── cli.py           # click CLI（命令列入口）
+└── tests/
+    ├── conftest.py          # fixture：in-memory DB、TestClient
+    ├── test_service.py      # 單元測試（service 層）
+    ├── test_api.py          # 整合測試（FastAPI TestClient）
+    └── test_cli.py          # 整合測試（click CliRunner）</code></pre>
+      </div>
+    <h3 id="分層對照-spring-的-controller-service-repository">分層：對照 Spring 的 Controller / Service / Repository</h3><p>你在 Spring 裡的反射動作是把程式碼切成三層。這個專案完全照搬這個心智模型，只是把 Java 的物件圖換成 Python 的模組：</p>
+<table>
+<thead>
+<tr>
+<th>Spring</th>
+<th>本專案</th>
+<th>職責</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@RestController</code></td>
+<td><code>main.py</code>（FastAPI）/ <code>cli.py</code>（click）</td>
+<td>入口層：解析輸入、呼叫 service、組裝回應</td>
+</tr>
+<tr>
+<td><code>@Service</code></td>
+<td><code>service.py</code></td>
+<td>商業邏輯，<strong>不認識 HTTP、不認識 click</strong></td>
+</tr>
+<tr>
+<td><code>@Repository</code> / JPA</td>
+<td><code>models.py</code> + <code>db.py</code>（SQLAlchemy）</td>
+<td>持久層</td>
+</tr>
+<tr>
+<td>DTO / Request body</td>
+<td><code>schemas.py</code>（pydantic）</td>
+<td>API 邊界的請求/回應契約</td>
+</tr>
+</tbody></table>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：分層不是靠 <code>@Service</code> 註解或 Spring 容器，而是靠<strong>模組相依方向</strong>。<code>service.py</code> 只 import <code>models</code> 與 <code>schemas</code>，<strong>不 import</strong> <code>fastapi</code> 或 <code>click</code>。這條規則用肉眼就能稽核：core 不該知道誰在呼叫它。這正是「同一份邏輯、兩種介面」能成立的原因。</p>
+</div><div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Spring 用依賴注入容器把三層接起來；Python 直接用函式參數傳遞 <code>Session</code>——service 的每個函式第一個參數都是 <code>session: Session</code>。這就是「窮人的依賴注入」，而且它顯式、可測、零魔法。</p>
+</div><hr>
+<h2 id="型別與資料模型三分">型別與資料模型三分</h2><p>第 9 章立過一條規矩：<strong>信任邊界用 pydantic 做執行期驗證，邊界內用 dataclass / 普通物件傳遞</strong>。在這個專案裡，這條規矩具體化成三種模型，各司其職，不要混用：</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>工具</th>
+<th>用在哪</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ORM model</td>
+<td>SQLAlchemy <code>DeclarativeBase</code></td>
+<td>持久層</td>
+<td>對應資料表、管理 identity 與 session</td>
+</tr>
+<tr>
+<td>API schema</td>
+<td>pydantic <code>BaseModel</code></td>
+<td>HTTP 請求/回應</td>
+<td>不信任外部輸入，要驗證、要序列化</td>
+</tr>
+<tr>
+<td>（內部 DTO）</td>
+<td>dataclass / 直接傳 ORM 物件</td>
+<td>service 內部</td>
+<td>邊界內已可信，不需重複驗證</td>
+</tr>
+</tbody></table>
+<p>新手常犯的錯是把 SQLAlchemy model 直接丟去當 API 回應，或把 pydantic model 拿去存資料庫。三分法讓每一層的契約獨立演進——資料庫加個 <code>updated_at</code> 欄位不會逼 API 改版。</p>
+<h3 id="modelspy持久層sqlalchemy-20">models.py：持久層（SQLAlchemy 2.0）</h3><p>SQLAlchemy 2.0 的 <code>Mapped[...]</code> 風格跟 JPA 的 annotated entity 神似，差別是型別資訊由 <code>Mapped[]</code> 帶出、<code>mapped_column()</code> 補欄位細節。<code>StrEnum</code>（3.11+）讓 enum 值在序列化時自然變成字串。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-537" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Ftasks%2Fmodels.py%0Afrom%20__future__%20import%20annotations%0A%0Aimport%20enum%0Afrom%20datetime%20import%20UTC%2C%20datetime%0A%0Afrom%20sqlalchemy%20import%20DateTime%2C%20Enum%2C%20String%0Afrom%20sqlalchemy.orm%20import%20DeclarativeBase%2C%20Mapped%2C%20mapped_column%0A%0A%0Aclass%20Base(DeclarativeBase)%3A%0A%20%20%20%20pass%0A%0A%0Aclass%20Status(enum.StrEnum)%3A%0A%20%20%20%20TODO%20%3D%20%22todo%22%0A%20%20%20%20DOING%20%3D%20%22doing%22%0A%20%20%20%20DONE%20%3D%20%22done%22%0A%0A%0Adef%20_now()%20-%3E%20datetime%3A%0A%20%20%20%20return%20datetime.now(UTC)%0A%0A%0Aclass%20Task(Base)%3A%0A%20%20%20%20__tablename__%20%3D%20%22tasks%22%0A%0A%20%20%20%20id%3A%20Mapped%5Bint%5D%20%3D%20mapped_column(primary_key%3DTrue)%0A%20%20%20%20title%3A%20Mapped%5Bstr%5D%20%3D%20mapped_column(String(200))%0A%20%20%20%20status%3A%20Mapped%5BStatus%5D%20%3D%20mapped_column(Enum(Status)%2C%20default%3DStatus.TODO)%0A%20%20%20%20created_at%3A%20Mapped%5Bdatetime%5D%20%3D%20mapped_column(DateTime(timezone%3DTrue)%2C%20default%3D_now)'), 'copy-btn-537')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/tasks/models.py
+from __future__ import annotations
+
+import enum
+from datetime import UTC, datetime
+
+from sqlalchemy import DateTime, Enum, String
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class Status(enum.StrEnum):
+    TODO = "todo"
+    DOING = "doing"
+    DONE = "done"
+
+
+def _now() -&gt; datetime:
+    return datetime.now(UTC)
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(200))
+    status: Mapped[Status] = mapped_column(Enum(Status), default=Status.TODO)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>class Task(Base)</code> ≈ <code>@Entity class Task</code>；<code>mapped_column(primary_key=True)</code> ≈ <code>@Id @GeneratedValue</code>。但 SQLAlchemy 沒有 JPA 那層 EntityManager 的隱式快取魔法——session 邊界與 flush 時機你要自己掌握，比 Hibernate 更顯式（也更少驚喜）。</p>
+</div><h3 id="schemaspyapi-邊界pydantic">schemas.py：API 邊界（pydantic）</h3><p>注意三個 schema 的分工：<code>TaskCreate</code> 是「能建立的最小集合」（只收 <code>title</code>，<code>id</code> 由 DB 配、<code>status</code> 預設 todo）；<code>TaskUpdate</code> 全部欄位 optional（PATCH 語意）；<code>TaskOut</code> 是回應契約，<code>from_attributes=True</code> 讓它能直接從 ORM 物件讀屬性。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-538" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Ftasks%2Fschemas.py%0Afrom%20__future__%20import%20annotations%0A%0Afrom%20datetime%20import%20datetime%0A%0Afrom%20pydantic%20import%20BaseModel%2C%20ConfigDict%2C%20Field%0A%0Afrom%20tasks.models%20import%20Status%0A%0A%0Aclass%20TaskCreate(BaseModel)%3A%0A%20%20%20%20title%3A%20str%20%3D%20Field(min_length%3D1%2C%20max_length%3D200)%0A%0A%0Aclass%20TaskUpdate(BaseModel)%3A%0A%20%20%20%20title%3A%20str%20%7C%20None%20%3D%20Field(default%3DNone%2C%20min_length%3D1%2C%20max_length%3D200)%0A%20%20%20%20status%3A%20Status%20%7C%20None%20%3D%20None%0A%0A%0Aclass%20TaskOut(BaseModel)%3A%0A%20%20%20%20model_config%20%3D%20ConfigDict(from_attributes%3DTrue)%0A%0A%20%20%20%20id%3A%20int%0A%20%20%20%20title%3A%20str%0A%20%20%20%20status%3A%20Status%0A%20%20%20%20created_at%3A%20datetime'), 'copy-btn-538')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/tasks/schemas.py
+from __future__ import annotations
+
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from tasks.models import Status
+
+
+class TaskCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+
+
+class TaskUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    status: Status | None = None
+
+
+class TaskOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    status: Status
+    created_at: datetime</code></pre>
+      </div>
+    <p><code>Field(min_length=1)</code> 不是裝飾——它是契約。空字串 title 會在進入 service 前就被 pydantic 擋下並回 422，service 層因此<strong>完全不必</strong>寫 <code>if not title: raise ...</code> 這種防禦碼。這是「驗證集中在邊界」帶來的乾淨。</p>
+<h3 id="servicepy核心邏輯無框架相依">service.py：核心邏輯（無框架相依）</h3><p>這是整個專案的心臟，也是兩個入口共用的那份「同一套邏輯」。每個函式收一個 <code>Session</code>、回 ORM 物件，找不到就丟自訂例外 <code>TaskNotFound</code>——<strong>它不知道 HTTP 404，也不知道 click 的錯誤碼</strong>，那是入口層的事。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-539" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Ftasks%2Fservice.py%0Afrom%20__future__%20import%20annotations%0A%0Afrom%20sqlalchemy%20import%20select%0Afrom%20sqlalchemy.orm%20import%20Session%0A%0Afrom%20tasks.models%20import%20Status%2C%20Task%0Afrom%20tasks.schemas%20import%20TaskCreate%2C%20TaskUpdate%0A%0A%0Aclass%20TaskNotFound(Exception)%3A%0A%20%20%20%20def%20__init__(self%2C%20task_id%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20super().__init__(f%22task%20%7Btask_id%7D%20not%20found%22)%0A%20%20%20%20%20%20%20%20self.task_id%20%3D%20task_id%0A%0A%0Adef%20create_task(session%3A%20Session%2C%20data%3A%20TaskCreate)%20-%3E%20Task%3A%0A%20%20%20%20task%20%3D%20Task(title%3Ddata.title%2C%20status%3DStatus.TODO)%0A%20%20%20%20session.add(task)%0A%20%20%20%20session.commit()%0A%20%20%20%20session.refresh(task)%0A%20%20%20%20return%20task%0A%0A%0Adef%20get_task(session%3A%20Session%2C%20task_id%3A%20int)%20-%3E%20Task%3A%0A%20%20%20%20task%20%3D%20session.get(Task%2C%20task_id)%0A%20%20%20%20if%20task%20is%20None%3A%0A%20%20%20%20%20%20%20%20raise%20TaskNotFound(task_id)%0A%20%20%20%20return%20task%0A%0A%0Adef%20list_tasks(session%3A%20Session%2C%20status%3A%20Status%20%7C%20None%20%3D%20None)%20-%3E%20list%5BTask%5D%3A%0A%20%20%20%20stmt%20%3D%20select(Task).order_by(Task.id)%0A%20%20%20%20if%20status%20is%20not%20None%3A%0A%20%20%20%20%20%20%20%20stmt%20%3D%20stmt.where(Task.status%20%3D%3D%20status)%0A%20%20%20%20return%20list(session.scalars(stmt))%0A%0A%0Adef%20update_task(session%3A%20Session%2C%20task_id%3A%20int%2C%20data%3A%20TaskUpdate)%20-%3E%20Task%3A%0A%20%20%20%20task%20%3D%20get_task(session%2C%20task_id)%0A%20%20%20%20if%20data.title%20is%20not%20None%3A%0A%20%20%20%20%20%20%20%20task.title%20%3D%20data.title%0A%20%20%20%20if%20data.status%20is%20not%20None%3A%0A%20%20%20%20%20%20%20%20task.status%20%3D%20data.status%0A%20%20%20%20session.commit()%0A%20%20%20%20session.refresh(task)%0A%20%20%20%20return%20task%0A%0A%0Adef%20delete_task(session%3A%20Session%2C%20task_id%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20task%20%3D%20get_task(session%2C%20task_id)%0A%20%20%20%20session.delete(task)%0A%20%20%20%20session.commit()'), 'copy-btn-539')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/tasks/service.py
+from __future__ import annotations
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from tasks.models import Status, Task
+from tasks.schemas import TaskCreate, TaskUpdate
+
+
+class TaskNotFound(Exception):
+    def __init__(self, task_id: int) -&gt; None:
+        super().__init__(f"task {task_id} not found")
+        self.task_id = task_id
+
+
+def create_task(session: Session, data: TaskCreate) -&gt; Task:
+    task = Task(title=data.title, status=Status.TODO)
+    session.add(task)
+    session.commit()
+    session.refresh(task)
+    return task
+
+
+def get_task(session: Session, task_id: int) -&gt; Task:
+    task = session.get(Task, task_id)
+    if task is None:
+        raise TaskNotFound(task_id)
+    return task
+
+
+def list_tasks(session: Session, status: Status | None = None) -&gt; list[Task]:
+    stmt = select(Task).order_by(Task.id)
+    if status is not None:
+        stmt = stmt.where(Task.status == status)
+    return list(session.scalars(stmt))
+
+
+def update_task(session: Session, task_id: int, data: TaskUpdate) -&gt; Task:
+    task = get_task(session, task_id)
+    if data.title is not None:
+        task.title = data.title
+    if data.status is not None:
+        task.status = data.status
+    session.commit()
+    session.refresh(task)
+    return task
+
+
+def delete_task(session: Session, task_id: int) -&gt; None:
+    task = get_task(session, task_id)
+    session.delete(task)
+    session.commit()</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：自訂例外 <code>TaskNotFound</code> 是分層的關鍵。service 用「丟例外」表達失敗（第 12 章 EAFP），讓每個入口層自己決定怎麼翻譯——HTTP 翻成 404、CLI 翻成非零 exit code。如果 service 直接 <code>raise HTTPException(404)</code>，它就被 FastAPI 綁死，CLI 再也用不了它。</p>
+</div><h3 id="dbpyengine-與-session-工廠">db.py：engine 與 session 工廠</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-540" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Ftasks%2Fdb.py%0Afrom%20__future__%20import%20annotations%0A%0Afrom%20sqlalchemy%20import%20Engine%2C%20create_engine%0Afrom%20sqlalchemy.orm%20import%20Session%2C%20sessionmaker%0A%0Afrom%20tasks.models%20import%20Base%0A%0ADEFAULT_URL%20%3D%20%22sqlite%3A%2F%2F%2Ftasks.db%22%0A%0A%0Adef%20make_engine(url%3A%20str%20%3D%20DEFAULT_URL)%20-%3E%20Engine%3A%0A%20%20%20%20engine%20%3D%20create_engine(url)%0A%20%20%20%20Base.metadata.create_all(engine)%0A%20%20%20%20return%20engine%0A%0A%0Adef%20make_session_factory(url%3A%20str%20%3D%20DEFAULT_URL)%20-%3E%20sessionmaker%5BSession%5D%3A%0A%20%20%20%20return%20sessionmaker(bind%3Dmake_engine(url))'), 'copy-btn-540')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/tasks/db.py
+from __future__ import annotations
+
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session, sessionmaker
+
+from tasks.models import Base
+
+DEFAULT_URL = "sqlite:///tasks.db"
+
+
+def make_engine(url: str = DEFAULT_URL) -&gt; Engine:
+    engine = create_engine(url)
+    Base.metadata.create_all(engine)
+    return engine
+
+
+def make_session_factory(url: str = DEFAULT_URL) -&gt; sessionmaker[Session]:
+    return sessionmaker(bind=make_engine(url))</code></pre>
+      </div>
+    <p>把「怎麼建 engine」抽成工廠，是讓測試能塞 in-memory DB 的關鍵——production 用 <code>sqlite:///tasks.db</code>，測試用 <code>sqlite:///:memory:</code>，service 與入口層對此一無所知。</p>
+<hr>
+<h2 id="api-與-cli-兩個入口">API 與 CLI 兩個入口</h2><p>現在來證明「一份核心、兩種介面」的價值：同樣呼叫 <code>service.create_task</code>，一個透過 HTTP、一個透過命令列。</p>
+<h3 id="fastapi-appmainpy">FastAPI app（main.py）</h3><p>承接第 16 章，FastAPI 用 <code>Depends</code> 做依賴注入。這裡的關鍵是 <code>get_db</code> 這個 generator dependency——它 yield 一個 session、請求結束後在 <code>finally</code> 關閉，行為等同 Spring 的 request-scoped <code>EntityManager</code>，但機制是 Python 的 generator + context（第 6、12 章）。<code>Annotated[Session, Depends(get_db)]</code> 是 FastAPI 推薦的注入寫法，可重用又對 mypy 友善。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-541" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Ftasks%2Fmain.py%0Afrom%20__future__%20import%20annotations%0A%0Afrom%20collections.abc%20import%20Iterator%0Afrom%20typing%20import%20Annotated%0A%0Afrom%20fastapi%20import%20Depends%2C%20FastAPI%2C%20HTTPException%0Afrom%20sqlalchemy.orm%20import%20Session%2C%20sessionmaker%0A%0Afrom%20tasks.db%20import%20make_session_factory%0Afrom%20tasks.models%20import%20Status%0Afrom%20tasks.schemas%20import%20TaskCreate%2C%20TaskOut%2C%20TaskUpdate%0Afrom%20tasks.service%20import%20(%0A%20%20%20%20TaskNotFound%2C%0A%20%20%20%20create_task%2C%0A%20%20%20%20delete_task%2C%0A%20%20%20%20get_task%2C%0A%20%20%20%20list_tasks%2C%0A%20%20%20%20update_task%2C%0A)%0A%0Aapp%20%3D%20FastAPI(title%3D%22Tasks%20API%22)%0A%0A_factory%3A%20sessionmaker%5BSession%5D%20%3D%20make_session_factory()%0A%0A%0Adef%20get_db()%20-%3E%20Iterator%5BSession%5D%3A%0A%20%20%20%20session%20%3D%20_factory()%0A%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20yield%20session%0A%20%20%20%20finally%3A%0A%20%20%20%20%20%20%20%20session.close()%0A%0A%0ADB%20%3D%20Annotated%5BSession%2C%20Depends(get_db)%5D%0A%0A%0A%40app.post(%22%2Ftasks%22%2C%20response_model%3DTaskOut%2C%20status_code%3D201)%0Adef%20post_task(payload%3A%20TaskCreate%2C%20db%3A%20DB)%20-%3E%20object%3A%0A%20%20%20%20return%20create_task(db%2C%20payload)%0A%0A%0A%40app.get(%22%2Ftasks%22%2C%20response_model%3Dlist%5BTaskOut%5D)%0Adef%20get_tasks(db%3A%20DB%2C%20status%3A%20Status%20%7C%20None%20%3D%20None)%20-%3E%20object%3A%0A%20%20%20%20return%20list_tasks(db%2C%20status)%0A%0A%0A%40app.get(%22%2Ftasks%2F%7Btask_id%7D%22%2C%20response_model%3DTaskOut)%0Adef%20get_one(task_id%3A%20int%2C%20db%3A%20DB)%20-%3E%20object%3A%0A%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20return%20get_task(db%2C%20task_id)%0A%20%20%20%20except%20TaskNotFound%20as%20exc%3A%0A%20%20%20%20%20%20%20%20raise%20HTTPException(status_code%3D404%2C%20detail%3Dstr(exc))%20from%20exc%0A%0A%0A%40app.patch(%22%2Ftasks%2F%7Btask_id%7D%22%2C%20response_model%3DTaskOut)%0Adef%20patch_task(task_id%3A%20int%2C%20payload%3A%20TaskUpdate%2C%20db%3A%20DB)%20-%3E%20object%3A%0A%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20return%20update_task(db%2C%20task_id%2C%20payload)%0A%20%20%20%20except%20TaskNotFound%20as%20exc%3A%0A%20%20%20%20%20%20%20%20raise%20HTTPException(status_code%3D404%2C%20detail%3Dstr(exc))%20from%20exc%0A%0A%0A%40app.delete(%22%2Ftasks%2F%7Btask_id%7D%22%2C%20status_code%3D204)%0Adef%20remove_task(task_id%3A%20int%2C%20db%3A%20DB)%20-%3E%20None%3A%0A%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20delete_task(db%2C%20task_id)%0A%20%20%20%20except%20TaskNotFound%20as%20exc%3A%0A%20%20%20%20%20%20%20%20raise%20HTTPException(status_code%3D404%2C%20detail%3Dstr(exc))%20from%20exc'), 'copy-btn-541')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/tasks/main.py
+from __future__ import annotations
+
+from collections.abc import Iterator
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy.orm import Session, sessionmaker
+
+from tasks.db import make_session_factory
+from tasks.models import Status
+from tasks.schemas import TaskCreate, TaskOut, TaskUpdate
+from tasks.service import (
+    TaskNotFound,
+    create_task,
+    delete_task,
+    get_task,
+    list_tasks,
+    update_task,
+)
+
+app = FastAPI(title="Tasks API")
+
+_factory: sessionmaker[Session] = make_session_factory()
+
+
+def get_db() -&gt; Iterator[Session]:
+    session = _factory()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+DB = Annotated[Session, Depends(get_db)]
+
+
+@app.post("/tasks", response_model=TaskOut, status_code=201)
+def post_task(payload: TaskCreate, db: DB) -&gt; object:
+    return create_task(db, payload)
+
+
+@app.get("/tasks", response_model=list[TaskOut])
+def get_tasks(db: DB, status: Status | None = None) -&gt; object:
+    return list_tasks(db, status)
+
+
+@app.get("/tasks/{task_id}", response_model=TaskOut)
+def get_one(task_id: int, db: DB) -&gt; object:
+    try:
+        return get_task(db, task_id)
+    except TaskNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.patch("/tasks/{task_id}", response_model=TaskOut)
+def patch_task(task_id: int, payload: TaskUpdate, db: DB) -&gt; object:
+    try:
+        return update_task(db, task_id, payload)
+    except TaskNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.delete("/tasks/{task_id}", status_code=204)
+def remove_task(task_id: int, db: DB) -&gt; None:
+    try:
+        delete_task(db, task_id)
+    except TaskNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc</code></pre>
+      </div>
+    <p>入口層的工作只剩「翻譯」：把 <code>TaskNotFound</code> 翻成 <code>HTTPException(404)</code>（並用 <code>raise ... from exc</code> 保留例外鏈，第 12 章）。商業邏輯一行都沒有。<code>response_model=TaskOut</code> 讓 FastAPI 自動把 ORM 物件序列化成回應 schema、產生 OpenAPI 文件、並過濾掉不該外洩的欄位。</p>
+<h3 id="click-cliclipy">click CLI（cli.py）</h3><p>承接第 15 章，CLI 用 <code>click</code>（對照 picocli）。<code>@click.group()</code> 建出子指令樹（<code>tasks add</code> / <code>tasks list</code> / <code>tasks done</code>），<code>ctx.obj</code> 是跨指令傳遞的上下文——我們把 session 工廠塞進去，讓每個子指令都拿得到。注意 <code>if ctx.obj is None</code> 這個小設計：production 走 <code>--db</code> 建工廠，測試則用 <code>runner.invoke(main, ..., obj=factory)</code> 直接注入 in-memory 工廠（下一節會用到）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-542" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20src%2Ftasks%2Fcli.py%0Afrom%20__future__%20import%20annotations%0A%0Aimport%20click%0A%0Afrom%20tasks.db%20import%20make_session_factory%0Afrom%20tasks.models%20import%20Status%0Afrom%20tasks.schemas%20import%20TaskCreate%2C%20TaskUpdate%0Afrom%20tasks.service%20import%20(%0A%20%20%20%20TaskNotFound%2C%0A%20%20%20%20create_task%2C%0A%20%20%20%20delete_task%2C%0A%20%20%20%20list_tasks%2C%0A%20%20%20%20update_task%2C%0A)%0A%0A%0A%40click.group()%0A%40click.option(%22--db%22%2C%20%22db_url%22%2C%20default%3D%22sqlite%3A%2F%2F%2Ftasks.db%22%2C%20help%3D%22SQLAlchemy%20URL%22)%0A%40click.pass_context%0Adef%20main(ctx%3A%20click.Context%2C%20db_url%3A%20str)%20-%3E%20None%3A%0A%20%20%20%20%22%22%22tasks%20%E2%80%94%20%E5%91%BD%E4%BB%A4%E5%88%97%E4%BB%BB%E5%8B%99%E7%AE%A1%E7%90%86%E3%80%82%22%22%22%0A%20%20%20%20%23%20%E6%B8%AC%E8%A9%A6%E6%99%82%E5%8F%AF%E7%94%A8%20runner.invoke(main%2C%20...%2C%20obj%3Dfactory)%20%E6%B3%A8%E5%85%A5%20in-memory%20factory%0A%20%20%20%20if%20ctx.obj%20is%20None%3A%0A%20%20%20%20%20%20%20%20ctx.obj%20%3D%20make_session_factory(db_url)%0A%0A%0A%40main.command()%0A%40click.argument(%22title%22)%0A%40click.pass_obj%0Adef%20add(factory%3A%20object%2C%20title%3A%20str)%20-%3E%20None%3A%0A%20%20%20%20with%20factory()%20as%20session%3A%20%20%23%20type%3A%20ignore%5Boperator%5D%0A%20%20%20%20%20%20%20%20task%20%3D%20create_task(session%2C%20TaskCreate(title%3Dtitle))%0A%20%20%20%20%20%20%20%20click.echo(f%22%23%7Btask.id%7D%20%7Btask.title%7D%20%5B%7Btask.status.value%7D%5D%22)%0A%0A%0A%40main.command(name%3D%22list%22)%0A%40click.option(%22--status%22%2C%20type%3Dclick.Choice(%5Bs.value%20for%20s%20in%20Status%5D)%2C%20default%3DNone)%0A%40click.pass_obj%0Adef%20list_cmd(factory%3A%20object%2C%20status%3A%20str%20%7C%20None)%20-%3E%20None%3A%0A%20%20%20%20with%20factory()%20as%20session%3A%20%20%23%20type%3A%20ignore%5Boperator%5D%0A%20%20%20%20%20%20%20%20wanted%20%3D%20Status(status)%20if%20status%20else%20None%0A%20%20%20%20%20%20%20%20for%20task%20in%20list_tasks(session%2C%20wanted)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20click.echo(f%22%23%7Btask.id%7D%20%7Btask.title%7D%20%5B%7Btask.status.value%7D%5D%22)%0A%0A%0A%40main.command()%0A%40click.argument(%22task_id%22%2C%20type%3Dint)%0A%40click.pass_obj%0Adef%20done(factory%3A%20object%2C%20task_id%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20with%20factory()%20as%20session%3A%20%20%23%20type%3A%20ignore%5Boperator%5D%0A%20%20%20%20%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20task%20%3D%20update_task(session%2C%20task_id%2C%20TaskUpdate(status%3DStatus.DONE))%0A%20%20%20%20%20%20%20%20except%20TaskNotFound%20as%20exc%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20raise%20click.ClickException(str(exc))%20from%20exc%0A%20%20%20%20%20%20%20%20click.echo(f%22%23%7Btask.id%7D%20%7Btask.title%7D%20%5B%7Btask.status.value%7D%5D%22)%0A%0A%0A%40main.command()%0A%40click.argument(%22task_id%22%2C%20type%3Dint)%0A%40click.pass_obj%0Adef%20rm(factory%3A%20object%2C%20task_id%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20with%20factory()%20as%20session%3A%20%20%23%20type%3A%20ignore%5Boperator%5D%0A%20%20%20%20%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20delete_task(session%2C%20task_id)%0A%20%20%20%20%20%20%20%20except%20TaskNotFound%20as%20exc%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20raise%20click.ClickException(str(exc))%20from%20exc%0A%20%20%20%20%20%20%20%20click.echo(f%22deleted%20%23%7Btask_id%7D%22)%0A%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20main()'), 'copy-btn-542')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># src/tasks/cli.py
+from __future__ import annotations
+
+import click
+
+from tasks.db import make_session_factory
+from tasks.models import Status
+from tasks.schemas import TaskCreate, TaskUpdate
+from tasks.service import (
+    TaskNotFound,
+    create_task,
+    delete_task,
+    list_tasks,
+    update_task,
+)
+
+
+@click.group()
+@click.option("--db", "db_url", default="sqlite:///tasks.db", help="SQLAlchemy URL")
+@click.pass_context
+def main(ctx: click.Context, db_url: str) -&gt; None:
+    """tasks — 命令列任務管理。"""
+    # 測試時可用 runner.invoke(main, ..., obj=factory) 注入 in-memory factory
+    if ctx.obj is None:
+        ctx.obj = make_session_factory(db_url)
+
+
+@main.command()
+@click.argument("title")
+@click.pass_obj
+def add(factory: object, title: str) -&gt; None:
+    with factory() as session:  # type: ignore[operator]
+        task = create_task(session, TaskCreate(title=title))
+        click.echo(f"#{task.id} {task.title} [{task.status.value}]")
+
+
+@main.command(name="list")
+@click.option("--status", type=click.Choice([s.value for s in Status]), default=None)
+@click.pass_obj
+def list_cmd(factory: object, status: str | None) -&gt; None:
+    with factory() as session:  # type: ignore[operator]
+        wanted = Status(status) if status else None
+        for task in list_tasks(session, wanted):
+            click.echo(f"#{task.id} {task.title} [{task.status.value}]")
+
+
+@main.command()
+@click.argument("task_id", type=int)
+@click.pass_obj
+def done(factory: object, task_id: int) -&gt; None:
+    with factory() as session:  # type: ignore[operator]
+        try:
+            task = update_task(session, task_id, TaskUpdate(status=Status.DONE))
+        except TaskNotFound as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(f"#{task.id} {task.title} [{task.status.value}]")
+
+
+@main.command()
+@click.argument("task_id", type=int)
+@click.pass_obj
+def rm(factory: object, task_id: int) -&gt; None:
+    with factory() as session:  # type: ignore[operator]
+        try:
+            delete_task(session, task_id)
+        except TaskNotFound as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(f"deleted #{task_id}")
+
+
+if __name__ == "__main__":
+    main()</code></pre>
+      </div>
+    <p>跑起來（用 file-based sqlite，狀態會持久化）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">console</span>
+          <button id="copy-btn-543" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20python%20-m%20tasks.cli%20add%20%22%E5%AF%AB%E7%AC%AC18%E7%AB%A0%22%0A%231%20%E5%AF%AB%E7%AC%AC18%E7%AB%A0%20%5Btodo%5D%0A%24%20python%20-m%20tasks.cli%20add%20%22%E8%B7%91%E6%B8%AC%E8%A9%A6%22%0A%232%20%E8%B7%91%E6%B8%AC%E8%A9%A6%20%5Btodo%5D%0A%24%20python%20-m%20tasks.cli%20list%0A%231%20%E5%AF%AB%E7%AC%AC18%E7%AB%A0%20%5Btodo%5D%0A%232%20%E8%B7%91%E6%B8%AC%E8%A9%A6%20%5Btodo%5D%0A%24%20python%20-m%20tasks.cli%20done%201%0A%231%20%E5%AF%AB%E7%AC%AC18%E7%AB%A0%20%5Bdone%5D%0A%24%20python%20-m%20tasks.cli%20list%20--status%20todo%0A%232%20%E8%B7%91%E6%B8%AC%E8%A9%A6%20%5Btodo%5D'), 'copy-btn-543')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-console"><code class="language-console">$ python -m tasks.cli add "寫第18章"
+#1 寫第18章 [todo]
+$ python -m tasks.cli add "跑測試"
+#2 跑測試 [todo]
+$ python -m tasks.cli list
+#1 寫第18章 [todo]
+#2 跑測試 [todo]
+$ python -m tasks.cli done 1
+#1 寫第18章 [done]
+$ python -m tasks.cli list --status todo
+#2 跑測試 [todo]</code></pre>
+      </div>
+    <p>CLI 的 <code>done</code> 指令在底層呼叫的是<strong>和 HTTP PATCH 完全相同的</strong> <code>service.update_task</code>。這就是分層的紅利：商業規則只實作一次。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：click 的子指令是 callback 函式，<code>@click.pass_obj</code> 把 <code>ctx.obj</code> 當第一個參數注入。Java 工程師容易想用全域變數或 module-level singleton 來傳 session——別這麼做，那會讓測試無法注入替身。用 <code>ctx.obj</code> 傳上下文，保持可測。</p>
+</div><hr>
+<h2 id="測試策略">測試策略</h2><p>承接第 13 章，分兩種測試：<strong>service 層的單元測試</strong>（純邏輯，最多最快）與<strong>入口層的整合測試</strong>（API / CLI 各一套）。所有測試都跑在 in-memory sqlite 上，零外部相依、毫秒級。</p>
+<h3 id="conftestpyin-memory-db-與-dependency-override">conftest.py：in-memory DB 與 dependency override</h3><p>這個 <code>conftest.py</code> 是測試基礎建設的核心，三個地方值得細看：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-544" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20tests%2Fconftest.py%0Afrom%20__future__%20import%20annotations%0A%0Afrom%20collections.abc%20import%20Iterator%0A%0Aimport%20pytest%0Afrom%20fastapi.testclient%20import%20TestClient%0Afrom%20sqlalchemy%20import%20create_engine%0Afrom%20sqlalchemy.orm%20import%20Session%2C%20sessionmaker%0Afrom%20sqlalchemy.pool%20import%20StaticPool%0A%0Afrom%20tasks.main%20import%20app%2C%20get_db%0Afrom%20tasks.models%20import%20Base%0A%0A%0A%40pytest.fixture%0Adef%20session_factory()%20-%3E%20sessionmaker%5BSession%5D%3A%0A%20%20%20%20engine%20%3D%20create_engine(%0A%20%20%20%20%20%20%20%20%22sqlite%3A%2F%2F%2F%3Amemory%3A%22%2C%0A%20%20%20%20%20%20%20%20connect_args%3D%7B%22check_same_thread%22%3A%20False%7D%2C%0A%20%20%20%20%20%20%20%20poolclass%3DStaticPool%2C%0A%20%20%20%20)%0A%20%20%20%20Base.metadata.create_all(engine)%0A%20%20%20%20return%20sessionmaker(bind%3Dengine)%0A%0A%0A%40pytest.fixture%0Adef%20session(session_factory%3A%20sessionmaker%5BSession%5D)%20-%3E%20Iterator%5BSession%5D%3A%0A%20%20%20%20with%20session_factory()%20as%20s%3A%0A%20%20%20%20%20%20%20%20yield%20s%0A%0A%0A%40pytest.fixture%0Adef%20client(session_factory%3A%20sessionmaker%5BSession%5D)%20-%3E%20Iterator%5BTestClient%5D%3A%0A%20%20%20%20def%20override_get_db()%20-%3E%20Iterator%5BSession%5D%3A%0A%20%20%20%20%20%20%20%20with%20session_factory()%20as%20s%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20yield%20s%0A%0A%20%20%20%20app.dependency_overrides%5Bget_db%5D%20%3D%20override_get_db%0A%20%20%20%20yield%20TestClient(app)%0A%20%20%20%20app.dependency_overrides.clear()'), 'copy-btn-544')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># tests/conftest.py
+from __future__ import annotations
+
+from collections.abc import Iterator
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from tasks.main import app, get_db
+from tasks.models import Base
+
+
+@pytest.fixture
+def session_factory() -&gt; sessionmaker[Session]:
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    return sessionmaker(bind=engine)
+
+
+@pytest.fixture
+def session(session_factory: sessionmaker[Session]) -&gt; Iterator[Session]:
+    with session_factory() as s:
+        yield s
+
+
+@pytest.fixture
+def client(session_factory: sessionmaker[Session]) -&gt; Iterator[TestClient]:
+    def override_get_db() -&gt; Iterator[Session]:
+        with session_factory() as s:
+            yield s
+
+    app.dependency_overrides[get_db] = override_get_db
+    yield TestClient(app)
+    app.dependency_overrides.clear()</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>sqlite:///:memory:</code> 的記憶體資料庫是<strong>綁在連線（connection）上</strong>的——連線一關，資料就沒了。SQLAlchemy 預設的連線池每次 checkout 可能給你<strong>不同連線</strong>，於是 <code>create_all</code> 建的表在下一次查詢時「消失」（<code>no such table: tasks</code>）。解法是 <code>poolclass=StaticPool</code> 強制所有 session 共用同一條連線，<code>check_same_thread=False</code> 則允許 TestClient 跨執行緒使用它。要精確一點說：這個「no such table」只在連線池真的發出<strong>不同連線</strong>時才會浮現——例如 TestClient 把 sync endpoint 丟進 threadpool、跨執行緒 checkout 另一條連線時；若整個測試只在單一連線上順序重用，未必每次都觸發。但 in-memory sqlite 測試一律用 <code>StaticPool</code> 是穩當的標準建議，不必賭它哪次會踩到。這是經典坑，我在寫這章時也實際踩到了。</p>
+</div><p><code>client</code> fixture 用 <code>app.dependency_overrides[get_db] = ...</code> 把 production 的 <code>get_db</code> 換成測試版——這就是 FastAPI 的依賴覆寫機制，等同 Spring Test 的 <code>@MockBean</code>，但更輕：一個 dict 賦值而已。測試結束 <code>clear()</code> 還原，避免污染其他測試。</p>
+<h3 id="service-單元測試">service 單元測試</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-545" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20tests%2Ftest_service.py%0Afrom%20__future__%20import%20annotations%0A%0Aimport%20pytest%0Afrom%20sqlalchemy.orm%20import%20Session%0A%0Afrom%20tasks.models%20import%20Status%0Afrom%20tasks.schemas%20import%20TaskCreate%2C%20TaskUpdate%0Afrom%20tasks.service%20import%20(%0A%20%20%20%20TaskNotFound%2C%0A%20%20%20%20create_task%2C%0A%20%20%20%20delete_task%2C%0A%20%20%20%20get_task%2C%0A%20%20%20%20list_tasks%2C%0A%20%20%20%20update_task%2C%0A)%0A%0A%0Adef%20test_create_defaults_to_todo(session%3A%20Session)%20-%3E%20None%3A%0A%20%20%20%20task%20%3D%20create_task(session%2C%20TaskCreate(title%3D%22%E8%B2%B7%E7%89%9B%E5%A5%B6%22))%0A%20%20%20%20assert%20task.id%20is%20not%20None%0A%20%20%20%20assert%20task.status%20is%20Status.TODO%0A%0A%0Adef%20test_update_status(session%3A%20Session)%20-%3E%20None%3A%0A%20%20%20%20task%20%3D%20create_task(session%2C%20TaskCreate(title%3D%22%E5%AF%AB%E6%B8%AC%E8%A9%A6%22))%0A%20%20%20%20updated%20%3D%20update_task(session%2C%20task.id%2C%20TaskUpdate(status%3DStatus.DONE))%0A%20%20%20%20assert%20updated.status%20is%20Status.DONE%0A%0A%0Adef%20test_list_filters_by_status(session%3A%20Session)%20-%3E%20None%3A%0A%20%20%20%20a%20%3D%20create_task(session%2C%20TaskCreate(title%3D%22a%22))%0A%20%20%20%20create_task(session%2C%20TaskCreate(title%3D%22b%22))%0A%20%20%20%20update_task(session%2C%20a.id%2C%20TaskUpdate(status%3DStatus.DONE))%0A%20%20%20%20done%20%3D%20list_tasks(session%2C%20Status.DONE)%0A%20%20%20%20assert%20%5Bt.title%20for%20t%20in%20done%5D%20%3D%3D%20%5B%22a%22%5D%0A%0A%0Adef%20test_delete_removes_task(session%3A%20Session)%20-%3E%20None%3A%0A%20%20%20%20task%20%3D%20create_task(session%2C%20TaskCreate(title%3D%22%E5%BE%85%E5%88%AA%22))%0A%20%20%20%20delete_task(session%2C%20task.id)%0A%20%20%20%20with%20pytest.raises(TaskNotFound)%3A%0A%20%20%20%20%20%20%20%20get_task(session%2C%20task.id)%0A%0A%0Adef%20test_get_missing_raises(session%3A%20Session)%20-%3E%20None%3A%0A%20%20%20%20with%20pytest.raises(TaskNotFound)%3A%0A%20%20%20%20%20%20%20%20get_task(session%2C%20999)'), 'copy-btn-545')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># tests/test_service.py
+from __future__ import annotations
+
+import pytest
+from sqlalchemy.orm import Session
+
+from tasks.models import Status
+from tasks.schemas import TaskCreate, TaskUpdate
+from tasks.service import (
+    TaskNotFound,
+    create_task,
+    delete_task,
+    get_task,
+    list_tasks,
+    update_task,
+)
+
+
+def test_create_defaults_to_todo(session: Session) -&gt; None:
+    task = create_task(session, TaskCreate(title="買牛奶"))
+    assert task.id is not None
+    assert task.status is Status.TODO
+
+
+def test_update_status(session: Session) -&gt; None:
+    task = create_task(session, TaskCreate(title="寫測試"))
+    updated = update_task(session, task.id, TaskUpdate(status=Status.DONE))
+    assert updated.status is Status.DONE
+
+
+def test_list_filters_by_status(session: Session) -&gt; None:
+    a = create_task(session, TaskCreate(title="a"))
+    create_task(session, TaskCreate(title="b"))
+    update_task(session, a.id, TaskUpdate(status=Status.DONE))
+    done = list_tasks(session, Status.DONE)
+    assert [t.title for t in done] == ["a"]
+
+
+def test_delete_removes_task(session: Session) -&gt; None:
+    task = create_task(session, TaskCreate(title="待刪"))
+    delete_task(session, task.id)
+    with pytest.raises(TaskNotFound):
+        get_task(session, task.id)
+
+
+def test_get_missing_raises(session: Session) -&gt; None:
+    with pytest.raises(TaskNotFound):
+        get_task(session, 999)</code></pre>
+      </div>
+    <p>service 測試不碰 HTTP、不碰 CLI，純粹餵 session 與 schema、驗結果。<code>with pytest.raises(TaskNotFound)</code> 對照 JUnit 的 <code>assertThrows</code>。</p>
+<h3 id="api-整合測試fastapi-testclient">API 整合測試（FastAPI TestClient）</h3><p><code>TestClient</code> 用 in-process 的方式打 app，<strong>不需要真的啟動 server</strong>（底層走 ASGI transport），所以又快又穩。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-546" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20tests%2Ftest_api.py%0Afrom%20__future__%20import%20annotations%0A%0Afrom%20fastapi.testclient%20import%20TestClient%0A%0A%0Adef%20test_create_and_get(client%3A%20TestClient)%20-%3E%20None%3A%0A%20%20%20%20resp%20%3D%20client.post(%22%2Ftasks%22%2C%20json%3D%7B%22title%22%3A%20%22%E8%B2%B7%E5%92%96%E5%95%A1%22%7D)%0A%20%20%20%20assert%20resp.status_code%20%3D%3D%20201%0A%20%20%20%20task_id%20%3D%20resp.json()%5B%22id%22%5D%0A%0A%20%20%20%20got%20%3D%20client.get(f%22%2Ftasks%2F%7Btask_id%7D%22)%0A%20%20%20%20assert%20got.status_code%20%3D%3D%20200%0A%20%20%20%20assert%20got.json()%5B%22title%22%5D%20%3D%3D%20%22%E8%B2%B7%E5%92%96%E5%95%A1%22%0A%20%20%20%20assert%20got.json()%5B%22status%22%5D%20%3D%3D%20%22todo%22%0A%0A%0Adef%20test_validation_rejects_empty_title(client%3A%20TestClient)%20-%3E%20None%3A%0A%20%20%20%20resp%20%3D%20client.post(%22%2Ftasks%22%2C%20json%3D%7B%22title%22%3A%20%22%22%7D)%0A%20%20%20%20assert%20resp.status_code%20%3D%3D%20422%0A%0A%0Adef%20test_patch_status(client%3A%20TestClient)%20-%3E%20None%3A%0A%20%20%20%20task_id%20%3D%20client.post(%22%2Ftasks%22%2C%20json%3D%7B%22title%22%3A%20%22x%22%7D).json()%5B%22id%22%5D%0A%20%20%20%20resp%20%3D%20client.patch(f%22%2Ftasks%2F%7Btask_id%7D%22%2C%20json%3D%7B%22status%22%3A%20%22done%22%7D)%0A%20%20%20%20assert%20resp.status_code%20%3D%3D%20200%0A%20%20%20%20assert%20resp.json()%5B%22status%22%5D%20%3D%3D%20%22done%22%0A%0A%0Adef%20test_missing_returns_404(client%3A%20TestClient)%20-%3E%20None%3A%0A%20%20%20%20assert%20client.get(%22%2Ftasks%2F424242%22).status_code%20%3D%3D%20404'), 'copy-btn-546')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># tests/test_api.py
+from __future__ import annotations
+
+from fastapi.testclient import TestClient
+
+
+def test_create_and_get(client: TestClient) -&gt; None:
+    resp = client.post("/tasks", json={"title": "買咖啡"})
+    assert resp.status_code == 201
+    task_id = resp.json()["id"]
+
+    got = client.get(f"/tasks/{task_id}")
+    assert got.status_code == 200
+    assert got.json()["title"] == "買咖啡"
+    assert got.json()["status"] == "todo"
+
+
+def test_validation_rejects_empty_title(client: TestClient) -&gt; None:
+    resp = client.post("/tasks", json={"title": ""})
+    assert resp.status_code == 422
+
+
+def test_patch_status(client: TestClient) -&gt; None:
+    task_id = client.post("/tasks", json={"title": "x"}).json()["id"]
+    resp = client.patch(f"/tasks/{task_id}", json={"status": "done"})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "done"
+
+
+def test_missing_returns_404(client: TestClient) -&gt; None:
+    assert client.get("/tasks/424242").status_code == 404</code></pre>
+      </div>
+    <p><code>test_validation_rejects_empty_title</code> 證明了第二節的論點：空 title 在 pydantic 邊界就被擋下回 422，這個驗證<strong>我們一行都沒寫</strong>，是 <code>Field(min_length=1)</code> 自動產生的。</p>
+<h3 id="cli-整合測試click-clirunner">CLI 整合測試（click CliRunner）</h3><p>click 提供 <code>CliRunner</code> 在 process 內執行指令、攔截輸出與 exit code，對照 picocli 的測試 API。我們透過 <code>obj=session_factory</code> 注入 in-memory 工廠。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-547" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20tests%2Ftest_cli.py%0Afrom%20__future__%20import%20annotations%0A%0Afrom%20click.testing%20import%20CliRunner%0Afrom%20sqlalchemy.orm%20import%20Session%2C%20sessionmaker%0A%0Afrom%20tasks.cli%20import%20main%0A%0A%0Adef%20test_add_and_list(session_factory%3A%20sessionmaker%5BSession%5D)%20-%3E%20None%3A%0A%20%20%20%20runner%20%3D%20CliRunner()%0A%20%20%20%20add%20%3D%20runner.invoke(main%2C%20%5B%22add%22%2C%20%22%E8%B2%B7%E7%89%9B%E5%A5%B6%22%5D%2C%20obj%3Dsession_factory)%0A%20%20%20%20assert%20add.exit_code%20%3D%3D%200%0A%20%20%20%20assert%20%22%231%20%E8%B2%B7%E7%89%9B%E5%A5%B6%20%5Btodo%5D%22%20in%20add.output%0A%0A%20%20%20%20listed%20%3D%20runner.invoke(main%2C%20%5B%22list%22%5D%2C%20obj%3Dsession_factory)%0A%20%20%20%20assert%20%22%231%20%E8%B2%B7%E7%89%9B%E5%A5%B6%20%5Btodo%5D%22%20in%20listed.output%0A%0A%0Adef%20test_rm_deletes(session_factory%3A%20sessionmaker%5BSession%5D)%20-%3E%20None%3A%0A%20%20%20%20runner%20%3D%20CliRunner()%0A%20%20%20%20runner.invoke(main%2C%20%5B%22add%22%2C%20%22%E5%BE%85%E5%88%AA%22%5D%2C%20obj%3Dsession_factory)%0A%20%20%20%20removed%20%3D%20runner.invoke(main%2C%20%5B%22rm%22%2C%20%221%22%5D%2C%20obj%3Dsession_factory)%0A%20%20%20%20assert%20removed.exit_code%20%3D%3D%200%0A%20%20%20%20assert%20%22deleted%20%231%22%20in%20removed.output%0A%0A%20%20%20%20listed%20%3D%20runner.invoke(main%2C%20%5B%22list%22%5D%2C%20obj%3Dsession_factory)%0A%20%20%20%20assert%20%22%E5%BE%85%E5%88%AA%22%20not%20in%20listed.output%0A%0A%0Adef%20test_done_missing_errors(session_factory%3A%20sessionmaker%5BSession%5D)%20-%3E%20None%3A%0A%20%20%20%20runner%20%3D%20CliRunner()%0A%20%20%20%20result%20%3D%20runner.invoke(main%2C%20%5B%22done%22%2C%20%22999%22%5D%2C%20obj%3Dsession_factory)%0A%20%20%20%20assert%20result.exit_code%20!%3D%200%0A%20%20%20%20assert%20%22not%20found%22%20in%20result.output'), 'copy-btn-547')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># tests/test_cli.py
+from __future__ import annotations
+
+from click.testing import CliRunner
+from sqlalchemy.orm import Session, sessionmaker
+
+from tasks.cli import main
+
+
+def test_add_and_list(session_factory: sessionmaker[Session]) -&gt; None:
+    runner = CliRunner()
+    add = runner.invoke(main, ["add", "買牛奶"], obj=session_factory)
+    assert add.exit_code == 0
+    assert "#1 買牛奶 [todo]" in add.output
+
+    listed = runner.invoke(main, ["list"], obj=session_factory)
+    assert "#1 買牛奶 [todo]" in listed.output
+
+
+def test_rm_deletes(session_factory: sessionmaker[Session]) -&gt; None:
+    runner = CliRunner()
+    runner.invoke(main, ["add", "待刪"], obj=session_factory)
+    removed = runner.invoke(main, ["rm", "1"], obj=session_factory)
+    assert removed.exit_code == 0
+    assert "deleted #1" in removed.output
+
+    listed = runner.invoke(main, ["list"], obj=session_factory)
+    assert "待刪" not in listed.output
+
+
+def test_done_missing_errors(session_factory: sessionmaker[Session]) -&gt; None:
+    runner = CliRunner()
+    result = runner.invoke(main, ["done", "999"], obj=session_factory)
+    assert result.exit_code != 0
+    assert "not found" in result.output</code></pre>
+      </div>
+    <p>跑整套（<code>addopts</code> 已設定 coverage 門檻）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">console</span>
+          <button id="copy-btn-548" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20run%20pytest%20-q%0A............%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5B100%25%5D%0AName%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20Stmts%20%20%20Miss%20%20Cover%20%20%20Missing%0A-----------------------------------------------------%0Asrc%2Ftasks%2F__init__.py%20%20%20%20%20%20%201%20%20%20%20%20%200%20%20%20100%25%0Asrc%2Ftasks%2Fcli.py%20%20%20%20%20%20%20%20%20%20%2049%20%20%20%20%20%205%20%20%20%2090%25%20%20%2025%2C%2056%2C%2066-67%2C%2072%0Asrc%2Ftasks%2Fdb.py%20%20%20%20%20%20%20%20%20%20%20%2011%20%20%20%20%20%200%20%20%20100%25%0Asrc%2Ftasks%2Fmain.py%20%20%20%20%20%20%20%20%20%2041%20%20%20%20%2011%20%20%20%2073%25%20%20%2028-32%2C%2045%2C%2060-61%2C%2066-69%0Asrc%2Ftasks%2Fmodels.py%20%20%20%20%20%20%20%2019%20%20%20%20%20%200%20%20%20100%25%0Asrc%2Ftasks%2Fschemas.py%20%20%20%20%20%20%2015%20%20%20%20%20%200%20%20%20100%25%0Asrc%2Ftasks%2Fservice.py%20%20%20%20%20%20%2038%20%20%20%20%20%201%20%20%20%2097%25%20%20%2042%0A-----------------------------------------------------%0ATOTAL%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20174%20%20%20%20%2017%20%20%20%2090%25%0ARequired%20test%20coverage%20of%2085%25%20reached.%20Total%20coverage%3A%2090.23%25%0A12%20passed%20in%200.09s'), 'copy-btn-548')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-console"><code class="language-console">$ uv run pytest -q
+............                                                       [100%]
+Name                    Stmts   Miss  Cover   Missing
+-----------------------------------------------------
+src/tasks/__init__.py       1      0   100%
+src/tasks/cli.py           49      5    90%   25, 56, 66-67, 72
+src/tasks/db.py            11      0   100%
+src/tasks/main.py          41     11    73%   28-32, 45, 60-61, 66-69
+src/tasks/models.py        19      0   100%
+src/tasks/schemas.py       15      0   100%
+src/tasks/service.py       38      1    97%   42
+-----------------------------------------------------
+TOTAL                     174     17    90%
+Required test coverage of 85% reached. Total coverage: 90.23%
+12 passed in 0.09s</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：注意 coverage 分佈——<code>service.py</code> 97%、<code>schemas.py</code> 100%，但 <code>main.py</code> 只 73%。這是健康的：核心邏輯該被測到爛，入口層的薄翻譯碼可以容忍缺口。盲目追求 100% 會逼你寫無意義的測試；85% 門檻 + 高覆蓋的核心，才是務實的目標。</p>
+</div><hr>
+<h2 id="工程品質門檻ruff-mypy-coverage-全綠">工程品質門檻：ruff + mypy + coverage 全綠</h2><p>Java 的品質門檻你熟得很：Checkstyle 管風格、SpotBugs 抓 bug、JaCoCo 卡覆蓋率、編譯器擋型別。Python 把這些換成更少、更快的工具，全部設定收斂在一個 <code>pyproject.toml</code>。</p>
+<h3 id="pyprojecttoml單一設定中心">pyproject.toml：單一設定中心</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">toml</span>
+          <button id="copy-btn-549" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%5Bproject%5D%0Aname%20%3D%20%22tasks%22%0Aversion%20%3D%20%220.1.0%22%0Arequires-python%20%3D%20%22%3E%3D3.12%22%0Adependencies%20%3D%20%5B%0A%20%20%20%20%22fastapi%3E%3D0.115%22%2C%0A%20%20%20%20%22sqlalchemy%3E%3D2.0%22%2C%0A%20%20%20%20%22pydantic%3E%3D2.7%22%2C%0A%20%20%20%20%22click%3E%3D8.1%22%2C%0A%5D%0A%0A%5Bproject.scripts%5D%0Atasks%20%3D%20%22tasks.cli%3Amain%22%0A%0A%5Bdependency-groups%5D%0Adev%20%3D%20%5B%0A%20%20%20%20%22pytest%3E%3D8%22%2C%0A%20%20%20%20%22pytest-cov%22%2C%0A%20%20%20%20%22ruff%22%2C%0A%20%20%20%20%22mypy%22%2C%0A%20%20%20%20%22httpx%22%2C%0A%5D%0A%0A%5Bbuild-system%5D%0Arequires%20%3D%20%5B%22hatchling%22%5D%0Abuild-backend%20%3D%20%22hatchling.build%22%0A%0A%5Btool.ruff%5D%0Aline-length%20%3D%20100%0Asrc%20%3D%20%5B%22src%22%2C%20%22tests%22%5D%0A%0A%5Btool.ruff.lint%5D%0Aselect%20%3D%20%5B%22E%22%2C%20%22F%22%2C%20%22I%22%2C%20%22UP%22%2C%20%22B%22%2C%20%22SIM%22%5D%0A%0A%5Btool.mypy%5D%0Astrict%20%3D%20true%0Amypy_path%20%3D%20%22src%22%0A%0A%5Btool.pytest.ini_options%5D%0Apythonpath%20%3D%20%5B%22src%22%5D%0Aaddopts%20%3D%20%22--cov%3Dtasks%20--cov-report%3Dterm-missing%20--cov-fail-under%3D85%22'), 'copy-btn-549')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-toml"><code class="language-toml">[project]
+name = "tasks"
+version = "0.1.0"
+requires-python = "&gt;=3.12"
+dependencies = [
+    "fastapi&gt;=0.115",
+    "sqlalchemy&gt;=2.0",
+    "pydantic&gt;=2.7",
+    "click&gt;=8.1",
+]
+
+[project.scripts]
+tasks = "tasks.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest&gt;=8",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+    "httpx",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts = "--cov=tasks --cov-report=term-missing --cov-fail-under=85"</code></pre>
+      </div>
+    <p>注意 <code>[dependency-groups]</code> 的 <code>dev</code> 群組——pytest、pytest-cov、ruff、mypy 這些品管工具只在開發/CI 時需要，不該混進 <code>[project].dependencies</code> 跟著 wheel 散佈出去（對照 Maven 的 <code>&lt;scope&gt;test&lt;/scope&gt;</code>）。本機與 CI 用 <code>uv sync --dev</code> 一次裝齊，之後所有 <code>uv run ruff</code>/<code>uv run mypy</code>/<code>uv run pytest</code> 才有可執行檔可用。<code>httpx</code> 是 FastAPI <code>TestClient</code> 的相依，也歸在這裡。</p>
+<table>
+<thead>
+<tr>
+<th>Java 工具</th>
+<th>本專案</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Checkstyle + SpotBugs</td>
+<td>ruff lint（<code>E</code>/<code>F</code>/<code>B</code>/<code>SIM</code>）</td>
+<td>風格 + 常見 bug，毫秒級</td>
+</tr>
+<tr>
+<td>Spotless / google-java-format</td>
+<td>ruff format</td>
+<td>格式化，取代 black</td>
+</tr>
+<tr>
+<td>javac 型別檢查</td>
+<td>mypy <code>strict</code></td>
+<td>第 9 章，最嚴格的漸進式型別</td>
+</tr>
+<tr>
+<td>JaCoCo 門檻</td>
+<td>pytest-cov <code>--cov-fail-under=85</code></td>
+<td>低於 85% 直接 fail</td>
+</tr>
+</tbody></table>
+<p><code>select</code> 裡的 <code>UP</code> 規則特別值得一提：它會把舊寫法升級成現代語法。我在寫這章時，<code>datetime.now(timezone.utc)</code> 就被 <code>UP017</code> 揪出來，建議改成 <code>datetime.now(UTC)</code>——這正是讓程式碼跟上 3.12+ 的免費守門員。</p>
+<p>三道門檻一次跑：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">console</span>
+          <button id="copy-btn-550" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20run%20ruff%20check%20src%20tests%0AAll%20checks%20passed!%0A%24%20uv%20run%20mypy%20src%20tests%0ASuccess%3A%20no%20issues%20found%20in%2011%20source%20files%0A%24%20uv%20run%20pytest%20-q%0A12%20passed%20in%200.09s'), 'copy-btn-550')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-console"><code class="language-console">$ uv run ruff check src tests
+All checks passed!
+$ uv run mypy src tests
+Success: no issues found in 11 source files
+$ uv run pytest -q
+12 passed in 0.09s</code></pre>
+      </div>
+    <p>mypy <code>strict</code> 過了 11 個檔案（含測試）這件事不平凡：它逼你給每個函式回傳型別、不准 implicit <code>Any</code>、不准漏掉 <code>Optional</code>。寫這章時它就抓到 <code>make_engine</code> 漏標回傳型別——一個 Java 工程師絕不會放過的等級。</p>
+<h3 id="pre-commit-hook">pre-commit hook</h3><p>對照 Git 的 pre-commit、或 Maven 的 <code>validate</code> phase，把門檻前移到 commit 當下：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">yaml</span>
+          <button id="copy-btn-551" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20.pre-commit-config.yaml%0Arepos%3A%0A%20%20-%20repo%3A%20https%3A%2F%2Fgithub.com%2Fastral-sh%2Fruff-pre-commit%0A%20%20%20%20rev%3A%20v0.8.0%0A%20%20%20%20hooks%3A%0A%20%20%20%20%20%20-%20id%3A%20ruff%20%20%20%20%20%20%20%20%20%20%23%20lint%0A%20%20%20%20%20%20%20%20args%3A%20%5B--fix%5D%0A%20%20%20%20%20%20-%20id%3A%20ruff-format%20%20%20%23%20format%0A%20%20-%20repo%3A%20https%3A%2F%2Fgithub.com%2Fpre-commit%2Fmirrors-mypy%0A%20%20%20%20rev%3A%20v1.13.0%0A%20%20%20%20hooks%3A%0A%20%20%20%20%20%20-%20id%3A%20mypy%0A%20%20%20%20%20%20%20%20additional_dependencies%3A%20%5Bpydantic%2C%20sqlalchemy%5D'), 'copy-btn-551')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-yaml"><code class="language-yaml"># .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.0
+    hooks:
+      - id: ruff          # lint
+        args: [--fix]
+      - id: ruff-format   # format
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [pydantic, sqlalchemy]</code></pre>
+      </div>
+    <p><code>pre-commit install</code> 後，每次 <code>git commit</code> 自動跑 ruff + mypy，不過不讓你 commit。本機就擋下九成的 CI 紅燈。</p>
+<h3 id="github-actions-ci">GitHub Actions CI</h3><p>對照 Jenkins pipeline 或 Maven 的 GitHub Actions，這份 workflow 把四道關卡串成 matrix——lint、type-check、test、build，跨 3.12 / 3.13 兩個版本：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">yaml</span>
+          <button id="copy-btn-552" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20.github%2Fworkflows%2Fci.yml%0Aname%3A%20CI%0Aon%3A%20%5Bpush%2C%20pull_request%5D%0A%0Ajobs%3A%0A%20%20quality%3A%0A%20%20%20%20runs-on%3A%20ubuntu-latest%0A%20%20%20%20strategy%3A%0A%20%20%20%20%20%20matrix%3A%0A%20%20%20%20%20%20%20%20python-version%3A%20%5B%223.12%22%2C%20%223.13%22%5D%0A%20%20%20%20steps%3A%0A%20%20%20%20%20%20-%20uses%3A%20actions%2Fcheckout%40v4%0A%20%20%20%20%20%20-%20uses%3A%20astral-sh%2Fsetup-uv%40v5%0A%20%20%20%20%20%20%20%20with%3A%0A%20%20%20%20%20%20%20%20%20%20python-version%3A%20%24%7B%7B%20matrix.python-version%20%7D%7D%0A%20%20%20%20%20%20-%20run%3A%20uv%20sync%20--dev%0A%20%20%20%20%20%20-%20name%3A%20Lint%0A%20%20%20%20%20%20%20%20run%3A%20uv%20run%20ruff%20check%20.%0A%20%20%20%20%20%20-%20name%3A%20Format%20check%0A%20%20%20%20%20%20%20%20run%3A%20uv%20run%20ruff%20format%20--check%20.%0A%20%20%20%20%20%20-%20name%3A%20Type%20check%0A%20%20%20%20%20%20%20%20run%3A%20uv%20run%20mypy%20src%20tests%0A%20%20%20%20%20%20-%20name%3A%20Test%0A%20%20%20%20%20%20%20%20run%3A%20uv%20run%20pytest%0A%20%20%20%20%20%20-%20name%3A%20Build%0A%20%20%20%20%20%20%20%20run%3A%20uv%20build'), 'copy-btn-552')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-yaml"><code class="language-yaml"># .github/workflows/ci.yml
+name: CI
+on: [push, pull_request]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: uv sync --dev
+      - name: Lint
+        run: uv run ruff check .
+      - name: Format check
+        run: uv run ruff format --check .
+      - name: Type check
+        run: uv run mypy src tests
+      - name: Test
+        run: uv run pytest
+      - name: Build
+        run: uv build</code></pre>
+      </div>
+    <p><code>setup-uv</code> 取代了 Java 的 <code>setup-java</code> + 快取設定；<code>uv sync</code> 比 Maven 的 dependency resolution 快一個數量級。matrix 跨版本對照你在 Java 跨 JDK 17/21 測試的習慣。</p>
+<hr>
+<h2 id="打包與發佈">打包與發佈</h2><p>承接第 11 章，<code>uv build</code> 同時產 wheel（二進位散佈）與 sdist（原始碼散佈）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">console</span>
+          <button id="copy-btn-553" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20build%0ABuilding%20source%20distribution...%0ABuilding%20wheel%20from%20source%20distribution...%0ASuccessfully%20built%20dist%2Ftasks-0.1.0.tar.gz%0ASuccessfully%20built%20dist%2Ftasks-0.1.0-py3-none-any.whl'), 'copy-btn-553')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-console"><code class="language-console">$ uv build
+Building source distribution...
+Building wheel from source distribution...
+Successfully built dist/tasks-0.1.0.tar.gz
+Successfully built dist/tasks-0.1.0-py3-none-any.whl</code></pre>
+      </div>
+    <p><code>pyproject.toml</code> 裡的 <code>[project.scripts]</code> 是把 CLI 變成可安裝指令的關鍵——它對照 Maven 的 shade plugin + manifest <code>Main-Class</code>，但更乾淨。<code>tasks = &quot;tasks.cli:main&quot;</code> 這行讓 wheel 裡產生一個 console script entry point：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">console</span>
+          <button id="copy-btn-554" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20unzip%20-p%20dist%2Ftasks-0.1.0-py3-none-any.whl%20%27*%2Fentry_points.txt%27%0A%5Bconsole_scripts%5D%0Atasks%20%3D%20tasks.cli%3Amain'), 'copy-btn-554')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-console"><code class="language-console">$ unzip -p dist/tasks-0.1.0-py3-none-any.whl '*/entry_points.txt'
+[console_scripts]
+tasks = tasks.cli:main</code></pre>
+      </div>
+    <p>任何人 <code>pip install tasks-0.1.0-py3-none-any.whl</code> 之後，shell 裡就多了一個 <code>tasks</code> 指令，直接 <code>tasks add &quot;...&quot;</code> 即可——不必 <code>python -m</code>。版本號統一由 <code>[project].version</code> 管理（也可用 hatch-vcs 從 git tag 自動推導）。要發佈到 PyPI，一句 <code>uv publish</code>（或 <code>twine upload dist/*</code>）即可，配合 PyPI 的 trusted publishing 還能免 token。</p>
+<hr>
+<h2 id="收尾全書-checklist">收尾：全書 checklist</h2><p>這個小專案是前十七章的縮影。對照下表，確認每個關鍵觀念都在這裡落了地——這就是你帶走的「資深 Python 工程師檢查表」：</p>
+<table>
+<thead>
+<tr>
+<th>章</th>
+<th>觀念</th>
+<th>在本專案的落地</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>uv / pyproject / ruff / mypy 工具鏈</td>
+<td>單一 <code>pyproject.toml</code> 收斂全部設定，<code>uv run</code> 驅動一切</td>
+</tr>
+<tr>
+<td>2–3</td>
+<td>一切皆物件、函式即一等公民</td>
+<td>service 是模組層級函式，當作值傳遞、被兩個入口共用</td>
+</tr>
+<tr>
+<td>4–5</td>
+<td>Pythonic 資料結構與慣用法</td>
+<td>comprehension（<code>[t.title for t in ...]</code>）、<code>with</code> 管理 session</td>
+</tr>
+<tr>
+<td>6</td>
+<td>迭代器與產生器</td>
+<td><code>get_db</code> 是 generator dependency，yield session、finally 收尾</td>
+</tr>
+<tr>
+<td>7–8</td>
+<td>類別、<code>@property</code>、協定</td>
+<td>SQLAlchemy <code>DeclarativeBase</code> model、<code>StrEnum</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>型別三分（pydantic / dataclass / ORM）</td>
+<td>schema / model 各司其職，mypy strict 全綠</td>
+</tr>
+<tr>
+<td>10</td>
+<td>裝飾器</td>
+<td><code>@app.post</code>、<code>@main.command</code>、<code>@click.pass_obj</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td>src layout、entry point、打包</td>
+<td><code>src/tasks/</code>、<code>[project.scripts]</code>、<code>uv build</code> 出 wheel</td>
+</tr>
+<tr>
+<td>12</td>
+<td>例外與防禦</td>
+<td>自訂 <code>TaskNotFound</code>、<code>raise ... from exc</code> 保留例外鏈</td>
+</tr>
+<tr>
+<td>13</td>
+<td>pytest、fixture、覆寫、coverage</td>
+<td>in-memory DB fixture、<code>dependency_overrides</code>、85% 門檻</td>
+</tr>
+<tr>
+<td>14</td>
+<td>並行模型認知</td>
+<td>FastAPI sync endpoint 跑在 threadpool；session 不可跨 thread 共用</td>
+</tr>
+<tr>
+<td>15</td>
+<td>pathlib / CLI / 標準庫</td>
+<td>click CLI、<code>datetime.now(UTC)</code>、sqlite</td>
+</tr>
+<tr>
+<td>16</td>
+<td>FastAPI ↔ Spring Boot</td>
+<td><code>Depends</code> 注入、<code>response_model</code>、TestClient</td>
+</tr>
+<tr>
+<td>17</td>
+<td>資料處理思維</td>
+<td>service 用 <code>select()</code> 宣告式查詢，對照 Stream/SQL</td>
+</tr>
+</tbody></table>
+<p>如果你能從零把這個專案重建一遍、讓三道門檻全綠、產出可安裝的 wheel——那你已經不是「會寫 Python 的 Java 工程師」，而是「會用 Python 交付的工程師」了。剩下的只是把這個骨架放大：換個資料庫、加認證、上容器。架構與紀律不變。</p>
+<hr>
+<h2 id="本章小結">本章小結</h2><ol>
+<li><strong>分層靠相依方向，不靠註解</strong>：<code>service.py</code> 不 import <code>fastapi</code>/<code>click</code>，才能讓「一份核心、兩種入口」成立。這是整個專案最重要的設計決策。</li>
+<li><strong>型別三分</strong>：pydantic 守 API 邊界（驗證 + 序列化）、SQLAlchemy model 管持久、邊界內傳 ORM 物件或 dataclass。不要混用。</li>
+<li><strong>驗證集中在邊界</strong>：<code>Field(min_length=1)</code> 讓空 title 在進 service 前就回 422，core 不必寫防禦碼。</li>
+<li><strong>service 用例外表達失敗</strong>：丟自訂 <code>TaskNotFound</code>，由各入口層翻譯成 HTTP 404 或 CLI 非零 exit code，保留例外鏈。</li>
+<li><strong>測試靠注入替身</strong>：FastAPI 用 <code>dependency_overrides</code>、click 用 <code>obj=</code>、DB 用 in-memory sqlite + <code>StaticPool</code>。記得 in-memory sqlite 必須用 <code>StaticPool</code> 共用連線，否則「no such table」。</li>
+<li><strong>三道門檻全綠</strong>：ruff（lint+format）、mypy <code>strict</code>、pytest-cov（<code>--cov-fail-under</code>），全收斂在 <code>pyproject.toml</code>，由 pre-commit 與 GitHub Actions matrix 自動把關。</li>
+<li><strong>打包靠 entry point</strong>：<code>[project.scripts]</code> 把 CLI 變成可安裝指令，<code>uv build</code> 出 wheel/sdist，<code>uv publish</code> 上 PyPI。</li>
+<li><strong>務實的覆蓋率</strong>：核心邏輯逼近 100%、入口層容忍缺口，整體守住 85%。不要為了數字寫沒意義的測試。</li>
+</ol>
+<h2 id="練習">練習</h2><ol>
+<li><strong>加一層快取</strong>：在 <code>service.list_tasks</code> 前面加一個記憶體快取（<code>functools.lru_cache</code> 不適用於有 session 參數的情況，想想為什麼），並寫測試證明 <code>create_task</code> 後快取會失效。提示：快取要以「是否有寫入」為失效依據，思考它該放在 service 層還是入口層。</li>
+<li><strong>補 PUT 與分頁</strong>：替 API 加 <code>PUT /tasks/{id}</code>（全量取代，對照 PATCH 的部分更新語意差異）與 <code>GET /tasks?limit=&amp;offset=</code> 分頁。CLI 的 <code>list</code> 也加 <code>--limit</code>。確認新程式碼讓 coverage 不掉到 85% 以下。</li>
+<li><strong>把例外翻譯抽成 exception handler</strong>：FastAPI 支援 <code>@app.exception_handler(TaskNotFound)</code>，把 main.py 裡重複的 <code>try/except → 404</code> 收斂成一個全域 handler。比較前後的 endpoint 程式碼，體會「橫切關注點」在 FastAPI 怎麼處理（對照 Spring 的 <code>@ControllerAdvice</code>）。</li>
+<li><strong>換成 PostgreSQL（選做）</strong>：把 <code>DEFAULT_URL</code> 改成 <code>postgresql+psycopg://...</code>，用 testcontainers 或 docker 跑整合測試，in-memory sqlite 留給單元測試。觀察哪些程式碼需要改（提示：理論上只有設定，service/schema 一行都不該動——這就是分層的回報）。</li>
+<li><strong>CI 加一道安全掃描</strong>：在 GitHub Actions workflow 加上 <code>uv run pip-audit</code>（或 <code>bandit</code>）這道關卡，對照 Java 的 OWASP dependency-check。讓它在有已知漏洞相依時 fail。</li>
+</ol>

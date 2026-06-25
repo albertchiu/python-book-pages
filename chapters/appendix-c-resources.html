@@ -1,0 +1,293 @@
+<h1 id="附錄-c建議學習資源">附錄 C：建議學習資源</h1><p>讀完前 18 章，你已具備把 Python 寫得「像 Python」而非「用 Python 寫 Java」的底氣。但語言與生態系演進快速，真正的進階來自持續閱讀一手資料。這份指南為資深 Java 工程師量身挑選：跳過入門教學的水分，直指官方規格、深度書籍與高密度社群。每項資源都標明「為何值得 / 對應本書哪幾章」，方便你按需取用。</p>
+<hr>
+<h2 id="c1-官方文件docspythonorg">C.1 官方文件（docs.python.org）</h2><p>官方文件的品質遠勝多數第三方教學，且永遠與直譯器版本同步。對於習慣讀 JLS（Java Language Specification）與 JavaDoc 的你，這裡是最自然的起點。</p>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>網址</th>
+<th>為何值得 / 對應章節</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>The Python Tutorial</strong></td>
+<td><a href="https://docs.python.org/3/tutorial/" target="_blank" rel="noopener noreferrer">https://docs.python.org/3/tutorial/</a></td>
+<td>官方導覽，半天可通讀。CP 值最高的一份。對應第 2–6 章</td>
+</tr>
+<tr>
+<td><strong>Language Reference</strong></td>
+<td><a href="https://docs.python.org/3/reference/" target="_blank" rel="noopener noreferrer">https://docs.python.org/3/reference/</a></td>
+<td>等同 JLS：name binding、資料模型（data model）、執行模型。讀 <code>datamodel</code> 一章理解魔術方法。對應第 2、7、8、10 章</td>
+</tr>
+<tr>
+<td><strong>Library Reference</strong></td>
+<td><a href="https://docs.python.org/3/library/" target="_blank" rel="noopener noreferrer">https://docs.python.org/3/library/</a></td>
+<td>標準函式庫聖經。<code>collections</code>、<code>itertools</code>、<code>functools</code>、<code>pathlib</code>、<code>asyncio</code> 都在此。對應第 4、6、14、15 章</td>
+</tr>
+<tr>
+<td><strong>Python HOWTOs</strong></td>
+<td><a href="https://docs.python.org/3/howto/" target="_blank" rel="noopener noreferrer">https://docs.python.org/3/howto/</a></td>
+<td>主題式深入文（logging、sorting、descriptor、regex、enum）。Descriptor HOWTO 必讀。對應第 10、12、15 章</td>
+</tr>
+<tr>
+<td><strong>What&#39;s New in Python</strong></td>
+<td><a href="https://docs.python.org/3/whatsnew/" target="_blank" rel="noopener noreferrer">https://docs.python.org/3/whatsnew/</a></td>
+<td>每版變更總覽。建議從 3.10 讀起：3.10 的 pattern matching（match/case）、3.12 的型別參數語法（PEP 695）、3.13 起的 free-threading（PEP 703）。對應第 1、9、14 章</td>
+</tr>
+</tbody></table>
+<h3 id="重點-peppepspythonorg">重點 PEP（peps.python.org）</h3><p>PEP（Python Enhancement Proposal）就像 Java 的 JEP，是語言設計決策的一手依據。在終端機輸入 <code>import this</code> 可隨時調出 PEP 20「Python 之禪」：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-627" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20this%0AThe%20Zen%20of%20Python%2C%20by%20Tim%20Peters%0A%0ABeautiful%20is%20better%20than%20ugly.%0AExplicit%20is%20better%20than%20implicit.%0ASimple%20is%20better%20than%20complex.%0A...'), 'copy-btn-627')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import this
+The Zen of Python, by Tim Peters
+
+Beautiful is better than ugly.
+Explicit is better than implicit.
+Simple is better than complex.
+...</code></pre>
+      </div>
+    <table>
+<thead>
+<tr>
+<th>PEP</th>
+<th>主題</th>
+<th>對應章節</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>PEP 8</strong></td>
+<td>程式碼風格指南（命名、排版）</td>
+<td>第 1、5 章。註：實務上交給 ruff/black 自動執行，不需手背</td>
+</tr>
+<tr>
+<td><strong>PEP 20</strong></td>
+<td>The Zen of Python</td>
+<td>第 5 章</td>
+</tr>
+<tr>
+<td><strong>PEP 257</strong></td>
+<td>Docstring 慣例</td>
+<td>第 3 章（docstring 慣例）、第 13 章（doctest）</td>
+</tr>
+<tr>
+<td><strong>PEP 484</strong></td>
+<td>型別提示（Type Hints）的奠基文件</td>
+<td>第 9 章</td>
+</tr>
+<tr>
+<td><strong>PEP 703</strong></td>
+<td>移除 GIL，邁向 free-threading</td>
+<td>第 14 章</td>
+</tr>
+</tbody></table>
+<blockquote><p>小提醒：PEP 8 是「人讀的規範」，但今日的執行者是工具。<code>ruff</code> 與 <code>black</code> 會自動套用大半規則，你只需 <code>ruff check</code> 與 <code>ruff format</code>（詳見第 1 章），把腦力留給命名與架構。</p>
+</blockquote><hr>
+<h2 id="c2-書籍">C.2 書籍</h2><table>
+<thead>
+<tr>
+<th>書名</th>
+<th>作者 / 版次</th>
+<th>為何值得 / 適合誰 / 對應章節</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Fluent Python</strong></td>
+<td>Luciano Ramalho, 2nd ed, O&#39;Reilly 2022</td>
+<td>資深工程師的<strong>必讀</strong>。深入資料模型、魔術方法、descriptor、並行與型別，正好接續你已掌握的 OOP 直覺。對應第 4、6、7、8、10、14 章</td>
+</tr>
+<tr>
+<td><strong>Effective Python</strong></td>
+<td>Brett Slatkin, Addison-Wesley</td>
+<td>具體建議集，每條 2–4 頁，速讀型。像 Java 的《Effective Java》。<strong>3rd ed（125 條，2024）已出，要最新可選第 3 版；本書對照章節以 2nd ed（90 條，2019）為準。</strong> 對應第 3、5、6、9、12、13 章</td>
+</tr>
+<tr>
+<td><strong>Python Cookbook</strong></td>
+<td>David Beazley &amp; Brian K. Jones, 3rd ed, O&#39;Reilly 2013</td>
+<td>問題導向食譜，遇到具體任務時查閱。標準庫技巧密集。對應第 4、6、15 章</td>
+</tr>
+<tr>
+<td><strong>Robust Python</strong></td>
+<td>Patrick Viafore, O&#39;Reilly 2021</td>
+<td>為「愛型別的 Java 人」而寫：用型別提示、Protocol、enum、不可變性把大型程式碼庫變得可維護。對應第 8、9、12 章</td>
+</tr>
+<tr>
+<td><strong>Architecture Patterns with Python</strong></td>
+<td>Harry Percival &amp; Bob Gregory, O&#39;Reilly 2020</td>
+<td>從 Spring/DDD 背景轉 Python 的橋樑：Repository、Unit of Work、依賴注入、事件驅動。對應第 11、16、18 章</td>
+</tr>
+</tbody></table>
+<blockquote><p>路線提示：若只買一本，選《Fluent Python》。若你最在意「把 Python 寫得跟 Java 一樣穩」，加買《Robust Python》。</p>
+</blockquote><hr>
+<h2 id="c3-線上教學與部落格">C.3 線上教學與部落格</h2><ul>
+<li><strong>Real Python</strong>（<a href="https://realpython.com/" target="_blank" rel="noopener noreferrer">https://realpython.com/</a>）：品質最穩定的英文教學站，主題涵蓋全面，多數深度文有付費牆但免費內容已足夠。搭配第 13–17 章的實務主題閱讀。</li>
+<li><strong>官方 Tutorial</strong>（見 C.1）：仍是最佳免費起點，不要跳過。</li>
+<li><strong>Raymond Hettinger 的演講</strong>：經典 PyCon 講題 &quot;Transforming Code into Beautiful, Idiomatic Python&quot;（YouTube 可搜尋）示範如何把 C/Java 式迴圈改寫成 Pythonic 寫法。對應第 5、6 章。他的 &quot;Beyond PEP 8&quot; 也值得一看。</li>
+<li><strong>mCoding</strong>（James Murphy，YouTube）：短而硬核，講 CPython 內部、型別、慣用法。對應第 2、9、10 章。</li>
+<li><strong>ArjanCodes</strong>（YouTube）：物件導向設計、SOLID、設計模式在 Python 的呈現，最貼近 Java 工程師的思考。對應第 7、8、11 章。</li>
+</ul>
+<p>下面這類「把命令式迴圈 Pythonic 化」正是 Hettinger 反覆強調的，以 <code>itertools</code> 為例：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-628" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20itertools%0A%3E%3E%3E%20list(itertools.pairwise(%5B1%2C%202%2C%203%2C%204%5D))%20%20%20%23%20%E7%9B%B8%E9%84%B0%E9%85%8D%E5%B0%8D%EF%BC%8C%E5%85%8D%E6%89%8B%E5%AF%AB%E7%B4%A2%E5%BC%95%0A%5B(1%2C%202)%2C%20(2%2C%203)%2C%20(3%2C%204)%5D%0A%3E%3E%3E%20%5B(k%2C%20list(g))%20for%20k%2C%20g%20in%20itertools.groupby(%22aaabbc%22)%5D%0A%5B(%27a%27%2C%20%5B%27a%27%2C%20%27a%27%2C%20%27a%27%5D)%2C%20(%27b%27%2C%20%5B%27b%27%2C%20%27b%27%5D)%2C%20(%27c%27%2C%20%5B%27c%27%5D)%5D'), 'copy-btn-628')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import itertools
+&gt;&gt;&gt; list(itertools.pairwise([1, 2, 3, 4]))   # 相鄰配對，免手寫索引
+[(1, 2), (2, 3), (3, 4)]
+&gt;&gt;&gt; [(k, list(g)) for k, g in itertools.groupby("aaabbc")]
+[('a', ['a', 'a', 'a']), ('b', ['b', 'b']), ('c', ['c'])]</code></pre>
+      </div>
+    <hr>
+<h2 id="c4-練習平台">C.4 練習平台</h2><p>刻意練習能把「讀懂」變成「寫順」。建議用 Python 重做你熟悉的題目，專注在慣用法而非演算法。</p>
+<table>
+<thead>
+<tr>
+<th>平台</th>
+<th>網址</th>
+<th>為何值得 / 對應章節</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Exercism — Python track</strong></td>
+<td><a href="https://exercism.org/tracks/python" target="_blank" rel="noopener noreferrer">https://exercism.org/tracks/python</a></td>
+<td>有人工 code review，會糾正你的「Java 腔」。最推薦的起點。對應第 5、7 章</td>
+</tr>
+<tr>
+<td><strong>LeetCode</strong></td>
+<td><a href="https://leetcode.com/" target="_blank" rel="noopener noreferrer">https://leetcode.com/</a></td>
+<td>用 Python 重刷熟題，體會切片、<code>collections</code>（<code>Counter</code>/<code>deque</code>）、解包的威力。對應第 4 章</td>
+</tr>
+<tr>
+<td><strong>Advent of Code</strong></td>
+<td><a href="https://adventofcode.com/" target="_blank" rel="noopener noreferrer">https://adventofcode.com/</a></td>
+<td>每年 12 月的解謎活動，題目適合練解析與資料結構。對應第 4、6、15 章</td>
+</tr>
+<tr>
+<td><strong>Codewars</strong></td>
+<td><a href="https://www.codewars.com/" target="_blank" rel="noopener noreferrer">https://www.codewars.com/</a></td>
+<td>小型 kata，快速暖身慣用法。對應第 5 章</td>
+</tr>
+</tbody></table>
+<p>練習時請同步寫測試，套用第 13 章的 pytest 心法（fixture、參數化、<code>hypothesis</code> 性質測試），把「能跑」升級成「可信」。</p>
+<hr>
+<h2 id="c5-工具官方文件">C.5 工具官方文件</h2><p>本書工具鏈的一手文件。遇到設定或行為疑問時，先查官方文件再 Google。</p>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>文件</th>
+<th>對應章節</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>uv</strong></td>
+<td><a href="https://docs.astral.sh/uv/" target="_blank" rel="noopener noreferrer">https://docs.astral.sh/uv/</a></td>
+<td>第 1、11、18 章（套件 / 環境 / 專案管理）</td>
+</tr>
+<tr>
+<td><strong>ruff</strong></td>
+<td><a href="https://docs.astral.sh/ruff/" target="_blank" rel="noopener noreferrer">https://docs.astral.sh/ruff/</a></td>
+<td>第 1 章（lint + format，取代 flake8/black/isort）</td>
+</tr>
+<tr>
+<td><strong>mypy</strong></td>
+<td><a href="https://mypy.readthedocs.io/" target="_blank" rel="noopener noreferrer">https://mypy.readthedocs.io/</a></td>
+<td>第 9 章（靜態型別檢查）</td>
+</tr>
+<tr>
+<td><strong>pytest</strong></td>
+<td><a href="https://docs.pytest.org/" target="_blank" rel="noopener noreferrer">https://docs.pytest.org/</a></td>
+<td>第 13 章（測試框架）</td>
+</tr>
+<tr>
+<td><strong>pydantic</strong></td>
+<td><a href="https://docs.pydantic.dev/" target="_blank" rel="noopener noreferrer">https://docs.pydantic.dev/</a></td>
+<td>第 9、16、18 章（資料驗證 / 設定）</td>
+</tr>
+<tr>
+<td><strong>FastAPI</strong></td>
+<td><a href="https://fastapi.tiangolo.com/" target="_blank" rel="noopener noreferrer">https://fastapi.tiangolo.com/</a></td>
+<td>第 16、18 章（Web 框架 + DI）</td>
+</tr>
+<tr>
+<td><strong>SQLAlchemy</strong></td>
+<td><a href="https://docs.sqlalchemy.org/" target="_blank" rel="noopener noreferrer">https://docs.sqlalchemy.org/</a></td>
+<td>第 16、18 章（ORM，對照 JPA/Hibernate）</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="c6-社群">C.6 社群</h2><ul>
+<li><strong>Python Discord</strong>（<a href="https://discord.com/invite/python" target="_blank" rel="noopener noreferrer">https://discord.com/invite/python</a>）：活躍即時問答，有專屬幫助頻道。</li>
+<li><strong>r/Python</strong> 與 <strong>r/learnpython</strong>（reddit.com）：前者偏生態系新聞與討論，後者適合提問。</li>
+<li><strong>Stack Overflow <code>[python]</code> tag</strong>（<a href="https://stackoverflow.com/questions/tagged/python" target="_blank" rel="noopener noreferrer">https://stackoverflow.com/questions/tagged/python</a>）：搜尋既有答案的首選。</li>
+<li><strong>電子報</strong>：<strong>PyCoder&#39;s Weekly</strong>（<a href="https://pycoders.com/" target="_blank" rel="noopener noreferrer">https://pycoders.com/</a>）與 <strong>Python Weekly</strong>（<a href="https://www.pythonweekly.com/" target="_blank" rel="noopener noreferrer">https://www.pythonweekly.com/</a>），每週彙整重要文章與套件，是低成本保持資訊更新的方式。</li>
+</ul>
+<hr>
+<h2 id="c7-給-java-工程師的閱讀路線圖">C.7 給 Java 工程師的閱讀路線圖</h2><p>把上述資源與本書 18 章串成一條 4–8 週的路徑。每階段先讀本書章節建立骨架，再用外部資源補肉。</p>
+<h3 id="第-1-週地基與語感對應第-15-章">第 1 週：地基與語感（對應第 1–5 章）</h3><ol>
+<li>通讀<strong>官方 Tutorial</strong>（半天到一天）。</li>
+<li>本書第 1–5 章：工具鏈、語法、函式、資料結構、Pythonic 慣用法。</li>
+<li>開始 <strong>Exercism Python track</strong>，讓 review 糾正你的 Java 腔。</li>
+<li>看 Hettinger 的 &quot;Transforming Code into Beautiful, Idiomatic Python&quot;。</li>
+</ol>
+<h3 id="第-23-週物件模型與抽象對應第-610-章">第 2–3 週：物件模型與抽象（對應第 6–10 章）</h3><ol>
+<li>本書第 6–10 章：迭代器、類別、繼承與協定、型別提示、裝飾器與元程式設計。</li>
+<li>同步讀 <strong>Fluent Python</strong> 對應章節（資料模型、魔術方法、descriptor）。</li>
+<li>愛型別的話加讀 <strong>Robust Python</strong>，把 Protocol 與 enum 內化。</li>
+<li>閱讀 <strong>Descriptor HOWTO</strong> 與 <strong>PEP 484</strong>。</li>
+</ol>
+<p>下面是貫穿第 7–9 章的核心對照——以不可變值物件為例，<code>@dataclass(frozen=True, slots=True)</code> 對應 Java 的 record（同樣自動產生 equals/hashCode）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-629" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20dataclasses%20import%20dataclass%0A%3E%3E%3E%20%40dataclass(frozen%3DTrue%2C%20slots%3DTrue)%0A...%20class%20Point%3A%0A...%20%20%20%20%20x%3A%20int%0A...%20%20%20%20%20y%3A%20int%0A...%0A%3E%3E%3E%20p%20%3D%20Point(1%2C%202)%0A%3E%3E%3E%20p%0APoint(x%3D1%2C%20y%3D2)%0A%3E%3E%3E%20hash(p)%20%3D%3D%20hash(Point(1%2C%202))%20%20%20%23%20%E8%87%AA%E5%8B%95%E7%94%A2%E7%94%9F%20__hash__%20%E8%88%87%20__eq__%0ATrue'), 'copy-btn-629')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from dataclasses import dataclass
+&gt;&gt;&gt; @dataclass(frozen=True, slots=True)
+... class Point:
+...     x: int
+...     y: int
+...
+&gt;&gt;&gt; p = Point(1, 2)
+&gt;&gt;&gt; p
+Point(x=1, y=2)
+&gt;&gt;&gt; hash(p) == hash(Point(1, 2))   # 自動產生 __hash__ 與 __eq__
+True</code></pre>
+      </div>
+    <p>對照現代型別提示寫法（<code>list[int]</code>、<code>X | None</code>、<code>Callable</code> 從 <code>collections.abc</code>）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-630" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20collections.abc%20import%20Callable%0A%3E%3E%3E%20def%20first(items%3A%20list%5Bint%5D)%20-%3E%20int%20%7C%20None%3A%0A...%20%20%20%20%20return%20items%5B0%5D%20if%20items%20else%20None%0A...%0A%3E%3E%3E%20first(%5B1%2C%202%2C%203%5D)%0A1%0A%3E%3E%3E%20first(%5B%5D)%20is%20None%0ATrue'), 'copy-btn-630')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from collections.abc import Callable
+&gt;&gt;&gt; def first(items: list[int]) -&gt; int | None:
+...     return items[0] if items else None
+...
+&gt;&gt;&gt; first([1, 2, 3])
+1
+&gt;&gt;&gt; first([]) is None
+True</code></pre>
+      </div>
+    <h3 id="第-45-週工程實務對應第-1115-章">第 4–5 週：工程實務（對應第 11–15 章）</h3><ol>
+<li>本書第 11–15 章：模組與專案結構、例外、測試、並行、標準庫 I/O。</li>
+<li>精讀 <strong>pytest</strong> 與 <strong>mypy</strong> 官方文件，把第 13 章心法落地。</li>
+<li>用 <strong>LeetCode / Advent of Code</strong> 練資料結構與解析。</li>
+<li>訂閱 <strong>PyCoder&#39;s Weekly</strong> 開始被動吸收。</li>
+</ol>
+<h3 id="第-68-週應用與架構對應第-1618-章">第 6–8 週：應用與架構（對應第 16–18 章）</h3><ol>
+<li>本書第 16–18 章：Web 開發、資料處理自動化、總整專案。</li>
+<li>讀 <strong>FastAPI</strong>、<strong>SQLAlchemy 2.0</strong>、<strong>pydantic</strong> 官方文件。</li>
+<li>讀 <strong>Architecture Patterns with Python</strong>，把你的 Spring/DDD 經驗對應到 Python。</li>
+<li>用本書第 18 章 capstone 的 src layout + CI 模板，做一個自己的小專案收尾。</li>
+</ol>
+<hr>
+<blockquote><p><strong>一句話總結</strong>：把官方 tutorial 從頭到尾通讀一遍，是你能做的 CP 值最高的投資——它便宜、權威、且永遠跟著直譯器更新。</p>
+</blockquote>

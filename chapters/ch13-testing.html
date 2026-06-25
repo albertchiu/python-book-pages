@@ -1,0 +1,720 @@
+<h1 id="第-13-章測試">第 13 章：測試</h1><p>測試你不陌生——JUnit、Mockito、Hamcrest、覆蓋率報表，這套工程紀律你早就內化了。但 Python 的測試文化會顛覆兩個直覺：第一，主流框架 <strong>pytest 用裸 <code>assert</code></strong>，沒有 <code>assertEquals</code>/<code>assertThat</code> 那一大家子斷言方法，卻能給你比 JUnit 更漂亮的失敗訊息；第二，依賴注入不靠註解與容器，而靠一個叫 <strong>fixture</strong> 的函式機制，外加一個讓「測試案例本身變參數」的 <code>parametrize</code>。這一章把你的 JUnit/Mockito 經驗平移過來，再補上 Python 特有的兩件利器：<strong>property-based testing（hypothesis）</strong> 與 <strong>docstring 即測試（doctest）</strong>。</p>
+<hr>
+<h2 id="pytest-基礎對照-junit-5">pytest 基礎：對照 JUnit 5</h2><p>Python 標準庫內建 <code>unittest</code>（PyUnit），它是 JUnit 的直系後裔——<code>class TestX(unittest.TestCase)</code>、<code>self.assertEqual(...)</code>、<code>setUp</code>/<code>tearDown</code>，連 camelCase 都照抄。但 Python 社群的事實標準是第三方的 <strong>pytest</strong>，因為它把 JUnit 風格的冗長一掃而空。我們直接學 pytest。</p>
+<h3 id="測試的長相函式不是方法">測試的長相：函式，不是方法</h3><p>JUnit 5 裡測試是類別中的方法：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-396" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('class%20PricingTest%20%7B%0A%20%20%20%20%40Test%0A%20%20%20%20void%20subtotalSumsItems()%20%7B%0A%20%20%20%20%20%20%20%20int%20result%20%3D%20Pricing.subtotal(items)%3B%0A%20%20%20%20%20%20%20%20Assertions.assertEquals(18000%2C%20result)%3B%0A%20%20%20%20%7D%0A%7D'), 'copy-btn-396')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">class PricingTest {
+    @Test
+    void subtotalSumsItems() {
+        int result = Pricing.subtotal(items);
+        Assertions.assertEquals(18000, result);
+    }
+}</code></pre>
+      </div>
+    <p>pytest 的測試是<strong>模組層級的普通函式</strong>，靠命名慣例被發現——檔名 <code>test_*.py</code>（或 <code>*_test.py</code>）、函式 <code>test_*</code>，不需要任何註解：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-397" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20test_pricing.py%0Afrom%20pricing%20import%20subtotal%0A%0Adef%20test_subtotal_sums_items()%3A%0A%20%20%20%20result%20%3D%20subtotal(items)%0A%20%20%20%20assert%20result%20%3D%3D%2018000%20%20%20%20%20%20%20%20%20%20%23%20%E5%B0%B1%E6%98%AF%20Python%20%E5%85%A7%E5%BB%BA%E7%9A%84%20assert%EF%BC%8C%E6%B2%92%E6%9C%89%20assertEquals'), 'copy-btn-397')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># test_pricing.py
+from pricing import subtotal
+
+def test_subtotal_sums_items():
+    result = subtotal(items)
+    assert result == 18000          # 就是 Python 內建的 assert，沒有 assertEquals</code></pre>
+      </div>
+    <p>沒有 <code>@Test</code>、沒有繼承 <code>TestCase</code>、沒有 <code>public</code>。pytest 掃描檔案、找到 <code>test_</code> 開頭的函式就當測試跑。你也<strong>可以</strong>把測試放進 <code>class TestPricing:</code> 裡（純粹為了分組，類別名要 <code>Test</code> 開頭、且不能有 <code>__init__</code>），但多數 Python 專案連類別都省了。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：JUnit 用 <code>@Test</code> 註解標記測試；pytest 用「<code>test_</code> 命名慣例」收集測試。慣例優於設定，這是貫穿 Python 工具鏈的風格。</p>
+</div><h3 id="為什麼可以用裸-assertassert-rewriting">為什麼可以用裸 `assert`：assert rewriting</h3><p>Java 工程師看到 <code>assert result == 18000</code> 會皺眉：JUnit 不鼓勵用 Java 的 <code>assert</code>（它預設被 <code>-ea</code> 關掉，而且失敗訊息只有一句 <code>AssertionError</code>），所以才有 <code>assertEquals(expected, actual)</code> 這套 API 來產生有意義的訊息。</p>
+<p>pytest 用了一個巧妙的手法繞過這個限制：<strong>assert 重寫（assertion rewriting）</strong>。pytest 在 import 測試模組時，會改寫它的 AST（抽象語法樹），把每個 <code>assert</code> 拆解、在失敗時注入兩邊運算元的值。於是裸 <code>assert</code> 也能給出豐富的 diff：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-398" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20test_show_rich_message()%3A%0A%20%20%20%20actual%20%3D%20%7B%22a%22%3A%201%2C%20%22b%22%3A%202%7D%0A%20%20%20%20expected%20%3D%20%7B%22a%22%3A%201%2C%20%22b%22%3A%203%7D%0A%20%20%20%20assert%20actual%20%3D%3D%20expected'), 'copy-btn-398')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def test_show_rich_message():
+    actual = {"a": 1, "b": 2}
+    expected = {"a": 1, "b": 3}
+    assert actual == expected</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-399" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%20%20%20%20%20%20%20assert%20actual%20%3D%3D%20expected%0AE%20%20%20%20%20%20%20AssertionError%3A%20assert%20%7B%27a%27%3A%201%2C%20%27b%27%3A%202%7D%20%3D%3D%20%7B%27a%27%3A%201%2C%20%27b%27%3A%203%7D%0AE%20%20%20%20%20%20%20%20%20%0AE%20%20%20%20%20%20%20%20%20Omitting%201%20identical%20items%2C%20use%20-vv%20to%20show%0AE%20%20%20%20%20%20%20%20%20Differing%20items%3A%0AE%20%20%20%20%20%20%20%20%20%7B%27b%27%3A%202%7D%20!%3D%20%7B%27b%27%3A%203%7D%0AE%20%20%20%20%20%20%20%20%20Use%20-v%20to%20get%20more%20diff'), 'copy-btn-399')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">&gt;       assert actual == expected
+E       AssertionError: assert {'a': 1, 'b': 2} == {'a': 1, 'b': 3}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'b': 2} != {'b': 3}
+E         Use -v to get more diff</code></pre>
+      </div>
+    <p>它自動算出 dict 的差異、標出不同的 key。對 list、set、字串、dataclass 也都有客製化的 diff 輸出。<strong>這就是為什麼 pytest 不需要 <code>assertEquals</code>/<code>assertThat</code></strong>——重寫機制讓最直覺的 <code>assert a == b</code>、<code>assert x in coll</code>、<code>assert s.startswith(&quot;...&quot;)</code> 全都附帶好讀的失敗訊息。</p>
+<table>
+<thead>
+<tr>
+<th>JUnit 5</th>
+<th>pytest</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>assertEquals(a, b)</code></td>
+<td><code>assert a == b</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>assertTrue(x)</code> / <code>assertFalse(x)</code></td>
+<td><code>assert x</code> / <code>assert not x</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>assertNull(x)</code></td>
+<td><code>assert x is None</code></td>
+<td>用 <code>is</code>，不是 <code>==</code></td>
+</tr>
+<tr>
+<td><code>assertThrows(E.class, () -&gt; ...)</code></td>
+<td><code>with pytest.raises(E): ...</code></td>
+<td>見後面</td>
+</tr>
+<tr>
+<td><code>assertIterableEquals</code></td>
+<td><code>assert a == b</code></td>
+<td>list 比較直接用 <code>==</code></td>
+</tr>
+<tr>
+<td><code>assertEquals(0.3, x, 1e-9)</code></td>
+<td><code>assert x == pytest.approx(0.3)</code></td>
+<td>浮點數容差</td>
+</tr>
+</tbody></table>
+<p>浮點數那行值得單獨記住——它對應 JUnit 的 delta 參數：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-400" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20pytest%20import%20approx%0A%3E%3E%3E%200.1%20%2B%200.2%20%3D%3D%200.3%0AFalse%0A%3E%3E%3E%200.1%20%2B%200.2%20%3D%3D%20approx(0.3)%0ATrue'), 'copy-btn-400')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from pytest import approx
+&gt;&gt;&gt; 0.1 + 0.2 == 0.3
+False
+&gt;&gt;&gt; 0.1 + 0.2 == approx(0.3)
+True</code></pre>
+      </div>
+    <h3 id="執行方式">執行方式</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-401" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('uv%20run%20--with%20pytest%20pytest%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%B7%91%E7%95%B6%E5%89%8D%E7%9B%AE%E9%8C%84%E4%B8%8B%E6%89%80%E6%9C%89%E6%B8%AC%E8%A9%A6%0Auv%20run%20--with%20pytest%20pytest%20test_pricing.py%20%23%20%E8%B7%91%E5%96%AE%E4%B8%80%E6%AA%94%E6%A1%88%0Auv%20run%20--with%20pytest%20pytest%20-k%20discount%20%20%20%20%20%23%20%E5%8F%AA%E8%B7%91%E5%90%8D%E5%AD%97%E5%90%AB%20discount%20%E7%9A%84%E6%B8%AC%E8%A9%A6%0Auv%20run%20--with%20pytest%20pytest%20-q%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%AE%89%E9%9D%9C%E6%A8%A1%E5%BC%8F%EF%BC%9B-v%20%E5%8F%8D%E4%B9%8B%E6%9B%B4%E5%9B%89%E5%97%A6%0Auv%20run%20--with%20pytest%20pytest%20-x%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%AC%AC%E4%B8%80%E5%80%8B%E5%A4%B1%E6%95%97%E5%B0%B1%E5%81%9C%EF%BC%88fail%20fast%EF%BC%89%0Auv%20run%20--with%20pytest%20pytest%20--lf%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8F%AA%E9%87%8D%E8%B7%91%E4%B8%8A%E6%AC%A1%E5%A4%B1%E6%95%97%E7%9A%84%EF%BC%88last%20failed%EF%BC%89'), 'copy-btn-401')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">uv run --with pytest pytest                 # 跑當前目錄下所有測試
+uv run --with pytest pytest test_pricing.py # 跑單一檔案
+uv run --with pytest pytest -k discount     # 只跑名字含 discount 的測試
+uv run --with pytest pytest -q              # 安靜模式；-v 反之更囉嗦
+uv run --with pytest pytest -x              # 第一個失敗就停（fail fast）
+uv run --with pytest pytest --lf            # 只重跑上次失敗的（last failed）</code></pre>
+      </div>
+    <p><code>-k</code> 與 <code>--lf</code> 是日常神器：<code>-k</code> 像 JUnit 的 tag 過濾但更靈活（支援 <code>and</code>/<code>or</code>/<code>not</code> 運算式比對測試名），<code>--lf</code> 讓你修 bug 時只反覆跑那幾條紅燈的測試。</p>
+<hr>
+<h2 id="fixture依賴注入但更輕">fixture：依賴注入，但更輕</h2><p>JUnit 5 用 <code>@BeforeEach</code>/<code>@AfterEach</code> 準備與清理、用 extension（如 <code>@ExtendWith</code>）或建構子注入相依。pytest 把這些統一成一個機制：<strong>fixture</strong>。</p>
+<h3 id="基本款fixture-是會被注入的函式">基本款：fixture 是「會被注入的函式」</h3><p>宣告一個 <code>@pytest.fixture</code>，它的<strong>回傳值</strong>會被注入到任何「參數名稱跟它同名」的測試裡：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-402" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20pytest%0Afrom%20pricing%20import%20Item%2C%20subtotal%0A%0A%40pytest.fixture%0Adef%20cart()%20-%3E%20list%5BItem%5D%3A%0A%20%20%20%20return%20%5B%0A%20%20%20%20%20%20%20%20Item(%22apple%22%2C%20price%3D3000%2C%20qty%3D2)%2C%0A%20%20%20%20%20%20%20%20Item(%22book%22%2C%20price%3D12000%2C%20qty%3D1)%2C%0A%20%20%20%20%5D%0A%0Adef%20test_subtotal(cart%3A%20list%5BItem%5D)%20-%3E%20None%3A%20%20%20%23%20%E5%8F%83%E6%95%B8%E5%90%8D%20cart%20%E5%B0%8D%E4%B8%8A%20fixture%20cart%0A%20%20%20%20assert%20subtotal(cart)%20%3D%3D%2018000'), 'copy-btn-402')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import pytest
+from pricing import Item, subtotal
+
+@pytest.fixture
+def cart() -&gt; list[Item]:
+    return [
+        Item("apple", price=3000, qty=2),
+        Item("book", price=12000, qty=1),
+    ]
+
+def test_subtotal(cart: list[Item]) -&gt; None:   # 參數名 cart 對上 fixture cart
+    assert subtotal(cart) == 18000</code></pre>
+      </div>
+    <p>pytest 看到 <code>test_subtotal</code> 有個參數叫 <code>cart</code>，就去找名為 <code>cart</code> 的 fixture、呼叫它、把結果餵進來。這是<strong>按名稱</strong>的依賴注入——像 Spring 的 <code>@Autowired</code> 加上 by-name 解析，但完全不需要容器或註解掃描，靠的是函式參數名。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>@BeforeEach</code> 建立的物件你存進欄位、測試方法讀欄位；fixture 則是把那個物件<strong>當參數注入</strong>。fixture 比 <code>@BeforeEach</code> 更模組化——每個測試只「點名」自己要的 fixture，不會被一個共用的 setup 塞一堆用不到的東西。</p>
+</div><h3 id="setupteardownyield-fixture">setup/teardown：yield fixture</h3><p>要做清理（關連線、刪暫存檔），用 <code>yield</code> 把 fixture 拆成「之前」與「之後」兩半。<code>yield</code> 前是 setup、<code>yield</code> 出去的值被注入、控制權回來後（<code>yield</code> 之後）是 teardown——<strong>無論測試成功或失敗都會執行</strong>，等同 <code>try/finally</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-403" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40pytest.fixture%0Adef%20conn()%3A%0A%20%20%20%20c%20%3D%20FakeConn()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20setup%0A%20%20%20%20c.log.append(%22opened%22)%0A%20%20%20%20yield%20c%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%B8%AC%E8%A9%A6%E5%9C%A8%E6%AD%A4%E5%9F%B7%E8%A1%8C%EF%BC%8C%E6%8B%BF%E5%88%B0%E7%9A%84%E5%B0%B1%E6%98%AF%20c%0A%20%20%20%20c.close()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20teardown%EF%BC%9Ayield%20%E4%B9%8B%E5%BE%8C%E4%B8%80%E5%AE%9A%E6%9C%83%E8%B7%91'), 'copy-btn-403')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@pytest.fixture
+def conn():
+    c = FakeConn()              # setup
+    c.log.append("opened")
+    yield c                     # 測試在此執行，拿到的就是 c
+    c.close()                   # teardown：yield 之後一定會跑</code></pre>
+      </div>
+    <p>這比 JUnit 把 setup 和 teardown 拆成兩個分開的方法（<code>@BeforeEach</code>/<code>@AfterEach</code>）更內聚——資源的取得與釋放寫在同一個函式裡，視覺上就在一起，不會漏掉配對。</p>
+<h3 id="scope控制-fixture-多久建立一次">scope：控制 fixture 多久建立一次</h3><p>預設每個測試都會重新執行 fixture（<code>scope=&quot;function&quot;</code>）。對昂貴的資源（DB 連線、啟動容器），可以放寬 scope：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-404" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40pytest.fixture(scope%3D%22session%22)%20%20%20%20%20%23%20%E6%95%B4%E8%BC%AA%E6%B8%AC%E8%A9%A6%E5%8F%AA%E5%BB%BA%E7%AB%8B%E4%B8%80%E6%AC%A1%0Adef%20db_engine()%3A%0A%20%20%20%20engine%20%3D%20create_engine(...)%0A%20%20%20%20yield%20engine%0A%20%20%20%20engine.dispose()'), 'copy-btn-404')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@pytest.fixture(scope="session")     # 整輪測試只建立一次
+def db_engine():
+    engine = create_engine(...)
+    yield engine
+    engine.dispose()</code></pre>
+      </div>
+    <table>
+<thead>
+<tr>
+<th>scope</th>
+<th>多久建立一次</th>
+<th>約略對應 JUnit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>function</code>（預設）</td>
+<td>每個測試函式</td>
+<td><code>@BeforeEach</code></td>
+</tr>
+<tr>
+<td><code>class</code></td>
+<td>每個測試類別</td>
+<td>（JUnit 無直接對應）</td>
+</tr>
+<tr>
+<td><code>module</code></td>
+<td>每個 <code>.py</code> 檔</td>
+<td>——</td>
+</tr>
+<tr>
+<td><code>package</code></td>
+<td>每個套件</td>
+<td>——</td>
+</tr>
+<tr>
+<td><code>session</code></td>
+<td>整次 pytest 執行</td>
+<td><code>@BeforeAll</code>（但跨整個 suite）</td>
+</tr>
+</tbody></table>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>scope=&quot;session&quot;</code> 的 fixture 被所有測試共用，<strong>測試之間若改動它的狀態就會互相污染</strong>。共用的東西要嘛唯讀、要嘛每個測試自己負責回復原狀。這跟 JUnit <code>@BeforeAll</code>（static）的陷阱一樣——共享狀態是測試不穩定（flaky）的頭號來源。</p>
+</div><h3 id="conftestpy跨檔案共享-fixture">conftest.py：跨檔案共享 fixture</h3><p>把 fixture 放進 <code>conftest.py</code>，同目錄（與子目錄）下的所有測試檔都能直接使用它，<strong>不需 import</strong>。pytest 會自動發現 <code>conftest.py</code>。這是放共用 fixture、共用設定、自訂 marker 的地方——可以想成「測試專用的、按目錄階層生效的 <code>@TestConfiguration</code>」。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-405" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20conftest.py%0Aimport%20pytest%0A%0A%40pytest.fixture%0Adef%20cart()%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%BB%BB%E4%BD%95%E5%AD%90%E7%9B%AE%E9%8C%84%E7%9A%84%20test_*.py%20%E9%83%BD%E8%83%BD%E7%9B%B4%E6%8E%A5%E7%94%A8%20cart%EF%BC%8C%E5%85%8D%20import%0A%20%20%20%20return%20%5B...%5D'), 'copy-btn-405')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># conftest.py
+import pytest
+
+@pytest.fixture
+def cart():                  # 任何子目錄的 test_*.py 都能直接用 cart，免 import
+    return [...]</code></pre>
+      </div>
+    <h3 id="內建-fixture免費的工具箱">內建 fixture：免費的工具箱</h3><p>pytest 內建一批 fixture，直接當參數要就有，省掉你自己造輪子：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-406" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20test_writes_file(tmp_path)%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20tmp_path%20%E6%98%AF%E4%B8%80%E5%80%8B%E5%B0%88%E5%B1%AC%E6%AD%A4%E6%B8%AC%E8%A9%A6%E7%9A%84%E6%9A%AB%E5%AD%98%E7%9B%AE%E9%8C%84%EF%BC%88pathlib.Path%EF%BC%89%0A%20%20%20%20f%20%3D%20tmp_path%20%2F%20%22data.txt%22%0A%20%20%20%20f.write_text(%22hello%22%2C%20encoding%3D%22utf-8%22)%0A%20%20%20%20assert%20f.read_text(encoding%3D%22utf-8%22)%20%3D%3D%20%22hello%22%0A%0Adef%20test_captures_stdout(capsys)%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20capsys%20%E6%94%94%E6%88%AA%20stdout%2Fstderr%0A%20%20%20%20print(%22Hello%2C%20Albert%22)%0A%20%20%20%20captured%20%3D%20capsys.readouterr()%0A%20%20%20%20assert%20captured.out%20%3D%3D%20%22Hello%2C%20Albert%5Cn%22%0A%0Adef%20test_patches_env(monkeypatch)%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20monkeypatch%20%E5%AE%89%E5%85%A8%E5%9C%B0%E6%94%B9%E7%92%B0%E5%A2%83%EF%BC%8C%E6%B8%AC%E8%A9%A6%E7%B5%90%E6%9D%9F%E8%87%AA%E5%8B%95%E9%82%84%E5%8E%9F%0A%20%20%20%20monkeypatch.setenv(%22TIMEOUT%22%2C%20%225%22)%0A%20%20%20%20monkeypatch.setattr(%22mymod.CONST%22%2C%2042)%0A%20%20%20%20assert%20read_timeout()%20%3D%3D%205'), 'copy-btn-406')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def test_writes_file(tmp_path):                 # tmp_path 是一個專屬此測試的暫存目錄（pathlib.Path）
+    f = tmp_path / "data.txt"
+    f.write_text("hello", encoding="utf-8")
+    assert f.read_text(encoding="utf-8") == "hello"
+
+def test_captures_stdout(capsys):               # capsys 攔截 stdout/stderr
+    print("Hello, Albert")
+    captured = capsys.readouterr()
+    assert captured.out == "Hello, Albert\n"
+
+def test_patches_env(monkeypatch):              # monkeypatch 安全地改環境，測試結束自動還原
+    monkeypatch.setenv("TIMEOUT", "5")
+    monkeypatch.setattr("mymod.CONST", 42)
+    assert read_timeout() == 5</code></pre>
+      </div>
+    <ul>
+<li><strong><code>tmp_path</code></strong>：每個測試獨立的暫存目錄，pytest 會保留最近幾輪再回收。對照你在 Java 用 <code>@TempDir</code>。</li>
+<li><strong><code>capsys</code></strong>：攔截標準輸出/錯誤（<code>capfd</code> 攔的是檔案描述子層級，連子行程都抓）。對照 JUnit 重導 <code>System.out</code>。</li>
+<li><strong><code>monkeypatch</code></strong>：在測試範圍內改屬性、環境變數、<code>sys.path</code>、dict 項目，<strong>測試結束自動復原</strong>。比手動存舊值再還原安全得多。下一節的 mock 是它的重砲版。</li>
+</ul>
+<hr>
+<h2 id="參數化與-marker">參數化與 marker</h2><h3 id="parametrize一份邏輯多組資料">parametrize：一份邏輯，多組資料</h3><p>JUnit 5 的 <code>@ParameterizedTest</code> + <code>@CsvSource</code> 你用過。pytest 的 <code>@pytest.mark.parametrize</code> 是同一個概念，但更輕、更 Python：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-407" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40pytest.mark.parametrize(%0A%20%20%20%20%22amount%2C%20percent%2C%20expected%22%2C%0A%20%20%20%20%5B%0A%20%20%20%20%20%20%20%20(10000%2C%200%2C%2010000)%2C%0A%20%20%20%20%20%20%20%20(10000%2C%2010%2C%209000)%2C%0A%20%20%20%20%20%20%20%20(10000%2C%20100%2C%200)%2C%0A%20%20%20%20%20%20%20%20(9999%2C%2010%2C%209000)%2C%20%20%20%20%20%20%20%23%20%E6%95%B4%E6%95%B8%E9%99%A4%E6%B3%95%EF%BC%9A9999%20*%2010%20%2F%2F%20100%20%3D%20999%EF%BC%8C%E6%89%80%E4%BB%A5%209999%20-%20999%20%3D%209000%0A%20%20%20%20%5D%2C%0A)%0Adef%20test_apply_discount(amount%2C%20percent%2C%20expected)%3A%0A%20%20%20%20assert%20apply_discount(amount%2C%20percent)%20%3D%3D%20expected'), 'copy-btn-407')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@pytest.mark.parametrize(
+    "amount, percent, expected",
+    [
+        (10000, 0, 10000),
+        (10000, 10, 9000),
+        (10000, 100, 0),
+        (9999, 10, 9000),       # 整數除法：9999 * 10 // 100 = 999，所以 9999 - 999 = 9000
+    ],
+)
+def test_apply_discount(amount, percent, expected):
+    assert apply_discount(amount, percent) == expected</code></pre>
+      </div>
+    <p>每一組 tuple 會展開成<strong>一個獨立的測試案例</strong>——上面這個就是 4 個測試，任何一組失敗，其他照跑、報表也會精準指出是哪一組（pytest 會把參數值印進測試 ID，像 <code>test_apply_discount[9999-10-9000]</code>）。對照 JUnit：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-408" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40ParameterizedTest%0A%40CsvSource(%7B%2210000%2C%200%2C%2010000%22%2C%20%2210000%2C%2010%2C%209000%22%2C%20%2210000%2C%20100%2C%200%22%7D)%0Avoid%20testApplyDiscount(int%20amount%2C%20int%20percent%2C%20int%20expected)%20%7B%0A%20%20%20%20assertEquals(expected%2C%20Pricing.applyDiscount(amount%2C%20percent))%3B%0A%7D'), 'copy-btn-408')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">@ParameterizedTest
+@CsvSource({"10000, 0, 10000", "10000, 10, 9000", "10000, 100, 0"})
+void testApplyDiscount(int amount, int percent, int expected) {
+    assertEquals(expected, Pricing.applyDiscount(amount, percent));
+}</code></pre>
+      </div>
+    <p>差別在 Python 的版本<strong>直接傳 Python 物件</strong>（不是 CSV 字串再解析），所以你能塞 list、dict、自訂物件當參數，型別也不會在 CSV 來回轉換中走樣。要疊加多維組合就堆兩個 <code>parametrize</code>（笛卡兒積，等同 JUnit 的多 source 組合）。</p>
+<h3 id="marker給測試貼標籤">marker：給測試貼標籤</h3><p>marker 是 pytest 版的 tag/annotation。內建幾個最常用：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-409" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('import%20sys%0Aimport%20pytest%0A%0A%40pytest.mark.skip(reason%3D%22%E5%B0%9A%E6%9C%AA%E5%AF%A6%E4%BD%9C%22)%0Adef%20test_not_ready()%3A%20...%0A%0A%40pytest.mark.skipif(sys.platform%20%3D%3D%20%22win32%22%2C%20reason%3D%22%E5%8F%AA%E5%9C%A8%20POSIX%20%E8%B7%91%22)%0Adef%20test_posix_only()%3A%0A%20%20%20%20import%20os%0A%20%20%20%20assert%20os.sep%20%3D%3D%20%22%2F%22%0A%0A%40pytest.mark.xfail(reason%3D%22%E5%B7%B2%E7%9F%A5%20rounding%20bug%EF%BC%8C%E5%B0%9A%E6%9C%AA%E4%BF%AE%22)%0Adef%20test_known_bug()%3A%0A%20%20%20%20assert%20round(2.675%2C%202)%20%3D%3D%202.68%20%20%20%20%20%20%23%20%E5%85%B6%E5%AF%A6%E6%98%AF%202.67%EF%BC%88IEEE%20754%20%E6%B5%AE%E9%BB%9E%E6%95%B8%EF%BC%89%EF%BC%8Cxfail%20%E9%A0%90%E6%9C%9F%E5%AE%83%E5%A4%B1%E6%95%97'), 'copy-btn-409')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">import sys
+import pytest
+
+@pytest.mark.skip(reason="尚未實作")
+def test_not_ready(): ...
+
+@pytest.mark.skipif(sys.platform == "win32", reason="只在 POSIX 跑")
+def test_posix_only():
+    import os
+    assert os.sep == "/"
+
+@pytest.mark.xfail(reason="已知 rounding bug，尚未修")
+def test_known_bug():
+    assert round(2.675, 2) == 2.68      # 其實是 2.67（IEEE 754 浮點數），xfail 預期它失敗</code></pre>
+      </div>
+    <ul>
+<li><strong><code>skip</code> / <code>skipif</code></strong>：對應 JUnit 5 的 <code>@Disabled</code> / <code>@EnabledOnOs</code> / <code>assumeTrue(...)</code>。<code>skipif</code> 是有條件跳過。</li>
+<li><strong><code>xfail</code></strong>（expected to fail）：<strong>預期會失敗</strong>。它失敗了報表記為 <code>xfailed</code>（不算紅燈），萬一意外通過則記為 <code>xpassed</code>（提醒你 bug 可能修好了，該拿掉這個標記）。JUnit 沒有直接對應——這是把「已知缺陷」誠實寫進測試、又不讓 build 變紅的好工具。</li>
+</ul>
+<p>自訂 marker 用來分類測試（之後可用 <code>-m</code> 過濾）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-410" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40pytest.mark.slow%0Adef%20test_big_import()%3A%20...'), 'copy-btn-410')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@pytest.mark.slow
+def test_big_import(): ...</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-411" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('uv%20run%20--with%20pytest%20pytest%20-m%20%22not%20slow%22%20%20%20%20%23%20%E8%B7%B3%E9%81%8E%E6%89%80%E6%9C%89%E6%A8%99%20slow%20%E7%9A%84%E6%B8%AC%E8%A9%A6'), 'copy-btn-411')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">uv run --with pytest pytest -m "not slow"    # 跳過所有標 slow 的測試</code></pre>
+      </div>
+    <p>記得在 <code>pyproject.toml</code> 註冊自訂 marker，否則 pytest 會發警告（嚴格設定下會報錯）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">toml</span>
+          <button id="copy-btn-412" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%5Btool.pytest.ini_options%5D%0Amarkers%20%3D%20%5B%0A%20%20%20%20%22slow%3A%20%E8%B7%91%E5%BE%97%E6%85%A2%E7%9A%84%E6%B8%AC%E8%A9%A6%EF%BC%88%E7%94%A8%20-m%20%27not%20slow%27%20%E6%8E%92%E9%99%A4%EF%BC%89%22%2C%0A%5D'), 'copy-btn-412')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-toml"><code class="language-toml">[tool.pytest.ini_options]
+markers = [
+    "slow: 跑得慢的測試（用 -m 'not slow' 排除）",
+]</code></pre>
+      </div>
+    <h3 id="pytestraises測例外">pytest.raises：測例外</h3><p>對應 JUnit 5 的 <code>assertThrows</code>，但語法是 context manager：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-413" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20test_apply_discount_rejects_bad_percent()%3A%0A%20%20%20%20with%20pytest.raises(ValueError%2C%20match%3Dr%22percent%20must%20be%20in%22)%3A%0A%20%20%20%20%20%20%20%20apply_discount(10000%2C%20150)'), 'copy-btn-413')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def test_apply_discount_rejects_bad_percent():
+    with pytest.raises(ValueError, match=r"percent must be in"):
+        apply_discount(10000, 150)</code></pre>
+      </div>
+    <p><code>match=</code> 用<strong>正規表示式</strong>比對例外訊息（是 <code>re.search</code>，不必整段比對）。要進一步斷言例外物件本身，用 <code>as</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-414" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('with%20pytest.raises(ValueError)%20as%20excinfo%3A%0A%20%20%20%20apply_discount(10000%2C%20150)%0Aassert%20%22150%22%20in%20str(excinfo.value)'), 'copy-btn-414')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">with pytest.raises(ValueError) as excinfo:
+    apply_discount(10000, 150)
+assert "150" in str(excinfo.value)</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>pytest.raises</code> 的區塊裡<strong>只放預期會丟例外的那一行</strong>，別把無關的程式碼也包進去——否則例外可能是別處丟的，測試就失去意義。這對應你在 Java 只把單一 statement 放進 <code>assertThrows</code> 的 lambda。</p>
+</div><hr>
+<h2 id="unittestmock對照-mockito">unittest.mock：對照 Mockito</h2><p>標準庫的 <code>unittest.mock</code>（不需第三方）就是 Python 的 Mockito。核心是 <code>MagicMock</code> 與 <code>patch</code>。</p>
+<h3 id="magicmock自動長出任何屬性的替身">MagicMock：自動長出任何屬性的替身</h3><p><code>MagicMock</code> 對照 Mockito 的 <code>mock(SomeClass.class)</code>，但更激進——它<strong>自動回應任何屬性存取與方法呼叫</strong>，回傳的還是 MagicMock：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-415" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20from%20unittest.mock%20import%20MagicMock%0A%3E%3E%3E%20m%20%3D%20MagicMock()%0A%3E%3E%3E%20m.anything.you.access%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%B2%92%E5%AE%9A%E7%BE%A9%E4%B9%9F%E4%B8%8D%E5%A0%B1%E9%8C%AF%EF%BC%8C%E8%87%AA%E5%8B%95%E7%94%9F%E5%87%BA%E4%B8%80%E5%80%8B%E5%AD%90%20mock%0A%3CMagicMock%20name%3D%27mock.anything.you.access%27%20id%3D%27...%27%3E%0A%3E%3E%3E%20m.any_method(1%2C%202)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%BB%BB%E4%BD%95%E6%96%B9%E6%B3%95%E9%83%BD%E8%83%BD%E5%91%BC%E5%8F%AB%0A%3CMagicMock%20name%3D%27mock.any_method()%27%20id%3D%27...%27%3E'), 'copy-btn-415')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; from unittest.mock import MagicMock
+&gt;&gt;&gt; m = MagicMock()
+&gt;&gt;&gt; m.anything.you.access            # 沒定義也不報錯，自動生出一個子 mock
+&lt;MagicMock name='mock.anything.you.access' id='...'&gt;
+&gt;&gt;&gt; m.any_method(1, 2)               # 任何方法都能呼叫
+&lt;MagicMock name='mock.any_method()' id='...'&gt;</code></pre>
+      </div>
+    <p>設定回傳值用 <code>return_value</code>（對應 Mockito <code>when(...).thenReturn(...)</code>）、設定多次呼叫的不同回傳或丟例外用 <code>side_effect</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-416" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('repo%20%3D%20MagicMock()%0Arepo.find_user.return_value%20%3D%20%7B%22id%22%3A%201%2C%20%22name%22%3A%20%22Albert%22%7D%20%20%20%23%20when(repo.findUser(any)).thenReturn(...)%0A%0Auser%20%3D%20repo.find_user(1)%0Aassert%20user%5B%22name%22%5D%20%3D%3D%20%22Albert%22%0A%0Arepo.find_user.assert_called_once_with(1)%20%20%20%20%20%23%20verify(repo).findUser(1)'), 'copy-btn-416')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">repo = MagicMock()
+repo.find_user.return_value = {"id": 1, "name": "Albert"}   # when(repo.findUser(any)).thenReturn(...)
+
+user = repo.find_user(1)
+assert user["name"] == "Albert"
+
+repo.find_user.assert_called_once_with(1)     # verify(repo).findUser(1)</code></pre>
+      </div>
+    <table>
+<thead>
+<tr>
+<th>Mockito</th>
+<th>unittest.mock</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>mock(Repo.class)</code></td>
+<td><code>MagicMock()</code></td>
+<td>建立替身</td>
+</tr>
+<tr>
+<td><code>when(m.f()).thenReturn(x)</code></td>
+<td><code>m.f.return_value = x</code></td>
+<td>設定回傳</td>
+</tr>
+<tr>
+<td><code>when(m.f()).thenThrow(e)</code></td>
+<td><code>m.f.side_effect = e</code></td>
+<td>設定丟例外</td>
+</tr>
+<tr>
+<td><code>when(m.f()).thenReturn(a, b)</code></td>
+<td><code>m.f.side_effect = [a, b]</code></td>
+<td>連續回傳</td>
+</tr>
+<tr>
+<td><code>verify(m).f(1)</code></td>
+<td><code>m.f.assert_called_once_with(1)</code></td>
+<td>驗證呼叫</td>
+</tr>
+<tr>
+<td><code>verify(m, never()).f()</code></td>
+<td><code>m.f.assert_not_called()</code></td>
+<td>驗證未被呼叫</td>
+</tr>
+<tr>
+<td><code>verify(m, times(2)).f()</code></td>
+<td><code>m.f.call_count == 2</code></td>
+<td>驗證次數</td>
+</tr>
+</tbody></table>
+<p><code>side_effect</code> 比 Mockito 的 <code>thenThrow</code>/<code>thenReturn</code> 更靈活——它可以是例外（會被丟出）、可迭代物件（每次呼叫回傳下一個），或一個函式（用呼叫參數動態算回傳）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-417" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('m%20%3D%20MagicMock()%0Am.next.side_effect%20%3D%20%5B10%2C%2020%2C%2030%5D%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%80%A3%E7%BA%8C%E4%B8%89%E6%AC%A1%E5%91%BC%E5%8F%AB%E5%88%86%E5%88%A5%E5%9B%9E%2010%2C%2020%2C%2030%0Aassert%20%5Bm.next()%2C%20m.next()%2C%20m.next()%5D%20%3D%3D%20%5B10%2C%2020%2C%2030%5D%0A%0Am.fetch.side_effect%20%3D%20ConnectionError(%22down%22)%20%23%20%E4%B8%80%E5%91%BC%E5%8F%AB%E5%B0%B1%E4%B8%9F%E4%BE%8B%E5%A4%96'), 'copy-btn-417')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">m = MagicMock()
+m.next.side_effect = [10, 20, 30]             # 連續三次呼叫分別回 10, 20, 30
+assert [m.next(), m.next(), m.next()] == [10, 20, 30]
+
+m.fetch.side_effect = ConnectionError("down") # 一呼叫就丟例外</code></pre>
+      </div>
+    <h3 id="patch在使用處替換">patch：在「使用處」替換</h3><p>真正的重點是 <code>patch</code>——它在測試期間把某個名稱換成 mock，結束後自動還原。對照 Mockito 的 <code>@Mock</code> + <code>@InjectMocks</code> 或 <code>mockStatic</code>。假設我們的被測模組會去打外部 API：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-418" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20rates.py%0Adef%20fetch_rate(currency%3A%20str)%20-%3E%20float%3A%0A%20%20%20%20...%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%9C%9F%E7%9A%84%E6%9C%83%E9%80%A3%E7%B6%B2%0A%0Adef%20total_in_usd(amount_twd%3A%20int%2C%20currency%3A%20str%20%3D%20%22TWD%22)%20-%3E%20float%3A%0A%20%20%20%20rate%20%3D%20fetch_rate(currency)%20%20%20%20%20%20%20%20%23%20%E6%88%91%E5%80%91%E6%83%B3%E5%9C%A8%E6%B8%AC%E8%A9%A6%E8%A3%A1%20mock%20%E6%8E%89%E9%80%99%E5%80%8B%0A%20%20%20%20return%20round(amount_twd%20*%20rate%2C%202)'), 'copy-btn-418')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># rates.py
+def fetch_rate(currency: str) -&gt; float:
+    ...                       # 真的會連網
+
+def total_in_usd(amount_twd: int, currency: str = "TWD") -&gt; float:
+    rate = fetch_rate(currency)        # 我們想在測試裡 mock 掉這個
+    return round(amount_twd * rate, 2)</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-419" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20test_rates.py%0Afrom%20unittest.mock%20import%20patch%0Aimport%20pytest%0Aimport%20rates%0A%0A%40patch(%22rates.fetch_rate%22)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%B3%A8%E6%84%8F%EF%BC%9Apatch%20%E7%9A%84%E6%98%AF%20rates.fetch_rate%0Adef%20test_total_in_usd(mock_fetch)%3A%0A%20%20%20%20mock_fetch.return_value%20%3D%200.031%0A%20%20%20%20result%20%3D%20rates.total_in_usd(100000%2C%20%22TWD%22)%0A%20%20%20%20assert%20result%20%3D%3D%203100.0%0A%20%20%20%20mock_fetch.assert_called_once_with(%22TWD%22)%0A%0A%40patch(%22rates.fetch_rate%22)%0Adef%20test_network_failure(mock_fetch)%3A%0A%20%20%20%20mock_fetch.side_effect%20%3D%20ConnectionError(%22network%20down%22)%0A%20%20%20%20with%20pytest.raises(ConnectionError)%3A%0A%20%20%20%20%20%20%20%20rates.total_in_usd(100000)'), 'copy-btn-419')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># test_rates.py
+from unittest.mock import patch
+import pytest
+import rates
+
+@patch("rates.fetch_rate")                     # 注意：patch 的是 rates.fetch_rate
+def test_total_in_usd(mock_fetch):
+    mock_fetch.return_value = 0.031
+    result = rates.total_in_usd(100000, "TWD")
+    assert result == 3100.0
+    mock_fetch.assert_called_once_with("TWD")
+
+@patch("rates.fetch_rate")
+def test_network_failure(mock_fetch):
+    mock_fetch.side_effect = ConnectionError("network down")
+    with pytest.raises(ConnectionError):
+        rates.total_in_usd(100000)</code></pre>
+      </div>
+    <p>被 <code>@patch</code> 裝飾的測試會多收一個參數（那個 mock 物件）——多個 <code>@patch</code> 疊加時，<strong>注入順序由內到外</strong>（最靠近函式的 patch 是第一個參數），這個順序常讓人搞錯，記成「由下往上對應由左往右」。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-420" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40patch(%22rates.b%22)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%B8%8A%E9%9D%A2%E7%9A%84%20%E2%86%92%20%E5%B0%8D%E6%87%89%E5%BE%8C%E9%9D%A2%E7%9A%84%E5%8F%83%E6%95%B8%0A%40patch(%22rates.a%22)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E2%AC%85%20%E6%9C%80%E9%9D%A0%E8%BF%91%20def%20%E2%86%92%20%E5%B0%8D%E6%87%89%E7%AC%AC%E4%B8%80%E5%80%8B%E5%8F%83%E6%95%B8%0Adef%20test(mock_a%2C%20mock_b)%3A%20%20%20%20%20%20%23%20mock_a%20%E6%98%AF%20rates.a%E3%80%81mock_b%20%E6%98%AF%20rates.b%0A%20%20%20%20...'), 'copy-btn-420')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@patch("rates.b")              # 上面的 → 對應後面的參數
+@patch("rates.a")              # ⬅ 最靠近 def → 對應第一個參數
+def test(mock_a, mock_b):      # mock_a 是 rates.a、mock_b 是 rates.b
+    ...</code></pre>
+      </div>
+    <p>由下往上數：<code>@patch(&quot;rates.a&quot;)</code> 緊貼 <code>def</code>，所以它對應簽名裡的第一個 mock 參數 <code>mock_a</code>；再往上的 <code>@patch(&quot;rates.b&quot;)</code> 對應第二個 <code>mock_b</code>。</p>
+<h3 id="where-to-patch本章最關鍵的一條規則">where to patch：本章最關鍵的一條規則</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-421" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%40patch(%22rates.fetch_rate%22)%20%20%20%20%20%20%20%20%23%20%E2%9C%85%20%E5%B0%8D%EF%BC%9Apatch%20%E5%AE%83%E3%80%8C%E8%A2%AB%E4%BD%BF%E7%94%A8%E3%80%8D%E7%9A%84%E5%9C%B0%E6%96%B9'), 'copy-btn-421')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">@patch("rates.fetch_rate")        # ✅ 對：patch 它「被使用」的地方</code></pre>
+      </div>
+    <p>注意我們 patch 的是 <code>&quot;rates.fetch_rate&quot;</code>，<strong>不是</strong> <code>fetch_rate</code> 定義在哪個模組。這是初學者最常踩的坑。規則是：</p>
+<blockquote><p><strong>patch the name where it is looked up, not where it is defined.</strong>
+（在「名稱被查找的地方」打 patch，不是在「它被定義的地方」。）</p>
+</blockquote><p>為什麼？因為 Python 的 <code>import</code> 是<strong>綁定名稱</strong>。當 <code>rates.py</code> 寫 <code>from external import fetch_rate</code>，它在 <code>rates</code> 模組的命名空間裡建立了一個叫 <code>fetch_rate</code> 的名字，指向那個函式物件。你要替換的是 <strong><code>rates</code> 裡的那個綁定</strong>，去 patch 原始定義處的 <code>external.fetch_rate</code> 根本攔不到——<code>rates</code> 早就持有自己的參考了（這就是第 11 章講的 import 綁定機制在測試裡的直接後果）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-422" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E5%A6%82%E6%9E%9C%20rates.py%20%E6%98%AF%20%60from%20external%20import%20fetch_rate%60%0A%40patch(%22rates.fetch_rate%22)%20%20%20%20%20%20%20%20%23%20%E2%9C%85%20patch%20%E4%BD%BF%E7%94%A8%E8%99%95%0A%40patch(%22external.fetch_rate%22)%20%20%20%20%20%23%20%E2%9D%8C%20%E6%94%94%E4%B8%8D%E5%88%B0%EF%BC%8Crates%20%E5%B7%B2%E7%B6%81%E5%AE%9A%E4%BA%86%E8%87%AA%E5%B7%B1%E7%9A%84%E5%8F%83%E8%80%83%0A%0A%23%20%E5%A6%82%E6%9E%9C%20rates.py%20%E6%98%AF%20%60import%20external%60%20%E7%84%B6%E5%BE%8C%E5%91%BC%E5%8F%AB%20external.fetch_rate()%0A%40patch(%22external.fetch_rate%22)%20%20%20%20%20%23%20%E2%9C%85%20%E9%80%99%E6%99%82%E8%A6%81%20patch%20%E5%AE%9A%E7%BE%A9%E8%99%95%EF%BC%8C%E5%9B%A0%E7%82%BA%E6%9F%A5%E6%89%BE%E6%98%AF%E7%B6%93%E9%81%8E%20external%20%E6%A8%A1%E7%B5%84'), 'copy-btn-422')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># 如果 rates.py 是 `from external import fetch_rate`
+@patch("rates.fetch_rate")        # ✅ patch 使用處
+@patch("external.fetch_rate")     # ❌ 攔不到，rates 已綁定了自己的參考
+
+# 如果 rates.py 是 `import external` 然後呼叫 external.fetch_rate()
+@patch("external.fetch_rate")     # ✅ 這時要 patch 定義處，因為查找是經過 external 模組</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：「patch 哪裡」取決於<strong>被測模組怎麼 import</strong>，不是函式定義在哪。<code>from x import f</code>（直接綁名）→ patch <code>被測模組.f</code>；<code>import x</code> 後用 <code>x.f()</code>（每次經過模組查找）→ patch <code>x.f</code>。搞錯方向時的症狀是「mock 沒生效、真的去連網了」。這條規則在 Mockito 不存在，因為 Java 的方法呼叫是動態分派到物件，沒有「import 綁定名稱」這回事。</p>
+</div><p><code>patch</code> 也能當 context manager（<code>with patch(...) as m:</code>）或直接用 <code>monkeypatch.setattr</code>（pytest 風格，免裝飾器）。三種選一種，團隊統一即可。</p>
+<hr>
+<h2 id="coveragehypothesisdoctesttoxnox">coverage、hypothesis、doctest、tox/nox</h2><h3 id="coveragepy覆蓋率與它的侷限">coverage.py：覆蓋率與它的侷限</h3><p>對照 JaCoCo。透過 <code>pytest-cov</code> 外掛整合進 pytest：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-423" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('uv%20run%20--with%20pytest%20--with%20pytest-cov%20pytest%20--cov%3Dpricing%20--cov-report%3Dterm-missing'), 'copy-btn-423')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">uv run --with pytest --with pytest-cov pytest --cov=pricing --cov-report=term-missing</code></pre>
+      </div>
+    <p>以下為示意輸出，實際的 <code>Stmts</code> 行數與覆蓋率會依你自己的 <code>pricing.py</code> 而定：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-424" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('Name%20%20%20%20%20%20%20%20%20Stmts%20%20%20Miss%20%20Cover%20%20%20Missing%0A------------------------------------------%0Apricing.py%20%20%20%20%20%2012%20%20%20%20%20%200%20%20%20100%25%0A------------------------------------------%0ATOTAL%20%20%20%20%20%20%20%20%20%20%2012%20%20%20%20%20%200%20%20%20100%25'), 'copy-btn-424')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">Name         Stmts   Miss  Cover   Missing
+------------------------------------------
+pricing.py      12      0   100%
+------------------------------------------
+TOTAL           12      0   100%</code></pre>
+      </div>
+    <p><code>--cov-report=term-missing</code> 會列出<strong>沒被覆蓋的行號</strong>（<code>Missing</code> 欄），這是它最有用的地方——直接告訴你哪幾行從沒被執行。也能輸出 <code>html</code>（互動報表）或 <code>xml</code>（餵給 CI/SonarQube）。在 <code>pyproject.toml</code> 設門檻：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">toml</span>
+          <button id="copy-btn-425" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%5Btool.coverage.report%5D%0Afail_under%20%3D%2085%20%20%20%20%20%20%20%20%20%20%23%20%E8%A6%86%E8%93%8B%E7%8E%87%E4%BD%8E%E6%96%BC%2085%25%20%E5%B0%B1%E8%AE%93%20build%20%E5%A4%B1%E6%95%97%0Ashow_missing%20%3D%20true'), 'copy-btn-425')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-toml"><code class="language-toml">[tool.coverage.report]
+fail_under = 85          # 覆蓋率低於 85% 就讓 build 失敗
+show_missing = true</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<strong>高覆蓋率 ≠ 測得好</strong>。覆蓋率只證明那行「被執行過」，不證明它「被驗證過」。一個沒有任何 <code>assert</code>、只是把所有函式呼叫一遍的測試也能拿 100%——這在 Java/JaCoCo 也一樣。把覆蓋率當「找出<strong>完全沒被測到</strong>的程式碼」的工具（那是真訊號），別把它當「測試品質」的指標。語句覆蓋（statement）尤其寬鬆，分支覆蓋（branch，<code>--cov-branch</code>）嚴一點但仍不保證斷言充分。</p>
+</div><h3 id="hypothesisproperty-based-testing">hypothesis：property-based testing</h3><p>這是 Java 工程師最該帶走的新工具。對照 <strong>jqwik</strong>（或 Java 版 QuickCheck）。傳統測試（example-based）你<strong>手挑</strong>幾組輸入；property-based testing 你只描述「<strong>對任何合法輸入都該成立的性質</strong>」，框架去<strong>生成</strong>大量隨機輸入來打你的程式：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-426" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20hypothesis%20import%20given%2C%20strategies%20as%20st%0Afrom%20pricing%20import%20apply_discount%0A%0A%40given(%0A%20%20%20%20amount%3Dst.integers(min_value%3D0%2C%20max_value%3D10_000_000)%2C%0A%20%20%20%20percent%3Dst.integers(min_value%3D0%2C%20max_value%3D100)%2C%0A)%0Adef%20test_discount_never_exceeds_amount(amount%2C%20percent)%3A%0A%20%20%20%20discounted%20%3D%20apply_discount(amount%2C%20percent)%0A%20%20%20%20assert%200%20%3C%3D%20discounted%20%3C%3D%20amount%20%20%20%20%20%20%20%20%23%20%E6%80%A7%E8%B3%AA%EF%BC%9A%E6%8A%98%E5%BE%8C%E5%83%B9%E6%B0%B8%E9%81%A0%E5%9C%A8%20%5B0%2C%20%E5%8E%9F%E5%83%B9%5D%20%E4%B9%8B%E9%96%93'), 'copy-btn-426')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from hypothesis import given, strategies as st
+from pricing import apply_discount
+
+@given(
+    amount=st.integers(min_value=0, max_value=10_000_000),
+    percent=st.integers(min_value=0, max_value=100),
+)
+def test_discount_never_exceeds_amount(amount, percent):
+    discounted = apply_discount(amount, percent)
+    assert 0 &lt;= discounted &lt;= amount        # 性質：折後價永遠在 [0, 原價] 之間</code></pre>
+      </div>
+    <p><code>@given</code> 配上 <strong>strategies</strong>（<code>st.integers</code>、<code>st.text</code>、<code>st.lists</code>、<code>st.dictionaries</code>……，對應 jqwik 的 <code>Arbitraries</code>）描述輸入空間，hypothesis 每跑一次測試就生一批案例（預設 100 個）丟進去。<code>@given</code> 與 pytest 完全相容——直接當普通 pytest 測試跑。</p>
+<p><strong>最殺的功能是 shrinking（縮小反例）</strong>：找到反例後，hypothesis 不會把那個又長又亂的隨機輸入丟給你，而是<strong>自動把它縮小到最簡形式</strong>，方便你 debug。看一個能真正抓出 bug 的 <strong>round-trip（往返）範例</strong>——「序列化再反序列化應該還原」這類性質，是 property testing 的經典戰場：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-427" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20slugify.py%EF%BC%88%E6%9C%89%20bug%20%E7%9A%84%E5%AF%A6%E4%BD%9C%EF%BC%89%0Adef%20to_slug(title%3A%20str)%20-%3E%20str%3A%0A%20%20%20%20return%20title.strip().lower().replace(%22%20%22%2C%20%22-%22)%20%20%20%23%20bug%EF%BC%9A%E9%80%A3%E7%BA%8C%E7%A9%BA%E7%99%BD%E8%AE%8A%E9%80%A3%E7%BA%8C%20%27-%27%0A%0Adef%20from_slug(slug%3A%20str)%20-%3E%20str%3A%0A%20%20%20%20return%20slug.replace(%22-%22%2C%20%22%20%22)'), 'copy-btn-427')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># slugify.py（有 bug 的實作）
+def to_slug(title: str) -&gt; str:
+    return title.strip().lower().replace(" ", "-")   # bug：連續空白變連續 '-'
+
+def from_slug(slug: str) -&gt; str:
+    return slug.replace("-", " ")</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-428" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20test_roundtrip.py%0Afrom%20hypothesis%20import%20given%2C%20strategies%20as%20st%0Afrom%20slugify%20import%20to_slug%2C%20from_slug%0A%0Awords%20%3D%20st.text(alphabet%3D%22abc%20%22%2C%20min_size%3D0%2C%20max_size%3D20)%0A%0A%40given(words)%0Adef%20test_slug_roundtrip(title)%3A%0A%20%20%20%20normalized%20%3D%20%22%20%22.join(title.lower().split())%20%20%20%20%20%23%20%E6%88%91%E5%80%91%E5%B0%8D%E3%80%8C%E6%AD%A3%E8%A6%8F%E5%8C%96%E5%BE%8C%E3%80%8D%E7%9A%84%E5%BE%80%E8%BF%94%E6%9C%9F%E6%9C%9B%0A%20%20%20%20assert%20from_slug(to_slug(title))%20%3D%3D%20normalized'), 'copy-btn-428')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># test_roundtrip.py
+from hypothesis import given, strategies as st
+from slugify import to_slug, from_slug
+
+words = st.text(alphabet="abc ", min_size=0, max_size=20)
+
+@given(words)
+def test_slug_roundtrip(title):
+    normalized = " ".join(title.lower().split())     # 我們對「正規化後」的往返期望
+    assert from_slug(to_slug(title)) == normalized</code></pre>
+      </div>
+    <p>跑下去，hypothesis 找到反例並<strong>縮到最小</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-429" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('title%20%3D%20%27a%20%20a%27%0A%0A%3E%20%20%20%20%20%20%20assert%20from_slug(to_slug(title))%20%3D%3D%20normalized%0AE%20%20%20%20%20%20%20AssertionError%3A%20assert%20%27a%20%20a%27%20%3D%3D%20%27a%20a%27%0AE%20%20%20%20%20%20%20%20%20Falsifying%20example%3A%20test_slug_roundtrip(title%3D%27a%20%20a%27)'), 'copy-btn-429')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">title = 'a  a'
+
+&gt;       assert from_slug(to_slug(title)) == normalized
+E       AssertionError: assert 'a  a' == 'a a'
+E         Falsifying example: test_slug_roundtrip(title='a  a')</code></pre>
+      </div>
+    <p>它沒丟給你一個 20 字元的亂碼，而是縮到 <code>&#39;a  a&#39;</code>（兩個空白）——一眼就看出 bug：連續空白被轉成連續 <code>-</code>、還原時又變回連續空白，跟正規化後的單一空白對不上。<strong>這種「我沒想到的邊界輸入」正是手寫範例測試會漏、property testing 會抓的</strong>。hypothesis 還會把找到的反例存進 <code>.hypothesis/</code> 快取，下次優先重跑（迴歸保護）。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：寫 property test 的訣竅是找「<strong>不變式（invariant）</strong>」而非「具體答案」。好用的性質模式：往返（<code>decode(encode(x)) == x</code>）、等冪（<code>f(f(x)) == f(x)</code>）、與簡單參考實作比對（<code>my_sort(x) == sorted(x)</code>）、輸出的結構性質（<code>len(result) &lt;= len(input)</code>）。一條 property test 抵得上幾十條手寫案例，且會找到你想不到的邊界。</p>
+</div><h3 id="doctestdocstring-即測試">doctest：docstring 即測試</h3><p><code>doctest</code> 是標準庫工具：把 docstring 裡長得像 REPL 互動（<code>&gt;&gt;&gt;</code>）的片段<strong>當測試執行</strong>，比對實際輸出與寫下的輸出。對照——Java 沒有真正等價物（JavaDoc 的 <code>{@code}</code> 不會被執行）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-430" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20mathy.py%0Adef%20factorial(n%3A%20int)%20-%3E%20int%3A%0A%20%20%20%20%22%22%22%E5%9B%9E%E5%82%B3%20n%20%E7%9A%84%E9%9A%8E%E4%B9%98%E3%80%82%0A%0A%20%20%20%20%3E%3E%3E%20factorial(0)%0A%20%20%20%201%0A%20%20%20%20%3E%3E%3E%20factorial(5)%0A%20%20%20%20120%0A%20%20%20%20%22%22%22%0A%20%20%20%20result%20%3D%201%0A%20%20%20%20for%20i%20in%20range(2%2C%20n%20%2B%201)%3A%0A%20%20%20%20%20%20%20%20result%20*%3D%20i%0A%20%20%20%20return%20result'), 'copy-btn-430')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># mathy.py
+def factorial(n: int) -&gt; int:
+    """回傳 n 的階乘。
+
+    &gt;&gt;&gt; factorial(0)
+    1
+    &gt;&gt;&gt; factorial(5)
+    120
+    """
+    result = 1
+    for i in range(2, n + 1):
+        result *= i
+    return result</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-431" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('python3%20-m%20doctest%20mathy.py%20-v%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%94%A8%E6%A8%99%E6%BA%96%E5%BA%AB%E8%B7%91%0Auv%20run%20--with%20pytest%20pytest%20--doctest-modules%20mathy.py%20%20%20%23%20%E8%AE%93%20pytest%20%E4%B8%80%E8%B5%B7%E6%94%B6%E9%9B%86%20doctest'), 'copy-btn-431')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">python3 -m doctest mathy.py -v               # 用標準庫跑
+uv run --with pytest pytest --doctest-modules mathy.py   # 讓 pytest 一起收集 doctest</code></pre>
+      </div>
+    <p>doctest 的價值在<strong>讓文件不會腐爛</strong>——範例輸出對不上就紅燈，逼你維護文件的正確性。但它對輸出格式很挑剔（多一個空白、dict 順序、物件的 repr 位址都會讓它失敗），所以<strong>只拿它測「輸出穩定、適合當文件示範」的小函式</strong>，別把它當主力測試框架。複雜邏輯與邊界仍交給 pytest。</p>
+<h3 id="tox-nox跨多版本測試">tox / nox：跨多版本測試</h3><p>對照 CI build matrix 與 Maven profiles。你的函式庫要支援 Python 3.11/3.12/3.13，就得在每個版本各跑一次測試——<strong>tox</strong>（設定檔驅動）與 <strong>nox</strong>（用 Python 寫設定）就是做這件事的：每個目標版本建一個隔離的虛擬環境、裝好相依、跑測試。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">ini</span>
+          <button id="copy-btn-432" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20tox.ini%0A%5Btox%5D%0Aenv_list%20%3D%20py311%2C%20py312%2C%20py313%0A%0A%5Btestenv%5D%0Adeps%20%3D%20pytest%0Acommands%20%3D%20pytest%20%7Bposargs%7D'), 'copy-btn-432')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-ini"><code class="language-ini"># tox.ini
+[tox]
+env_list = py311, py312, py313
+
+[testenv]
+deps = pytest
+commands = pytest {posargs}</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-433" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20noxfile.py%EF%BC%88nox%20%E7%94%A8%20Python%20%E5%AF%AB%EF%BC%8C%E6%9B%B4%E9%9D%88%E6%B4%BB%EF%BC%89%0Aimport%20nox%0A%0A%40nox.session(python%3D%5B%223.11%22%2C%20%223.12%22%2C%20%223.13%22%5D)%0Adef%20tests(session)%3A%0A%20%20%20%20session.install(%22pytest%22%2C%20%22hypothesis%22)%0A%20%20%20%20session.run(%22pytest%22)'), 'copy-btn-433')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># noxfile.py（nox 用 Python 寫，更靈活）
+import nox
+
+@nox.session(python=["3.11", "3.12", "3.13"])
+def tests(session):
+    session.install("pytest", "hypothesis")
+    session.run("pytest")</code></pre>
+      </div>
+    <p><code>nox -s tests</code> 或 <code>tox</code> 會對每個版本各跑一輪。CI 裡你通常還會用 GitHub Actions 的 <code>strategy.matrix</code> 在不同 OS × 版本上平行跑——tox/nox 管「多 Python 版本」、CI matrix 管「多 OS／多維度」，兩者常一起用。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：函式庫（要被別人裝、需支援多版本）值得 tox/nox；公司內部的單一部署應用（你只跑一個鎖定的版本）通常不需要——直接在 CI 釘死那個版本即可。別為了「看起來完整」而引入用不到的 matrix 複雜度。</p>
+</div><hr>
+<h2 id="本章小結">本章小結</h2><ol>
+<li><strong>pytest 用函式 + 命名慣例 + 裸 <code>assert</code></strong>：<code>test_*.py</code> 裡的 <code>test_*</code> 函式自動被收集，無 <code>@Test</code>、無 <code>TestCase</code>。assert rewriting 讓裸 <code>assert a == b</code> 也有豐富 diff，所以不需要 <code>assertEquals</code> 那套 API。</li>
+<li><strong>fixture 是按名稱注入的依賴</strong>：宣告 <code>@pytest.fixture</code>，測試用同名參數「點名」即可注入。<code>yield</code> 版把 setup/teardown 寫在一起（<code>yield</code> 後一定執行）；scope 控制建立頻率，但共享 scope 小心狀態污染。</li>
+<li><strong>conftest.py 與內建 fixture 省你造輪子</strong>：<code>tmp_path</code>、<code>capsys</code>、<code>monkeypatch</code> 直接要就有；conftest.py 按目錄階層共享 fixture、免 import。</li>
+<li><strong>parametrize 把資料展開成多個獨立案例</strong>，傳的是 Python 物件而非 CSV；marker 貼標籤（<code>skip</code>/<code>skipif</code>/<code>xfail</code>、自訂 marker + <code>-m</code> 過濾）；<code>pytest.raises</code> 測例外、<code>match=</code> 用 regex。</li>
+<li><strong>unittest.mock = Python 版 Mockito</strong>：<code>MagicMock</code> 自動長屬性、<code>return_value</code>/<code>side_effect</code> 設行為、<code>assert_called_once_with</code> 驗證。</li>
+<li><strong>where to patch 是 mock 的命門</strong>：patch「名稱被查找的地方」而非「定義處」——<code>from x import f</code> → patch <code>被測模組.f</code>；<code>import x</code> 用 <code>x.f()</code> → patch <code>x.f</code>。搞錯就 mock 不生效。</li>
+<li><strong>覆蓋率是「找沒測到的碼」的工具，不是品質指標</strong>——高覆蓋率不代表斷言充分。</li>
+<li><strong>hypothesis（property-based）會抓你想不到的邊界</strong>：用 <code>@given</code> + strategies 描述性質（往返、等冪、不變式），框架生成大量輸入並自動 shrink 反例。doctest 讓文件不腐爛、tox/nox 跨多版本——各用在對的地方。</li>
+</ol>
+<hr>
+<h2 id="練習">練習</h2><p><strong>練習 1（JUnit → pytest 平移）</strong>
+把這段 JUnit 風格的測試改寫成 pytest：一個 <code>@BeforeEach</code> 建立空 <code>ShoppingCart</code>、兩個測試方法（加一個商品後 size 為 1、加重複商品後 quantity 累加）。要求用 fixture 取代 <code>@BeforeEach</code>、用裸 <code>assert</code>。提示：fixture 回傳那個 cart，兩個測試函式都把它當參數。</p>
+<p><strong>練習 2（parametrize + raises）</strong>
+為 <code>apply_discount(amount, percent)</code> 寫一條 parametrize 測試，涵蓋 <code>percent</code> 為 0、50、100 三組正常值，再寫一條獨立測試用 <code>pytest.raises(ValueError, match=...)</code> 驗證 <code>percent=-1</code> 與 <code>percent=101</code> 都會被拒絕。觀察失敗時 pytest 報的測試 ID 長什麼樣。</p>
+<p><strong>練習 3（where to patch）</strong>
+寫一個 <code>weather.py</code>，裡面 <code>from http_client import get_json</code> 並用它實作 <code>current_temp(city)</code>。寫測試把 <code>get_json</code> mock 掉、回傳假資料，斷言 <code>current_temp</code> 算出正確結果。先故意 patch <code>&quot;http_client.get_json&quot;</code>（定義處）跑一次、看它為什麼攔不到，再改成 patch <code>&quot;weather.get_json&quot;</code>（使用處）。用一句話解釋差異。</p>
+<p><strong>練習 4（property-based：抓真 bug）</strong>
+寫一個 <code>parse_duration(&quot;1h30m&quot;) -&gt; int</code>（回傳總秒數）與反向的 <code>format_duration(seconds) -&gt; str</code>，故意在某個邊界留 bug（例如剛好 0 秒或超過 60 分鐘）。用 hypothesis 寫 round-trip 性質 <code>parse_duration(format_duration(s)) == s</code>（<code>s</code> 用 <code>st.integers(min_value=0, max_value=86400)</code>），讓它幫你縮小出反例。提示：把反例貼出來，看 shrinking 縮到多小。</p>
+<p><strong>練習 5（覆蓋率的謊言）</strong>
+為練習 2 的 <code>apply_discount</code> 寫一個<strong>沒有任何 <code>assert</code></strong>、只呼叫函式的「假測試」，用 <code>--cov</code> 觀察它照樣能拿高覆蓋率。再補上真正的斷言。用這個對比解釋為什麼「覆蓋率達標」不能當驗收標準，以及它真正該被用來回答什麼問題。</p>

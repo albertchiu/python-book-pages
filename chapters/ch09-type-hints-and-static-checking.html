@@ -1,0 +1,482 @@
+<h1 id="第-9-章型別提示與靜態檢查java-工程師的舒適圈">第 9 章：型別提示與靜態檢查（Java 工程師的舒適圈）</h1><p>這一章是你的主場。第 3 章已經點過型別提示，這裡要把它變成完整的工程能力：用 <code>typing</code> 找回你習慣的型別詞彙、用泛型寫出型別安全的容器、用 mypy/pyright 把「編譯期型別檢查」以可選的方式裝回 Python、再用 pydantic 補上型別提示<strong>不做</strong>的那件事——執行期驗證。最後談「漸進式型別」（gradual typing）的取捨：不是型別標越多越好，而是標在刀口上。</p>
+<hr>
+<h2 id="typing-模組找回靜態型別的詞彙">`typing` 模組：找回靜態型別的詞彙</h2><p>現代 Python（3.10+）的型別語法已經很接近你要的樣子。先建立詞彙對照：</p>
+<table>
+<thead>
+<tr>
+<th>你想表達</th>
+<th>Python（現代寫法）</th>
+<th>Java</th>
+<th>備註</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>整數串列</td>
+<td><code>list[int]</code></td>
+<td><code>List&lt;Integer&gt;</code></td>
+<td>用內建 <code>list</code>，不是 <code>typing.List</code></td>
+</tr>
+<tr>
+<td>字串對整數的對應</td>
+<td><code>dict[str, int]</code></td>
+<td><code>Map&lt;String, Integer&gt;</code></td>
+<td></td>
+</tr>
+<tr>
+<td>可有可無</td>
+<td><code>str | None</code></td>
+<td><code>Optional&lt;String&gt;</code></td>
+<td><code>Optional[str]</code> 是同義舊寫法</td>
+</tr>
+<tr>
+<td>多種型別之一</td>
+<td><code>int | str</code></td>
+<td>（無直接對應）</td>
+<td><code>Union[int, str]</code> 是舊寫法</td>
+</tr>
+<tr>
+<td>函式型別</td>
+<td><code>Callable[[int, str], bool]</code></td>
+<td><code>BiFunction&lt;Integer,String,Boolean&gt;</code></td>
+<td>從 <code>collections.abc</code> 匯入</td>
+</tr>
+<tr>
+<td>固定長度異質</td>
+<td><code>tuple[int, str, float]</code></td>
+<td>（record / 多型別）</td>
+<td>跟 <code>tuple[int, ...]</code>（任意長度）不同</td>
+</tr>
+<tr>
+<td>放棄型別</td>
+<td><code>Any</code></td>
+<td>（<code>Object</code> 但更鬆）</td>
+<td>逃生出口，會關閉檢查</td>
+</tr>
+</tbody></table>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-271" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20lookup(table%3A%20dict%5Bstr%2C%20int%5D%2C%20key%3A%20str)%20-%3E%20int%20%7C%20None%3A%0A%20%20%20%20return%20table.get(key)%20%20%20%20%20%20%20%20%20%20%23%20%E6%89%BE%E4%B8%8D%E5%88%B0%E5%9B%9E%20None%EF%BC%8C%E6%89%80%E4%BB%A5%E5%9B%9E%E5%82%B3%E5%9E%8B%E5%88%A5%E6%98%AF%20int%20%7C%20None'), 'copy-btn-271')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def lookup(table: dict[str, int], key: str) -&gt; int | None:
+    return table.get(key)          # 找不到回 None，所以回傳型別是 int | None</code></pre>
+      </div>
+    <p>幾個 Java 工程師要記住的轉換：</p>
+<ul>
+<li><strong>不要用 <code>typing.List</code>／<code>Dict</code>／<code>Optional</code>／<code>Union</code> 的舊寫法</strong>。Python 3.9 起內建容器可直接當泛型（<code>list[int]</code>），3.10 起用 <code>X | Y</code> 取代 <code>Union</code>、<code>X | None</code> 取代 <code>Optional</code>。看到 <code>from typing import List</code> 就知道是舊碼。</li>
+<li><strong><code>str | None</code> 不是 Java 的 <code>Optional</code></strong>。它沒有 <code>.map()</code>/<code>.orElse()</code> 那套 API，就是「值或 None」。你靠型別<strong>縮小</strong>（narrowing）來安全使用它：</li>
+</ul>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-272" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20greet(name%3A%20str%20%7C%20None)%20-%3E%20str%3A%0A%20%20%20%20if%20name%20is%20None%3A%0A%20%20%20%20%20%20%20%20return%20%22Hi%2C%20stranger%22%0A%20%20%20%20return%20name.upper()%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E9%80%99%E8%A3%A1%20mypy%20%E5%B7%B2%E7%9F%A5%20name%20%E4%B8%80%E5%AE%9A%E6%98%AF%20str%EF%BC%88None%20%E8%A2%AB%E4%B8%8A%E9%9D%A2%E6%8E%92%E9%99%A4%E4%BA%86%EF%BC%89'), 'copy-btn-272')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def greet(name: str | None) -&gt; str:
+    if name is None:
+        return "Hi, stranger"
+    return name.upper()            # 這裡 mypy 已知 name 一定是 str（None 被上面排除了）</code></pre>
+      </div>
+    <p>mypy 會做<strong>流程敏感的型別縮小</strong>（type narrowing）：<code>if name is None: return</code> 之後，它知道剩下的分支裡 <code>name</code> 必為 <code>str</code>，所以 <code>name.upper()</code> 合法。這是型別提示真正好用的地方——它不只是文件，工具會順著你的控制流推理。</p>
+<hr>
+<h2 id="泛型typevargeneric與型別抹除的另一面">泛型：`TypeVar`、`Generic`，與型別抹除的另一面</h2><p>寫「對任何型別都成立、且能保留型別資訊」的函式或容器，就要泛型。Python 3.12（PEP 695）給了跟 Java 很像的簡潔語法：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-273" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20Python%203.12%2B%20%E6%96%B0%E8%AA%9E%E6%B3%95%EF%BC%9A%E6%96%B9%E6%8B%AC%E8%99%9F%E5%AE%A3%E5%91%8A%E5%9E%8B%E5%88%A5%E5%8F%83%E6%95%B8%EF%BC%8C%E4%B8%8D%E5%BF%85%E5%85%88%E5%BB%BA%20TypeVar%0Adef%20first%5BT%5D(items%3A%20list%5BT%5D)%20-%3E%20T%3A%0A%20%20%20%20return%20items%5B0%5D%0A%0Aclass%20Stack%5BT%5D%3A%0A%20%20%20%20def%20__init__(self)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self._items%3A%20list%5BT%5D%20%3D%20%5B%5D%0A%0A%20%20%20%20def%20push(self%2C%20item%3A%20T)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self._items.append(item)%0A%0A%20%20%20%20def%20pop(self)%20-%3E%20T%3A%0A%20%20%20%20%20%20%20%20return%20self._items.pop()'), 'copy-btn-273')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># Python 3.12+ 新語法：方括號宣告型別參數，不必先建 TypeVar
+def first[T](items: list[T]) -&gt; T:
+    return items[0]
+
+class Stack[T]:
+    def __init__(self) -&gt; None:
+        self._items: list[T] = []
+
+    def push(self, item: T) -&gt; None:
+        self._items.append(item)
+
+    def pop(self) -&gt; T:
+        return self._items.pop()</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-274" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20s%3A%20Stack%5Bint%5D%20%3D%20Stack()%0A%3E%3E%3E%20s.push(1)%0A%3E%3E%3E%20reveal_type(s.pop())%20%20%20%20%20%23%20mypy%20%E6%9C%83%E8%AA%AA%EF%BC%9ARevealed%20type%20is%20%22int%22'), 'copy-btn-274')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; s: Stack[int] = Stack()
+&gt;&gt;&gt; s.push(1)
+&gt;&gt;&gt; reveal_type(s.pop())     # mypy 會說：Revealed type is "int"</code></pre>
+      </div>
+    <p>（小提醒：較新版本的 mypy 預設用短名顯示型別——<code>int</code>；很舊的版本或開啟特定設定才會印出完整的 <code>builtins.int</code>。這純粹是顯示差異，不影響檢查結果。）</p>
+<p>對照 Java 的 <code>class Stack&lt;T&gt;</code> 與 <code>&lt;T&gt; T first(List&lt;T&gt; items)</code>，概念一模一樣。3.12 之前（或要相容舊版）的寫法是先建 <code>TypeVar</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-275" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20TypeVar%2C%20Generic%0A%0AT%20%3D%20TypeVar(%22T%22)%0A%0Adef%20first(items%3A%20list%5BT%5D)%20-%3E%20T%3A%0A%20%20%20%20return%20items%5B0%5D%0A%0Aclass%20Stack(Generic%5BT%5D)%3A%20%20%20%20%20%23%20%E8%88%8A%E5%AF%AB%E6%B3%95%E8%A6%81%E6%98%8E%E7%A2%BA%E7%B9%BC%E6%89%BF%20Generic%5BT%5D%0A%20%20%20%20...'), 'copy-btn-275')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import TypeVar, Generic
+
+T = TypeVar("T")
+
+def first(items: list[T]) -&gt; T:
+    return items[0]
+
+class Stack(Generic[T]):     # 舊寫法要明確繼承 Generic[T]
+    ...</code></pre>
+      </div>
+    <p><strong>有界型別</strong>（bounded）也有對應——「T 必須具備某種能力」。下面要求 <code>T</code> 必須支援 <code>&lt;</code> 比較，用一個 <code>Protocol</code>（第 8 章）當上界：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-276" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20Protocol%2C%20Any%0A%0Aclass%20Comparable(Protocol)%3A%0A%20%20%20%20def%20__lt__(self%2C%20other%3A%20Any%2C%20%2F)%20-%3E%20bool%3A%20...%20%20%20%20%23%20%E6%B3%A8%E6%84%8F%EF%BC%9A%E6%98%AF%20Any%20%E4%B8%8D%E6%98%AF%20object%0A%0Adef%20largest%5BT%3A%20Comparable%5D(items%3A%20list%5BT%5D)%20-%3E%20T%3A%20%20%20%23%20T%20%E7%9A%84%E4%B8%8A%E7%95%8C%E6%98%AF%20Comparable%0A%20%20%20%20biggest%20%3D%20items%5B0%5D%0A%20%20%20%20for%20item%20in%20items%5B1%3A%5D%3A%0A%20%20%20%20%20%20%20%20if%20biggest%20%3C%20item%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%9B%A0%E7%82%BA%E6%9C%89%E4%B8%8A%E7%95%8C%EF%BC%8Cmypy%20%E7%9F%A5%E9%81%93%20T%20%E5%8F%AF%E4%BB%A5%E7%94%A8%20%3C%0A%20%20%20%20%20%20%20%20%20%20%20%20biggest%20%3D%20item%0A%20%20%20%20return%20biggest'), 'copy-btn-276')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import Protocol, Any
+
+class Comparable(Protocol):
+    def __lt__(self, other: Any, /) -&gt; bool: ...    # 注意：是 Any 不是 object
+
+def largest[T: Comparable](items: list[T]) -&gt; T:   # T 的上界是 Comparable
+    biggest = items[0]
+    for item in items[1:]:
+        if biggest &lt; item:                          # 因為有上界，mypy 知道 T 可以用 &lt;
+            biggest = item
+    return biggest</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：上面 <code>__lt__</code> 的參數刻意標 <code>Any</code> 而非 <code>object</code>。原因很微妙：<code>int.__lt__</code> 的參數在 typeshed 裡是 <code>int</code>（比 <code>object</code> 窄），而方法參數是<strong>逆變</strong>（contravariant）的——要符合「參數是 <code>object</code>」的協定，實作的參數必須<strong>更寬</strong>。寫成 <code>other: object</code> 會讓 mypy 認定連 <code>int</code>、<code>str</code> 都不滿足 <code>Comparable</code>，<code>largest([3, 1, 4])</code> 直接被 <code>--strict</code> 擋下（<code>Value of type variable &quot;T&quot; of &quot;largest&quot; cannot be &quot;int&quot;</code>）。標 <code>Any</code> 才能讓內建型別順利通過。這正是「相信 mypy」的代價之一：協定的方向性要標對。</p>
+</div>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-277" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20largest(%5B3%2C%201%2C%204%2C%201%2C%205%2C%209%5D)%0A9%0A%3E%3E%3E%20largest(%5B%22banana%22%2C%20%22apple%22%2C%20%22cherry%22%5D)%0A%27cherry%27'), 'copy-btn-277')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; largest([3, 1, 4, 1, 5, 9])
+9
+&gt;&gt;&gt; largest(["banana", "apple", "cherry"])
+'cherry'</code></pre>
+      </div>
+    <p>上界（<code>T: Comparable</code>）對應 Java 的 <code>&lt;T extends Comparable&lt;T&gt;&gt;</code>：沒有它，mypy 不知道 <code>T</code> 能不能用 <code>&lt;</code>，會擋下 <code>biggest &lt; item</code>。加了上界，它才放行——而且回傳型別仍精準保留為傳入的 <code>T</code>（傳 <code>list[int]</code> 回 <code>int</code>，傳 <code>list[str]</code> 回 <code>str</code>）。</p>
+<h3 id="型別抹除java-的痛python-的坦白">型別抹除：Java 的痛，Python 的坦白</h3><p>Java 的泛型是<strong>型別抹除</strong>（type erasure）：<code>List&lt;String&gt;</code> 在執行期只是 <code>List</code>，於是你不能 <code>new T()</code>、不能 <code>new T[]</code>、不能 <code>obj instanceof List&lt;String&gt;</code>，還會收到一堆 unchecked 警告。Java 在編譯期「假裝」有泛型，執行期再抹掉，這個落差就是摩擦的來源。</p>
+<p>Python 走得更徹底——<strong>型別提示在執行期幾乎完全被忽略</strong>（連 PEP 695 的泛型也是純標注，不影響執行）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-278" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20s%20%3D%20Stack%5Bint%5D()%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%94%A8%E5%8F%83%E6%95%B8%E5%8C%96%E5%9E%8B%E5%88%A5%E5%BB%BA%E7%AB%8B%E5%AF%A6%E4%BE%8B%0A%3E%3E%3E%20type(s)%20is%20Stack%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%BB%BA%E7%AB%8B%E5%87%BA%E4%BE%86%E7%9A%84%E5%B0%B1%E6%98%AF%E6%99%AE%E9%80%9A%20Stack%EF%BC%8C%E6%B2%92%E8%A8%98%E4%BD%8F%20int%0ATrue%0A%3E%3E%3E%20Stack%5Bint%5D.__origin__%20is%20Stack%20%20%23%20%E5%8F%83%E6%95%B8%E5%8C%96%E5%8F%AA%E6%98%AF%E5%A4%96%E6%AE%BC%EF%BC%8C%E8%A2%AB%E5%8C%85%E4%BD%8F%E7%9A%84%E5%8E%9F%E5%A7%8B%E5%9E%8B%E5%88%A5%E4%BB%8D%E6%98%AF%20Stack%0ATrue%0A%3E%3E%3E%20isinstance(%5B1%2C%202%5D%2C%20list)%20%20%20%20%20%20%23%20%E4%BD%A0%E5%8F%AA%E8%83%BD%E6%AA%A2%E6%9F%A5%E5%88%B0%E3%80%8C%E5%8E%9F%E5%A7%8B%E5%9E%8B%E5%88%A5%E3%80%8Dlist%EF%BC%8C%E6%AA%A2%E6%9F%A5%E4%B8%8D%E5%88%B0%E3%80%8Clist%5Bint%5D%E3%80%8D%0ATrue%0A%3E%3E%3E%20isinstance(%5B1%2C%202%5D%2C%20list%5Bint%5D)%20%23%20%E4%B8%8D%E8%83%BD%E6%8B%BF%E5%8F%83%E6%95%B8%E5%8C%96%E6%B3%9B%E5%9E%8B%E5%81%9A%20isinstance%EF%BC%8C%E7%9B%B4%E6%8E%A5%E5%A0%B1%E9%8C%AF%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0ATypeError%3A%20isinstance()%20argument%202%20cannot%20be%20a%20parameterized%20generic'), 'copy-btn-278')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; s = Stack[int]()              # 用參數化型別建立實例
+&gt;&gt;&gt; type(s) is Stack              # 建立出來的就是普通 Stack，沒記住 int
+True
+&gt;&gt;&gt; Stack[int].__origin__ is Stack  # 參數化只是外殼，被包住的原始型別仍是 Stack
+True
+&gt;&gt;&gt; isinstance([1, 2], list)      # 你只能檢查到「原始型別」list，檢查不到「list[int]」
+True
+&gt;&gt;&gt; isinstance([1, 2], list[int]) # 不能拿參數化泛型做 isinstance，直接報錯
+Traceback (most recent call last):
+    ...
+TypeError: isinstance() argument 2 cannot be a parameterized generic</code></pre>
+      </div>
+    <p>抹除的「另一面」是：Python 從不假裝型別參數在執行期存在，所以你不會像 Java 那樣<strong>以為</strong>有、結果被抹除咬一口。代價是<strong>型別提示給你零執行期保證</strong>——<code>def f(x: int)</code> 傳進 str 照跑不誤。靜態安全感完全來自 mypy/pyright（這一節），執行期安全則要另外靠 pydantic（後面那節）。把這兩件事分清楚，是 Python 型別世界的核心心法。</p>
+<h3 id="變異性variancelistint-不是-listobject">變異性（variance）：`list[int]` 不是 `list[object]`</h3><p>這是 Java 工程師最容易踩的一個直覺陷阱。憑直覺，<code>int</code> 是 <code>object</code> 的子型別，所以 <code>list[int]</code> 應該也是 <code>list[object]</code> 的子型別吧？<strong>不是。</strong> mypy 會直接擋下：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-279" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20total_len(xs%3A%20list%5Bobject%5D)%20-%3E%20int%3A%0A%20%20%20%20return%20len(xs)%0A%0Anums%3A%20list%5Bint%5D%20%3D%20%5B1%2C%202%2C%203%5D%0Atotal_len(nums)%20%20%20%20%20%20%20%20%23%20mypy%20%E5%A0%B1%E9%8C%AF%EF%BC%9Alist%20%E6%98%AF%E4%B8%8D%E8%AE%8A%E7%9A%84%EF%BC%88invariant%EF%BC%89'), 'copy-btn-279')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def total_len(xs: list[object]) -&gt; int:
+    return len(xs)
+
+nums: list[int] = [1, 2, 3]
+total_len(nums)        # mypy 報錯：list 是不變的（invariant）</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-280" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('error%3A%20Argument%201%20to%20%22total_len%22%20has%20incompatible%20type%20%22list%5Bint%5D%22%3B%20expected%20%22list%5Bobject%5D%22%20%20%5Barg-type%5D%0Anote%3A%20%22list%22%20is%20invariant%20--%20see%20...%0Anote%3A%20Consider%20using%20%22Sequence%22%20instead%2C%20which%20is%20covariant'), 'copy-btn-280')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">error: Argument 1 to "total_len" has incompatible type "list[int]"; expected "list[object]"  [arg-type]
+note: "list" is invariant -- see ...
+note: Consider using "Sequence" instead, which is covariant</code></pre>
+      </div>
+    <p>原因是 <code>list</code> 是<strong>可變</strong>的，所以型別系統把它定為<strong>不變</strong>（invariant）：若允許 <code>list[int]</code> 當成 <code>list[object]</code> 傳入，函式內部就能往裡塞一個 <code>str</code>（對 <code>list[object]</code> 而言合法），破壞了呼叫端 <code>list[int]</code> 的假設。把參數改成唯讀的 <code>Sequence</code>（從 <code>collections.abc</code>）就過了——<code>Sequence</code> 是<strong>協變</strong>（covariant），只能讀不能寫，沒有上述風險：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-281" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20collections.abc%20import%20Sequence%0A%0Adef%20total_len(xs%3A%20Sequence%5Bobject%5D)%20-%3E%20int%3A%20%20%20%20%23%20%E5%8D%94%E8%AE%8A%EF%BC%9Alist%5Bint%5D%20%E5%8F%AF%E4%BB%A5%E5%82%B3%E9%80%B2%E4%BE%86%0A%20%20%20%20return%20len(xs)'), 'copy-btn-281')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from collections.abc import Sequence
+
+def total_len(xs: Sequence[object]) -&gt; int:    # 協變：list[int] 可以傳進來
+    return len(xs)</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 的<strong>陣列</strong>是協變的（<code>Integer[]</code> 可當 <code>Object[]</code>），但這個設計是個歷史錯誤——往 <code>Object[]</code> 塞 <code>String</code> 會在執行期丟 <code>ArrayStoreException</code>。Java 的<strong>泛型</strong>記取教訓改成不變：<code>List&lt;Integer&gt;</code> 不是 <code>List&lt;Object&gt;</code>，這跟 Python 的 <code>list</code> 一致。要表達協變，Java 用 <code>List&lt;? extends T&gt;</code>（只讀，對應 Python 的 <code>Sequence[T]</code>），要表達逆變用 <code>List&lt;? super T&gt;</code>（只寫）——就是 PECS（Producer Extends, Consumer Super）。Python 沒有 <code>?</code> 萬用字元，而是讓型別本身帶 variance：可變的 <code>list</code> 不變、唯讀的 <code>Sequence</code>/<code>Iterable</code> 協變。<strong>思維差異</strong>：Java 把 variance 標在「使用點」（wildcard 寫在你用它的地方），Python 標在「定義點」（variance 是型別本身的屬性）；所以在 Python，你選 <code>Sequence</code> 還是 <code>list</code> 當參數型別，就同時決定了它的 variance。</p>
+</div><p>（補一個逆變的實例：函式參數位置本身也是逆變的。<code>Callable[[object], None]</code> 是 <code>Callable[[int], None]</code> 的<strong>子型別</strong>——一個「什麼都能收」的回呼，當然能用在「只需要收 int」的地方；反過來不行。要一個 <code>Callable[[int], None]</code> 的位置，你不能塞 <code>Callable[[str], None]</code>，mypy 會擋。這跟前面 <code>Comparable.__lt__</code> 標 <code>Any</code> 是同一個方向性問題的不同切面。）</p>
+<h3 id="self讓工廠方法的回傳型別跟著子類別收斂">`Self`：讓工廠方法的回傳型別跟著子類別收斂</h3><p>第 7 章的 classmethod 工廠方法（<code>@classmethod def margherita(cls) -&gt; ?</code>）刻意寫 <code>return cls(...)</code> 而非 <code>return Pizza(...)</code>，好讓子類別呼叫時拿到子類別實例——<code>cls</code> 參與多型。但那時回傳型別只能寫成字串前向參照 <code>-&gt; &quot;Pizza&quot;</code>，這在型別層其實<strong>漏掉了多型</strong>：mypy 會把 <code>DeepDishPizza.margherita()</code> 推成 <code>Pizza</code>，而非實際拿到的 <code>DeepDishPizza</code>。</p>
+<p><code>typing.Self</code>（3.11+）正是補上這塊的工具——它代表「目前這個類別」，會跟著實際呼叫的子類別收斂：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-282" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20Self%0A%0Aclass%20Pizza%3A%0A%20%20%20%20def%20__init__(self%2C%20toppings%3A%20list%5Bstr%5D)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20self.toppings%20%3D%20toppings%0A%0A%20%20%20%20%40classmethod%0A%20%20%20%20def%20margherita(cls)%20-%3E%20Self%3A%20%20%20%20%20%20%20%20%20%20%23%20%E5%9B%9E%E5%82%B3%20Self%EF%BC%8C%E4%B8%8D%E5%86%8D%E5%AF%AB%E6%AD%BB%20%22Pizza%22%0A%20%20%20%20%20%20%20%20return%20cls(%5B%22mozzarella%22%2C%20%22tomato%22%5D)%0A%0Aclass%20DeepDishPizza(Pizza)%3A%0A%20%20%20%20pass'), 'copy-btn-282')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import Self
+
+class Pizza:
+    def __init__(self, toppings: list[str]) -&gt; None:
+        self.toppings = toppings
+
+    @classmethod
+    def margherita(cls) -&gt; Self:          # 回傳 Self，不再寫死 "Pizza"
+        return cls(["mozzarella", "tomato"])
+
+class DeepDishPizza(Pizza):
+    pass</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-283" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20p%20%3D%20DeepDishPizza.margherita()%0A%3E%3E%3E%20reveal_type(p)%20%20%20%20%20%20%20%20%23%20mypy%20%E6%9C%83%E8%AA%AA%EF%BC%9ARevealed%20type%20is%20%22DeepDishPizza%22'), 'copy-btn-283')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; p = DeepDishPizza.margherita()
+&gt;&gt;&gt; reveal_type(p)        # mypy 會說：Revealed type is "DeepDishPizza"</code></pre>
+      </div>
+    <p>把回傳改回 <code>-&gt; &quot;Pizza&quot;</code>，同一行 <code>reveal_type</code> 就會印出 <code>Pizza</code>——靜態端丟失了子類別資訊。<code>Self</code> 讓型別系統終於跟上 <code>cls</code> 在執行期的多型行為。除了 classmethod 工廠，鏈式 API（<code>builder.add(...).add(...)</code>，每個方法 <code>return self</code>）也該把回傳標成 <code>Self</code>，子類別才能繼續鏈下去而不被收窄成基底型別。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 沒有 self-type。要讓 builder 的鏈式方法在子類別也回傳子類別型別，得動用<strong>遞迴泛型</strong>：<code>abstract class Builder&lt;T extends Builder&lt;T&gt;&gt;</code>，再讓每個方法 <code>return (T) this</code>——又囉嗦又要強制轉型。Python 一個 <code>Self</code> 就解決，因為它本來就是動態語言、<code>cls</code>／<code>self</code> 天生帶多型，型別系統只是把這個既有事實標出來而已。</p>
+</div><hr>
+<h2 id="protocol-與結構型別檢查">`Protocol` 與結構型別檢查</h2><p>第 8 章介紹過 <code>Protocol</code>（結構型別）。從型別系統的角度再補一點：它讓你能為「行為」而非「繼承關係」寫型別，這在做泛型抽象時特別有用。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-284" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20Protocol%0A%0Aclass%20SupportsClose(Protocol)%3A%0A%20%20%20%20def%20close(self)%20-%3E%20None%3A%20...%0A%0Adef%20use_then_close(resource%3A%20SupportsClose)%20-%3E%20None%3A%0A%20%20%20%20%23%20%E4%BB%BB%E4%BD%95%E6%9C%89%20close()%20%E7%9A%84%E6%9D%B1%E8%A5%BF%E9%83%BD%E8%83%BD%E5%82%B3%E9%80%B2%E4%BE%86%EF%BC%9A%E6%AA%94%E6%A1%88%E3%80%81%E9%80%A3%E7%B7%9A%E3%80%81%E4%BD%A0%E7%9A%84%E8%87%AA%E8%A8%82%E9%A1%9E%E5%88%A5%E2%80%A6%E2%80%A6%0A%20%20%20%20%23%20%E5%AE%8C%E5%85%A8%E4%B8%8D%E9%9C%80%E8%A6%81%E5%AE%83%E5%80%91%E5%8E%BB%E7%B9%BC%E6%89%BF%E6%9F%90%E5%80%8B%E5%85%B1%E5%90%8C%E5%9F%BA%E5%BA%95%0A%20%20%20%20resource.close()'), 'copy-btn-284')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import Protocol
+
+class SupportsClose(Protocol):
+    def close(self) -&gt; None: ...
+
+def use_then_close(resource: SupportsClose) -&gt; None:
+    # 任何有 close() 的東西都能傳進來：檔案、連線、你的自訂類別……
+    # 完全不需要它們去繼承某個共同基底
+    resource.close()</code></pre>
+      </div>
+    <p>對照 Java：要表達「任何可關閉的東西」，Java 用 <code>AutoCloseable</code> 介面，而且每個型別都得<strong>明寫</strong> <code>implements AutoCloseable</code>。Python 的 Protocol 是結構性的——第三方類別只要剛好有 <code>close()</code> 就自動相容，你不必、也無法去改它的繼承宣告。需要執行期 <code>isinstance</code> 檢查時，加 <code>@runtime_checkable</code>（見第 8 章）。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：寫函式參數型別時，優先問「我<strong>需要對方具備什麼能力</strong>」，用 Protocol 描述那個最小能力集，而不是要求一個具體的類別或基底。這讓你的 API 更好測（傳個 fake 就行）、更不綁實作。</p>
+</div><hr>
+<h2 id="mypy-pyright-的導入與-ci-整合">mypy / pyright 的導入與 CI 整合</h2><p>型別提示要發揮價值，得有檢查器在 CI 與編輯器裡跑。兩大選擇：</p>
+<ul>
+<li><strong>mypy</strong>：型別檢查的事實標準，由 Python 官方人員維護。</li>
+<li><strong>pyright</strong>：微軟出品、用 TypeScript 寫、速度快，VS Code 的 Pylance 內建它。</li>
+</ul>
+<p>設定寫在 <code>pyproject.toml</code>（對照 Maven 的 <code>&lt;configuration&gt;</code>）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">toml</span>
+          <button id="copy-btn-285" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%5Btool.mypy%5D%0Apython_version%20%3D%20%223.12%22%0Astrict%20%3D%20true%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E4%B8%80%E9%8D%B5%E9%96%8B%E5%95%9F%E4%B8%80%E6%95%B4%E7%B5%84%E5%9A%B4%E6%A0%BC%E6%AA%A2%E6%9F%A5%EF%BC%88%E5%BC%B7%E7%83%88%E5%BB%BA%E8%AD%B0%E6%96%B0%E5%B0%88%E6%A1%88%E5%B0%B1%E9%96%8B%EF%BC%89%0Awarn_unused_ignores%20%3D%20true%20%20%20%20%20%20%20%20%20%23%20%E6%8A%93%E5%87%BA%E5%B7%B2%E7%B6%93%E4%B8%8D%E9%9C%80%E8%A6%81%E7%9A%84%20%23%20type%3A%20ignore%0Awarn_redundant_casts%20%3D%20true'), 'copy-btn-285')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-toml"><code class="language-toml">[tool.mypy]
+python_version = "3.12"
+strict = true                      # 一鍵開啟一整組嚴格檢查（強烈建議新專案就開）
+warn_unused_ignores = true         # 抓出已經不需要的 # type: ignore
+warn_redundant_casts = true</code></pre>
+      </div>
+    <p><code>strict = true</code> 會打開像 <code>disallow_untyped_defs</code>（不准有沒標型別的函式）、<code>warn_return_any</code> 等一整組規則，相當於 Java「把所有 compiler warning 當 error」。新專案建議一開始就開 strict；既有專案則漸進導入（下一節）。</p>
+<p>CI 整合就是在流水線加一步（以 GitHub Actions 為例）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">yaml</span>
+          <button id="copy-btn-286" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('-%20name%3A%20Type%20check%0A%20%20run%3A%20uv%20run%20mypy%20src%2F'), 'copy-btn-286')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-yaml"><code class="language-yaml">- name: Type check
+  run: uv run mypy src/</code></pre>
+      </div>
+    <p>讓 mypy 失敗就讓 build 紅燈，型別錯誤就跟測試失敗一樣擋下 PR——這就把 Java 編譯器的型別把關，以工具的形式裝回了 Python 的工作流。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：debug 型別時善用 <code>reveal_type(x)</code>——它不是真函式，是給 mypy 看的「請告訴我你推出 x 是什麼型別」。執行前刪掉即可（mypy 不要求 import）。另一個是 <code>reveal_locals()</code>。這兩個是釐清「為什麼 mypy 覺得這裡型別不對」的利器。</p>
+</div><h3 id="final-與-literal把-java-的-final-與受限值裝回來">`Final` 與 `Literal`：把 Java 的 `final` 與受限值裝回來</h3><p>前兩章一再說「Python 沒有 <code>final</code>」（第 7、8 章）——指的是執行期：任何類別都能被繼承、任何名稱都能被重新賦值，直譯器不攔你。但靜態層可以把那份安全感裝回來。<code>typing.Final</code> 標的名稱，mypy 會擋下任何重新賦值：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-287" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20Final%0A%0AMAX_RETRIES%3A%20Final%20%3D%203%20%20%20%20%20%20%23%20%E4%B8%8D%E5%BF%85%E5%AF%AB%20Final%5Bint%5D%EF%BC%8Cmypy%20%E6%9C%83%E5%BE%9E%203%20%E6%8E%A8%E5%87%BA%20int%0A%0AMAX_RETRIES%20%3D%205%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20mypy%20%E5%A0%B1%E9%8C%AF%EF%BC%9ACannot%20assign%20to%20final%20name%20%22MAX_RETRIES%22'), 'copy-btn-287')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import Final
+
+MAX_RETRIES: Final = 3      # 不必寫 Final[int]，mypy 會從 3 推出 int
+
+MAX_RETRIES = 5             # mypy 報錯：Cannot assign to final name "MAX_RETRIES"</code></pre>
+      </div>
+    <p>跟 Java <code>final int MAX_RETRIES = 3</code> 對照：差別仍是老地方——Java 的 <code>final</code> 由編譯器強制，Python 的 <code>Final</code> 只在 mypy 眼裡有效，執行期照樣能改。但用途完全一樣：宣告常數的「這就是定值」意圖，並讓檢查器替你把關。<code>Final</code> 也能標類別屬性，甚至（搭配 <code>@final</code> 裝飾器）標記「這個類別／方法不准被繼承或覆寫」——這是把 Java <code>final class</code>／<code>final method</code> 的語意以靜態檢查形式找回來最直接的對應。</p>
+<p><code>Literal</code> 則處理「這個參數只能是這幾個值之一」。狀態碼、模式字串這類受限字串，與其用 <code>str</code>（什麼字串都放行）不如收緊成字面值集合：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-288" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20Literal%0A%0Adef%20open_file(path%3A%20str%2C%20mode%3A%20Literal%5B%22r%22%2C%20%22w%22%2C%20%22a%22%5D)%20-%3E%20None%3A%0A%20%20%20%20...%0A%0Aopen_file(%22data.txt%22%2C%20%22r%22)%20%20%20%20%20%23%20OK%0Aopen_file(%22data.txt%22%2C%20%22rw%22)%20%20%20%20%23%20mypy%20%E5%A0%B1%E9%8C%AF%EF%BC%9Aexpected%20%22Literal%5B%27r%27%2C%20%27w%27%2C%20%27a%27%5D%22'), 'copy-btn-288')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import Literal
+
+def open_file(path: str, mode: Literal["r", "w", "a"]) -&gt; None:
+    ...
+
+open_file("data.txt", "r")     # OK
+open_file("data.txt", "rw")    # mypy 報錯：expected "Literal['r', 'w', 'a']"</code></pre>
+      </div>
+    <p>對照 Java：要限制「只能是這幾個值」，Java 往往開一個 <code>enum</code>。<code>Literal</code> 更輕——不必定義新型別，直接把允許的字面值列進簽章；mypy 會把傳錯的值當場標紅，等於免費得到 enum 的約束力。值多、或想附帶行為時才升級成真正的 <code>enum</code>（Python 的 <code>enum.Enum</code>）。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>Final</code>、<code>Literal</code> 跟前面的 <code>Self</code> 一樣，都是「Python 執行期沒有，但靜態層幫你補回」的工具——本章的核心命題正是用 mypy 把 Java 編譯器的把關一塊塊裝回來，而這些就是其中幾塊拼圖。</p>
+</div><div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：寫公開 API 時若「同名函式因參數型別不同、回傳型別也跟著不同」，用 <code>@overload</code>（從 <code>typing</code>）疊出多個型別簽章、再寫一個實作本體：<code>@overload def f(x: int) -&gt; int</code>、<code>@overload def f(x: str) -&gt; list[str]</code>，呼叫端傳 <code>int</code> mypy 推得 <code>int</code>、傳 <code>str</code> 推得 <code>list[str]</code>。表面像 Java 的方法多載（overloading），<strong>機制卻相反</strong>：Java 是真有多個方法、由編譯器選一個；Python 執行期只有<strong>一個</strong>函式，<code>@overload</code> 簽章純粹是給檢查器看的型別資訊，本體得自己用 <code>isinstance</code> 分流。屬進階工具，需要時再查即可。</p>
+</div><hr>
+<h2 id="pydantic執行期驗證對照-bean-validation">pydantic：執行期驗證（對照 Bean Validation）</h2><p>再強調一次關鍵事實：<strong>型別提示在執行期不做任何檢查</strong>。<code>def f(age: int)</code> 收到 <code>&quot;100&quot;</code> 不會報錯。當資料來自<strong>外部世界</strong>（HTTP request、JSON、設定檔、DB），你需要的是執行期驗證——這正是 <strong>pydantic</strong> 的領域，也是 FastAPI（第 16 章）的核心。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-289" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20pydantic%20import%20BaseModel%2C%20Field%2C%20ValidationError%0A%0Aclass%20User(BaseModel)%3A%0A%20%20%20%20name%3A%20str%0A%20%20%20%20age%3A%20int%20%3D%20Field(ge%3D0%2C%20le%3D150)%20%20%20%20%20%20%20%23%20%E7%B4%84%E6%9D%9F%EF%BC%9A0%20%3C%3D%20age%20%3C%3D%20150%0A%20%20%20%20email%3A%20str'), 'copy-btn-289')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from pydantic import BaseModel, Field, ValidationError
+
+class User(BaseModel):
+    name: str
+    age: int = Field(ge=0, le=150)       # 約束：0 &lt;= age &lt;= 150
+    email: str</code></pre>
+      </div>
+    <p>pydantic 在<strong>建立物件那一刻</strong>就驗證、甚至轉型：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-290" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20u%20%3D%20User(name%3D%22Albert%22%2C%20age%3D42%2C%20email%3D%22a%40b.com%22)%0A%3E%3E%3E%20u.age%0A42%0A%3E%3E%3E%20User(name%3D%22Albert%22%2C%20age%3D%2242%22%2C%20email%3D%22a%40b.com%22).age%20%20%20%20%23%20%E5%AD%97%E4%B8%B2%20%2242%22%20%E8%87%AA%E5%8B%95%E8%BD%89%E6%88%90%20int%0A42%0A%3E%3E%3E%20User(name%3D%22Albert%22%2C%20age%3D200%2C%20email%3D%22a%40b.com%22)%20%20%20%20%20%20%20%20%20%23%20%E9%81%95%E5%8F%8D%20le%3D150%0ATraceback%20(most%20recent%20call%20last)%3A%0A%20%20%20%20...%0Apydantic_core._pydantic_core.ValidationError%3A%201%20validation%20error%20for%20User%0Aage%0A%20%20Input%20should%20be%20less%20than%20or%20equal%20to%20150%20%5Btype%3Dless_than_equal%2C%20...%5D'), 'copy-btn-290')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; u = User(name="Albert", age=42, email="a@b.com")
+&gt;&gt;&gt; u.age
+42
+&gt;&gt;&gt; User(name="Albert", age="42", email="a@b.com").age    # 字串 "42" 自動轉成 int
+42
+&gt;&gt;&gt; User(name="Albert", age=200, email="a@b.com")         # 違反 le=150
+Traceback (most recent call last):
+    ...
+pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+age
+  Input should be less than or equal to 150 [type=less_than_equal, ...]</code></pre>
+      </div>
+    <p>對照 Java 的 <strong>Bean Validation</strong>（<code>@NotNull</code>、<code>@Min</code>、<code>@Max</code>、<code>@Email</code>）+ Hibernate Validator：兩者都是「宣告式地對資料下約束、在執行期驗證」。差別在 pydantic 把<strong>型別轉換</strong>也一起做了（<code>&quot;42&quot;</code> → <code>42</code>），且與 Python 型別提示無縫整合——你的型別標注<strong>同時就是</strong>驗證 schema。</p>
+<p>把三層責任放在一起看，整個型別故事就完整了：</p>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>何時作用</th>
+<th>對照 Java</th>
+<th>負責</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>型別提示 + mypy/pyright</td>
+<td>開發／CI（靜態）</td>
+<td>javac 型別檢查</td>
+<td>你自己的程式邏輯一致性</td>
+</tr>
+<tr>
+<td>pydantic</td>
+<td>執行期</td>
+<td>Bean Validation</td>
+<td>來自外部、不可信的資料</td>
+</tr>
+</tbody></table>
+<h3 id="typeddict-與-cast不想付執行期成本時的兩個工具">`TypedDict` 與 `cast`：不想付執行期成本時的兩個工具</h3><p>pydantic 有執行期成本（驗證、轉型、建物件）。有時你只是想<strong>在 mypy 眼中</strong>讓一坨 <code>dict</code> 或一個 <code>Any</code> 有形狀，而不需要真的驗證——這時有兩個零成本工具：</p>
+<p><code>TypedDict</code> 描述「dict 應該長什麼形狀」，但<strong>不做任何執行期檢查</strong>，純粹是給檢查器看的：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-291" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20TypedDict%0A%0Aclass%20UserDict(TypedDict)%3A%0A%20%20%20%20name%3A%20str%0A%20%20%20%20age%3A%20int%0A%0Adef%20show(u%3A%20UserDict)%20-%3E%20str%3A%0A%20%20%20%20return%20f%22%7Bu%5B%27name%27%5D%7D%20(%7Bu%5B%27age%27%5D%7D)%22%20%20%20%23%20mypy%20%E7%9F%A5%E9%81%93%20u%5B%27age%27%5D%20%E6%98%AF%20int%E3%80%81%E6%89%93%E9%8C%AF%20key%20%E6%9C%83%E5%A0%B1%E9%8C%AF'), 'copy-btn-291')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import TypedDict
+
+class UserDict(TypedDict):
+    name: str
+    age: int
+
+def show(u: UserDict) -&gt; str:
+    return f"{u['name']} ({u['age']})"   # mypy 知道 u['age'] 是 int、打錯 key 會報錯</code></pre>
+      </div>
+    <p><code>cast(T, x)</code> 則是型別斷言：「我比 mypy 更清楚這是 <code>T</code>，別管推斷了」。它在執行期<strong>什麼都不做</strong>（連檢查都沒有），只改變 mypy 的看法。處理 <code>json.loads()</code> 回傳的 <code>Any</code> 時，這是一種把它收斂成具體形狀的輕量做法：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-292" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20cast%0Aimport%20json%0A%0Adata%20%3D%20json.loads(%27%7B%22name%22%3A%20%22Albert%22%2C%20%22age%22%3A%2042%7D%27)%20%20%20%23%20data%20%E6%98%AF%20Any%0Auser%20%3D%20cast(UserDict%2C%20data)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%96%B7%E8%A8%80%E6%88%90%20UserDict%EF%BC%8C%E9%9B%B6%E6%88%90%E6%9C%AC%E3%80%81%E4%B8%8D%E9%A9%97%E8%AD%89%0Areveal_type(user%5B%22age%22%5D)%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20mypy%20%E6%8E%A8%E5%BE%97%20int'), 'copy-btn-292')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import cast
+import json
+
+data = json.loads('{"name": "Albert", "age": 42}')   # data 是 Any
+user = cast(UserDict, data)                           # 斷言成 UserDict，零成本、不驗證
+reveal_type(user["age"])                              # mypy 推得 int</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>cast(T, x)</code> 對應 Java 的 <code>(T) x</code> 強制轉型——但<strong>只有一半</strong>。Java 的 <code>(T)</code> 會在執行期檢查，型別不符就丟 <code>ClassCastException</code>；Python 的 <code>cast</code> 在執行期完全不檢查，你斷言錯了也不會當場炸，錯誤會延後到後面某個操作。<strong>思維差異</strong>：<code>cast</code> 是把責任從工具拿回自己手上，斷言錯的後果你自負。所以該不該用 <code>cast</code> vs <code>pydantic</code>，本質是「要不要花執行期成本換取真正的保證」：邊界內、你確信形狀正確時用 <code>TypedDict</code>/<code>cast</code>（零成本）；資料來自外部、不可信時用 pydantic（有成本，但會真的擋下壞資料）。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：內部程式碼（你自己呼叫自己）靠 mypy 就夠了，別讓 pydantic 的執行期開銷散落各處。把 pydantic 用在<strong>信任邊界</strong>上——API 入口、設定載入、外部資料解析。邊界內用普通 <code>@dataclass</code>（第 7 章）、邊界外用 pydantic <code>BaseModel</code>，是很常見的分工。</p>
+</div><hr>
+<h2 id="漸進式型別gradual-typing的取捨">漸進式型別（gradual typing）的取捨</h2><p>Python 的型別系統是<strong>漸進式</strong>的：你可以一行型別都不標（純動態），也可以標到 strict 全綠（接近靜態語言），或落在中間。<code>Any</code> 是這套系統的「逃生出口」——任何東西都相容 <code>Any</code>、<code>Any</code> 也相容任何東西，等於對那一塊<strong>關閉檢查</strong>。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-293" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20typing%20import%20Any%0A%0Adef%20parse(raw%3A%20Any)%20-%3E%20dict%5Bstr%2C%20int%5D%3A%0A%20%20%20%20raise%20NotImplementedError%20%20%20%20%23%20raw%20%E6%98%AF%20Any%EF%BC%9A%E9%80%B2%E4%BE%86%E4%B8%8D%E6%AA%A2%E6%9F%A5%EF%BC%8C%E4%BD%86%E5%9B%9E%E5%82%B3%E5%80%BC%E6%9C%89%E5%9E%8B%E5%88%A5%EF%BC%8C%E5%91%BC%E5%8F%AB%E7%AB%AF%E4%BB%8D%E5%8F%97%E4%BF%9D%E8%AD%B7'), 'copy-btn-293')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from typing import Any
+
+def parse(raw: Any) -&gt; dict[str, int]:
+    raise NotImplementedError    # raw 是 Any：進來不檢查，但回傳值有型別，呼叫端仍受保護</code></pre>
+      </div>
+    <p>導入策略與取捨：</p>
+<ul>
+<li><strong>新專案</strong>：直接 <code>strict = true</code>，從第一天就維持全綠，成本最低。</li>
+<li><strong>既有大型專案</strong>：漸進導入。先在 <code>pyproject.toml</code> 對少數模組開檢查，或用 <code># type: ignore[code]</code> 暫時壓住特定錯誤（記得標明 error code，配合 <code>warn_unused_ignores</code> 之後就能清掉過期的）。優先標<strong>公開 API 邊界</strong>與<strong>複雜的領域邏輯</strong>——這裡型別的投資報酬率最高；一次性腳本可以完全不標。</li>
+<li><strong>務必標明 ignore 的 error code</strong>：寫 <code># type: ignore[arg-type]</code> 而不是裸的 <code># type: ignore</code>，才不會連帶吞掉其他真正的錯誤。</li>
+</ul>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>Any</code> 會「傳染」。一個回傳 <code>Any</code> 的函式，其結果再拿去做任何運算往往還是 <code>Any</code>，靜態檢查在那條路徑上等於失效。<code>json.loads()</code> 的回傳就是 <code>Any</code>——拿到外部 JSON 後，盡早用 pydantic 或明確的型別斷言把它「收斂」成具體型別，別讓 <code>Any</code> 一路擴散到整個程式。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：漸進式型別的精神不是「型別越多越好」，而是<strong>把型別投資在會回本的地方</strong>：團隊協作的公開介面、容易錯的複雜邏輯、外部資料的邊界。享受動態語言的彈性（快速原型、duck typing），同時用型別把關鍵介面釘死——這正是資深工程師能讓 Python 程式碼「比一般人寫得更穩」的地方。</p>
+</div><hr>
+<h2 id="本章小結">本章小結</h2><ol>
+<li><strong>用現代型別語法</strong>：<code>list[int]</code>、<code>dict[str, int]</code>、<code>X | None</code>、<code>X | Y</code>，別再用 <code>typing.List</code>/<code>Optional</code>/<code>Union</code> 舊寫法。<code>str | None</code> 不是 Java <code>Optional</code>，靠型別縮小來安全使用。</li>
+<li><strong>mypy 會做流程敏感的型別縮小</strong>：<code>if x is None: return</code> 之後它知道 <code>x</code> 是非 None 型別。型別提示不只是文件，工具會順著控制流推理。</li>
+<li><strong>泛型有 3.12 新語法</strong>：<code>def first[T](...)</code>、<code>class Stack[T]</code>，跟 Java <code>&lt;T&gt;</code> 神似；舊寫法用 <code>TypeVar</code> + <code>Generic[T]</code>。</li>
+<li><strong>型別抹除的另一面</strong>：Java 編譯期假裝有泛型、執行期抹掉造成摩擦；Python 坦白地讓提示在執行期幾乎完全無效——零執行期保證，靜態安全全靠檢查器。</li>
+<li><strong>變異性（variance）</strong>：<code>list[int]</code> 不是 <code>list[object]</code>（<code>list</code> 不變），改用唯讀的 <code>Sequence</code>（協變）才能收子型別容器——對應 Java 泛型的不變與 <code>? extends</code>/<code>? super</code>（PECS）。<code>cast</code>/<code>TypedDict</code> 是零執行期成本的型別斷言／形狀描述，pydantic 才有真正的執行期驗證。</li>
+<li><strong><code>Self</code>／<code>Final</code>／<code>Literal</code> 把 Java 的把關裝回靜態層</strong>：<code>Self</code> 讓 classmethod 工廠／鏈式方法的回傳型別跟著子類別收斂（回扣第 7 章 <code>cls</code> 多型，免去 Java 的遞迴泛型）；<code>Final</code> 是靜態版 <code>final</code>（mypy 擋重新賦值）；<code>Literal</code> 收緊「只能是這幾個值」（輕量版 enum）。</li>
+<li><strong><code>Protocol</code> 為「能力」而非「繼承」寫型別</strong>：描述函式需要的最小能力集，API 更好測、更不綁實作。</li>
+<li><strong>三層責任要分清</strong>：mypy/pyright 管靜態（你的程式邏輯）、pydantic 管執行期（外部不可信資料、對照 Bean Validation）。邊界內用 <code>@dataclass</code>、邊界外用 pydantic。</li>
+<li><strong>漸進式型別是投資決策</strong>：新專案直接開 <code>strict</code>；既有專案漸進導入、優先標公開 API 與複雜邏輯。<code>Any</code> 是逃生出口但會傳染，盡早收斂外部資料。</li>
+</ol>
+<hr>
+<h2 id="練習">練習</h2><p><strong>練習 1（型別縮小）</strong>
+為下面函式加上型別提示，讓 mypy 在 <code>strict</code> 下全綠。<code>config.get(&quot;port&quot;)</code> 回傳 <code>str | None</code>，你要處理 None 的情況再轉成 int。寫完用 <code>uv run --with mypy mypy</code> 驗證，並故意把回傳改成可能回 None，觀察 mypy 怎麼抱怨。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-294" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20get_port(config)%3A%0A%20%20%20%20port%20%3D%20config.get(%22port%22)%0A%20%20%20%20return%20int(port)'), 'copy-btn-294')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def get_port(config):
+    port = config.get("port")
+    return int(port)</code></pre>
+      </div>
+    <p><strong>練習 2（泛型容器）</strong>
+用 Python 3.12 新語法寫一個泛型 <code>Pair[A, B]</code>（兩個可能不同型別的欄位 <code>first: A</code>、<code>second: B</code>），提供 <code>swap() -&gt; Pair[B, A]</code>。用 <code>reveal_type</code> 驗證 <code>Pair(1, &quot;x&quot;).swap()</code> 被推導成 <code>Pair[str, int]</code>。</p>
+<p><strong>練習 3（抹除實驗）</strong>
+不查文件，先預測下面每行的結果再執行：<code>list[int] is list[str]</code>、<code>isinstance([1], list[int])</code>、<code>isinstance([1], list)</code>。用一句話解釋為什麼 Python 不讓你對 <code>list[int]</code> 做 isinstance。</p>
+<p><strong>練習 4（mypy vs pydantic 的分界）</strong>
+寫一個 <code>@dataclass</code> 版的 <code>Config</code> 和一個 pydantic <code>BaseModel</code> 版的 <code>Config</code>，各塞一個 <code>port: int</code>。分別用 <code>Config(port=&quot;8080&quot;)</code>（字串）建立，觀察兩者行為的差異（一個照建立但 mypy 會在靜態時抱怨、一個在執行期轉型或報錯）。用這個差異說明「信任邊界」該用哪一個。</p>
+<p><strong>練習 5（馴服 <code>Any</code>）</strong>
+<code>data = json.loads(raw)</code> 的 <code>data</code> 是 <code>Any</code>。寫一個 pydantic model <code>Event(name: str, count: int)</code>，把 <code>data</code> 收斂成 <code>Event</code>，讓後續程式碼享有型別保護。再示範若不收斂、直接 <code>data[&quot;count&quot;] + 1</code>，為什麼 mypy 幫不了你（提示：<code>Any</code> 的傳染性）。</p>

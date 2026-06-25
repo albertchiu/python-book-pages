@@ -1,0 +1,661 @@
+<h1 id="第-1-章python-生態系與開發環境">第 1 章：Python 生態系與開發環境</h1><p>身為資深 Java 工程師，你對「編譯、依賴管理、IDE、建置工具」這條工具鏈早已駕輕就熟——<code>javac</code>、Maven、Gradle、JUnit 各司其職，邊界清晰。進到 Python，你會發現規則重新洗牌：有人說「Python 是直譯語言所以不用編譯」（其實不對）、依賴管理的歷史包袱讓初學者一頭霧水（<code>pip</code>、<code>venv</code>、<code>poetry</code>、<code>conda</code> 到底用哪個）、而型別檢查竟然是「選用的」。本章要做的，是把 Python 的執行模型與現代工具鏈一次講清楚，並用你熟悉的 JVM 與 Maven/Gradle 當座標，讓你在第一天就建立正確的心智模型，避免踩進那些「Java 沒有、Python 才有」的坑。</p>
+<hr>
+<h2 id="11-執行模型cpythonbytecode-與虛擬機">1.1 執行模型：CPython、bytecode 與虛擬機</h2><h3 id="java-怎麼做">Java 怎麼做</h3><p>Java 的執行流程你閉著眼睛都能畫出來：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-0" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('.java%20%20--javac--%3E%20%20.class%20(bytecode)%20%20--classloader--%3E%20%20JVM%20%E8%A7%A3%E8%AD%AF%20%2B%20JIT%20%E7%B7%A8%E8%AD%AF%20--%3E%20%E6%A9%9F%E5%99%A8%E7%A2%BC'), 'copy-btn-0')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">.java  --javac--&gt;  .class (bytecode)  --classloader--&gt;  JVM 解譯 + JIT 編譯 --&gt; 機器碼</code></pre>
+      </div>
+    <p>關鍵是<strong>編譯與執行是兩個明確分開的步驟</strong>。你先跑 <code>javac</code>，把原始碼轉成平台無關的 <code>.class</code> bytecode；執行期 JVM（HotSpot）載入 bytecode，先解譯，熱點程式碼再由 JIT 編譯成原生機器碼。</p>
+<h3 id="python-怎麼做">Python 怎麼做</h3><p>很多人說「Python 是直譯語言（interpreted language）」，這句話會誤導你。真相是：<strong>Python 也會編譯成 bytecode，只是這個步驟是隱形且即時的。</strong></p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-1" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('.py%20%20--compile--%3E%20%20bytecode%20(.pyc%20%2F%20__pycache__)%20%20--%3E%20%20PVM%20(Python%20Virtual%20Machine)%20%E9%80%90%E6%A2%9D%E5%9F%B7%E8%A1%8C'), 'copy-btn-1')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">.py  --compile--&gt;  bytecode (.pyc / __pycache__)  --&gt;  PVM (Python Virtual Machine) 逐條執行</code></pre>
+      </div>
+    <p>當你執行 <code>python foo.py</code>，CPython（Python 的官方參考實作，用 C 寫成）做了這些事：</p>
+<ol>
+<li><strong>詞法/語法分析</strong>：把 <code>.py</code> 解析成抽象語法樹（AST）。</li>
+<li><strong>編譯</strong>：把 AST 編譯成 <strong>bytecode</strong>（一串虛擬機指令）。</li>
+<li><strong>執行</strong>：由 PVM（一個基於堆疊的虛擬機，本質是一個巨大的 C 語言 evaluation loop）逐條解譯 bytecode。</li>
+</ol>
+<p>你可以親眼看到 bytecode。<code>dis</code> 模組就是 Python 版的 <code>javap -c</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-2" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20dis%0A%3E%3E%3E%20def%20add(a%2C%20b)%3A%0A...%20%20%20%20%20return%20a%20%2B%20b%0A...%0A%3E%3E%3E%20dis.dis(add)%0A%20%201%20%20%20%20%20%20%20%20%20%20%200%20RESUME%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%200%0A%0A%20%202%20%20%20%20%20%20%20%20%20%20%202%20LOAD_FAST%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%200%20(a)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%204%20LOAD_FAST%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%201%20(b)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%206%20BINARY_OP%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%200%20(%2B)%0A%20%20%20%20%20%20%20%20%20%20%20%20%2010%20RETURN_VALUE'), 'copy-btn-2')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import dis
+&gt;&gt;&gt; def add(a, b):
+...     return a + b
+...
+&gt;&gt;&gt; dis.dis(add)
+  1           0 RESUME                   0
+
+  2           2 LOAD_FAST                0 (a)
+              4 LOAD_FAST                1 (b)
+              6 BINARY_OP                0 (+)
+             10 RETURN_VALUE</code></pre>
+      </div>
+    <p>（以上為 Python 3.12 的輸出。最左欄是原始碼行號，第二欄是指令在 bytecode 中的位元組偏移量，接著才是 opcode 與運算元；<code>LOAD_FAST 0 (a)</code> 的 <code>0</code> 是區域變數 <code>a</code> 的索引。）</p>
+<blockquote><p>注意：實際 opcode 名稱會隨 CPython 版本演進。例如 Python 3.14 引入 <code>LOAD_FAST_BORROW</code> 之類的 fused/借用指令，會把上面兩條 <code>LOAD_FAST</code> 融合成單一條 <code>LOAD_FAST_BORROW_LOAD_FAST_BORROW 1 (a, b)</code>；Python 3.13 則是 <code>LOAD_FAST_LOAD_FAST 1 (a, b)</code>。重點不是記住指令，而是理解「Python 原始碼確實被編譯成了 bytecode」。</p>
+</blockquote><h3 id="pycache-與-pyc被快取的-bytecode">`__pycache__` 與 `.pyc`：被快取的 bytecode</h3><p>那 <code>.class</code> 在哪？對應物是 <code>.pyc</code>，但<strong>只有被 <code>import</code> 的模組</strong>才會把編譯結果快取下來。你執行的主腳本（<code>python foo.py</code> 的 <code>foo.py</code>）不會留下 <code>.pyc</code>，但它 <code>import</code> 的模組會：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-3" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20import%20py_compile%0A%3E%3E%3E%20py_compile.compile(%22greet.py%22)%20%20%20%23%20%E6%89%8B%E5%8B%95%E8%A7%B8%E7%99%BC%E7%B7%A8%E8%AD%AF%0A%3E%3E%3E%20import%20os%0A%3E%3E%3E%20os.listdir(%22__pycache__%22)%0A%5B%27greet.cpython-314.pyc%27%5D'), 'copy-btn-3')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; import py_compile
+&gt;&gt;&gt; py_compile.compile("greet.py")   # 手動觸發編譯
+&gt;&gt;&gt; import os
+&gt;&gt;&gt; os.listdir("__pycache__")
+['greet.cpython-314.pyc']</code></pre>
+      </div>
+    <p><code>.pyc</code> 檔名帶有實作與版本標記（<code>cpython-314</code>），這是刻意的：不同版本的 bytecode 格式不相容，所以要隔離快取。<code>.pyc</code> 純粹是<strong>編譯快取</strong>——下次 import 時若原始碼沒變（比對 mtime 或 hash），就直接載入 bytecode 跳過編譯，加快啟動。它不是給你拿去獨立散佈執行的產物（這點跟 <code>.class</code> 很不一樣）。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>__pycache__</code> 是自動產生的快取，不需要納入版控。所有 Python 專案的 <code>.gitignore</code> 第一條幾乎都是 <code>__pycache__/</code>。</p>
+</div><div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>.pyc</code> ≈ <code>.class</code>，但前者是隱形快取、版本綁定、不對外散佈；後者是你建置流程的一級產物。</p>
+</div><h3 id="直譯與編譯的誤解一次講清">「直譯」與「編譯」的誤解，一次講清</h3><table>
+<thead>
+<tr>
+<th>面向</th>
+<th>Java</th>
+<th>Python (CPython)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>編譯步驟</td>
+<td>顯式（<code>javac</code>）</td>
+<td>隱式（import / 執行時自動）</td>
+</tr>
+<tr>
+<td>中間產物</td>
+<td><code>.class</code> bytecode</td>
+<td><code>.pyc</code> bytecode（快取）</td>
+</tr>
+<tr>
+<td>執行引擎</td>
+<td>JVM（堆疊式 VM）</td>
+<td>PVM（堆疊式 VM）</td>
+</tr>
+<tr>
+<td>JIT</td>
+<td>HotSpot 內建 JIT</td>
+<td>CPython 無 JIT（3.13 起有實驗性 JIT）</td>
+</tr>
+<tr>
+<td>啟動成本</td>
+<td>JVM 暖機較重</td>
+<td>直接跑，啟動快</td>
+</tr>
+</tbody></table>
+<p>所以更精確的說法是：<strong>Python 是「編譯成 bytecode 後在虛擬機上解譯執行」的語言</strong>——在這點上它和 Java 的模型驚人地相似。最大的差別是：CPython 預設<strong>沒有 JIT</strong>，bytecode 就是一條一條解譯，不會像 HotSpot 那樣把熱點編成機器碼。這正是 CPython 在純 CPU 密集運算上比 Java 慢的根本原因。</p>
+<h3 id="其他實作cpython-為何是事實標準">其他實作：CPython 為何是事實標準</h3><p>Python 是一份<strong>語言規格</strong>，可以有多種實作，就像 Java 有 HotSpot、OpenJ9、GraalVM：</p>
+<table>
+<thead>
+<tr>
+<th>實作</th>
+<th>對照</th>
+<th>特性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>CPython</strong></td>
+<td>HotSpot（事實標準）</td>
+<td>官方參考實作，C 寫成，生態系預設目標</td>
+</tr>
+<tr>
+<td><strong>PyPy</strong></td>
+<td>GraalVM / HotSpot JIT</td>
+<td>帶 JIT 的實作，純 Python 數值運算可快數倍</td>
+</tr>
+<tr>
+<td><strong>Jython</strong></td>
+<td>跑在 JVM 上的腳本語言</td>
+<td>編譯成 JVM bytecode，可呼叫 Java 函式庫（但停在 Python 2.7，已式微）</td>
+</tr>
+<tr>
+<td><strong>GraalPy</strong></td>
+<td>GraalVM 多語言</td>
+<td>Oracle 的 GraalVM 上的 Python，可與 Java 互通</td>
+</tr>
+</tbody></table>
+<p>為什麼 CPython 是事實標準？因為<strong>生態系</strong>。NumPy、pandas、PyTorch 這類效能關鍵套件大量使用 C 擴充（CPython 的 C API），這些 C 擴充在 PyPy/Jython 上往往無法直接運作或需要相容層。對 99% 的工作，「Python」就等於「CPython」。本書所有範例都以 CPython 3.12+ 為準。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：別急著為了效能跳去 PyPy。PyPy 對長時間運行的純 Python 數值程式很有效，但若你的瓶頸在 NumPy（底層已是 C/Fortran），PyPy 幫不上忙，反而可能因相容性問題踩雷。先量測再優化。</p>
+</div><p>關於 <strong>GIL（Global Interpreter Lock）</strong>：CPython 有一把全域鎖，同一時刻只有一個執行緒能執行 Python bytecode——這是 Java 工程師最大的認知衝擊之一（你習慣的 <code>Thread</code> 能真正並行跑 CPU 工作，Python 的 <code>threading</code> 在 CPU 密集任務上不行）。這牽涉並行模型的根本選擇，我們留到第 14 章專門深入，這裡先記住「它存在、它會影響你選 threading 還是 multiprocessing」即可。</p>
+<hr>
+<h2 id="12-虛擬環境venv一個-java-工程師沒有的痛點">1.2 虛擬環境（venv）：一個 Java 工程師沒有的痛點</h2><h3 id="為什麼需要隔離">為什麼需要隔離</h3><p>先理解 Java 為什麼<strong>沒有</strong>這個問題。在 Maven/Gradle 世界，依賴是<strong>每專案獨立</strong>的：jar 放在本地 <code>~/.m2</code> 倉庫，但每個專案的 classpath 由它自己的 <code>pom.xml</code>/<code>build.gradle</code> 決定。專案 A 用 Guava 31、專案 B 用 Guava 32，彼此井水不犯河水——因為依賴解析是專案層級的。</p>
+<p>Python <strong>預設不是這樣</strong>。<code>pip install requests</code> 預設裝到<strong>全域</strong> <code>site-packages</code>，全機所有 Python 程式共用。後果：</p>
+<ul>
+<li>專案 A 需要 <code>django==3.2</code>，專案 B 需要 <code>django==4.2</code>——全域只能裝一個版本，直接衝突。</li>
+<li>你裝的套件污染了系統 Python，某天系統工具因為版本被你升級而壞掉。</li>
+</ul>
+<p>這就是「相依地獄（dependency hell）」。<strong>虛擬環境（virtual environment, venv）</strong> 就是解法：為每個專案建立一個獨立的、隔離的 Python 環境與其專屬的 <code>site-packages</code>。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：現代發行版（含 Homebrew 安裝的 Python）多依 <strong>PEP 668</strong> 把系統 Python 標記為 externally-managed（在其標準函式庫目錄放一個 <code>EXTERNALLY-MANAGED</code> 檔）。此時直接對系統 Python 跑 <code>pip install</code> 會被擋下，並提示你改用 venv 或 pipx。這從另一個角度強化了 venv 的必要性——連 Python 自己都不希望你污染全域。</p>
+</div><div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：venv 提供的隔離 ≈ Maven/Gradle「每專案獨立 classpath」這件你本來就免費享有的事。差別是 Java 自動做到，Python 要你顯式建立並啟用一個 venv。</p>
+</div><h3 id="建立與使用">建立與使用</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-4" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E5%9C%A8%E5%B0%88%E6%A1%88%E6%A0%B9%E7%9B%AE%E9%8C%84%E5%BB%BA%E7%AB%8B%E8%99%9B%E6%93%AC%E7%92%B0%E5%A2%83%EF%BC%88%E6%85%A3%E4%BE%8B%E5%91%BD%E5%90%8D%20.venv%EF%BC%89%0Apython3%20-m%20venv%20.venv%0A%0A%23%20%E5%95%9F%E7%94%A8%EF%BC%88macOS%20%2F%20Linux%EF%BC%89%0Asource%20.venv%2Fbin%2Factivate%0A%0A%23%20%E5%95%9F%E7%94%A8%EF%BC%88Windows%20PowerShell%EF%BC%89%0A.venv%5CScripts%5CActivate.ps1%0A%0A%23%20%E5%95%9F%E7%94%A8%E5%BE%8C%EF%BC%8C%E6%8F%90%E7%A4%BA%E5%AD%97%E5%85%83%E5%89%8D%E6%9C%83%E5%87%BA%E7%8F%BE%20(.venv)%EF%BC%8C%E6%AD%A4%E6%99%82%20python%20%2F%20pip%20%E9%83%BD%E6%8C%87%E5%90%91%E9%80%99%E5%80%8B%E7%92%B0%E5%A2%83%0A(.venv)%20%24%20which%20python%0A%2Fpath%2Fto%2Fproject%2F.venv%2Fbin%2Fpython%0A%0A%23%20%E5%81%9C%E7%94%A8%0A(.venv)%20%24%20deactivate'), 'copy-btn-4')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash"># 在專案根目錄建立虛擬環境（慣例命名 .venv）
+python3 -m venv .venv
+
+# 啟用（macOS / Linux）
+source .venv/bin/activate
+
+# 啟用（Windows PowerShell）
+.venv\Scripts\Activate.ps1
+
+# 啟用後，提示字元前會出現 (.venv)，此時 python / pip 都指向這個環境
+(.venv) $ which python
+/path/to/project/.venv/bin/python
+
+# 停用
+(.venv) $ deactivate</code></pre>
+      </div>
+    <h3 id="venv-裡面有什麼">`.venv` 裡面有什麼</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-5" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('.venv%2F%0A%E2%94%9C%E2%94%80%E2%94%80%20bin%2F%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%8F%AF%E5%9F%B7%E8%A1%8C%E6%AA%94%EF%BC%88python%E3%80%81pip%E3%80%81%E4%BB%A5%E5%8F%8A%E5%A5%97%E4%BB%B6%E6%8F%90%E4%BE%9B%E7%9A%84%20CLI%EF%BC%89%0A%E2%94%82%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20python%20-%3E%20...%20%20%23%20%E6%8C%87%E5%90%91%E7%9B%B4%E8%AD%AF%E5%99%A8%E7%9A%84%E7%AC%A6%E8%99%9F%E9%80%A3%E7%B5%90%0A%E2%94%82%20%20%20%E2%94%9C%E2%94%80%E2%94%80%20pip%0A%E2%94%82%20%20%20%E2%94%94%E2%94%80%E2%94%80%20activate%20%20%20%20%20%20%23%20%E5%95%9F%E7%94%A8%E8%85%B3%E6%9C%AC%EF%BC%88%E4%BF%AE%E6%94%B9%20PATH%20%E8%88%87%20PROMPT%EF%BC%89%0A%E2%94%9C%E2%94%80%E2%94%80%20lib%2F%0A%E2%94%82%20%20%20%E2%94%94%E2%94%80%E2%94%80%20python3.12%2F%0A%E2%94%82%20%20%20%20%20%20%20%E2%94%94%E2%94%80%E2%94%80%20site-packages%2F%20%20%20%23%20%E9%80%99%E5%80%8B%E7%92%B0%E5%A2%83%E5%B0%88%E5%B1%AC%E7%9A%84%E5%A5%97%E4%BB%B6%E5%B0%B1%E8%A3%9D%E5%9C%A8%E9%80%99%0A%E2%94%9C%E2%94%80%E2%94%80%20include%2F%0A%E2%94%94%E2%94%80%E2%94%80%20pyvenv.cfg%20%20%20%20%20%20%20%20%23%20%E8%A8%AD%E5%AE%9A%E6%AA%94%EF%BC%8C%E8%A8%98%E9%8C%84%E5%9F%BA%E5%BA%95%E7%9B%B4%E8%AD%AF%E5%99%A8%E8%B7%AF%E5%BE%91%E7%AD%89'), 'copy-btn-5')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">.venv/
+├── bin/              # 可執行檔（python、pip、以及套件提供的 CLI）
+│   ├── python -&gt; ...  # 指向直譯器的符號連結
+│   ├── pip
+│   └── activate      # 啟用腳本（修改 PATH 與 PROMPT）
+├── lib/
+│   └── python3.12/
+│       └── site-packages/   # 這個環境專屬的套件就裝在這
+├── include/
+└── pyvenv.cfg        # 設定檔，記錄基底直譯器路徑等</code></pre>
+      </div>
+    <p>「啟用」做的事其實很單純：把 <code>.venv/bin</code> 插到 <code>PATH</code> 最前面，於是 <code>python</code> 與 <code>pip</code> 都解析到 venv 內的版本。<code>pip install</code> 自然就裝進這個環境的 <code>site-packages</code>，與全域隔離。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>.venv</code> 是<strong>環境</strong>而非<strong>設定</strong>，絕對不要進版控（<code>.gitignore</code> 它）。你版控的是「如何重建環境」的描述（<code>pyproject.toml</code> / lock 檔），而不是環境本身——就像你版控 <code>pom.xml</code> 而非 <code>~/.m2</code>。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：很多新手忘了啟用 venv 就 <code>pip install</code>，結果裝到了全域、或裝到另一個專案的環境。養成「進專案先確認 <code>(.venv)</code> 出現」的習慣。後面介紹的 <code>uv</code> 會幫你免去手動啟用的麻煩。</p>
+</div><hr>
+<h2 id="13-套件與專案設定從-pip-到-pyprojecttoml">1.3 套件與專案設定：從 pip 到 pyproject.toml</h2><h3 id="pip-與-requirementstxt-的不足">pip 與 requirements.txt 的不足</h3><p><code>pip</code> 是 Python 的套件安裝器（≈ 你直接呼叫 Maven 的依賴下載功能）。最傳統的依賴宣告方式是 <code>requirements.txt</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-6" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20requirements.txt%0Arequests%3D%3D2.32.3%0Aflask%3E%3D3.0'), 'copy-btn-6')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text"># requirements.txt
+requests==2.32.3
+flask&gt;=3.0</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-7" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('pip%20install%20-r%20requirements.txt%0Apip%20freeze%20%3E%20requirements.txt%20%20%20%23%20%E6%8A%8A%E7%95%B6%E5%89%8D%E7%92%B0%E5%A2%83%E5%87%8D%E7%B5%90%E6%88%90%E6%B8%85%E5%96%AE'), 'copy-btn-7')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">pip install -r requirements.txt
+pip freeze &gt; requirements.txt   # 把當前環境凍結成清單</code></pre>
+      </div>
+    <p>這套老方法有幾個 Java 工程師一眼能看穿的問題：</p>
+<ol>
+<li><strong>沒有專案元資料</strong>：<code>requirements.txt</code> 只是一串套件，沒有專案名稱、版本、進入點、建置設定。它不是 <code>pom.xml</code>，比較像光禿禿的 dependency 區段。</li>
+<li><strong>直接依賴與間接依賴混在一起</strong>：<code>pip freeze</code> 把<strong>所有</strong>安裝的東西（含遞移依賴）攤平列出，你看不出哪些是你真正想要的、哪些是被拖進來的。對照 Maven 你能清楚區分 direct 與 transitive dependency。</li>
+<li><strong>不可重現（non-reproducible）</strong>：<code>flask&gt;=3.0</code> 這種範圍宣告，今天解析到 3.0.3、下個月可能解析到 3.1.0，導致「在我機器上能跑」。</li>
+</ol>
+<h3 id="現代標準pyprojecttomlpep-621">現代標準：pyproject.toml（PEP 621）</h3><p><code>pyproject.toml</code> 是現在 Python 專案設定的<strong>單一事實來源（single source of truth）</strong>，地位等同 <code>pom.xml</code> / <code>build.gradle</code>。PEP 621 標準化了 <code>[project]</code> 區段：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">toml</span>
+          <button id="copy-btn-8" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%5Bproject%5D%0Aname%20%3D%20%22greeter%22%0Aversion%20%3D%20%220.1.0%22%0Adescription%20%3D%20%22A%20friendly%20greeting%20service%22%0Areadme%20%3D%20%22README.md%22%0Arequires-python%20%3D%20%22%3E%3D3.12%22%0Adependencies%20%3D%20%5B%0A%20%20%20%20%22httpx%3E%3D0.28%22%2C%0A%20%20%20%20%22rich%3E%3D13.0%22%2C%0A%5D%0A%0A%5Bproject.optional-dependencies%5D%0Adev%20%3D%20%5B%22ruff%22%2C%20%22mypy%22%2C%20%22pytest%22%5D%0A%0A%5Bproject.scripts%5D%0Agreeter%20%3D%20%22greeter.cli%3Amain%22%20%20%20%23%20%E5%AE%89%E8%A3%9D%E5%BE%8C%E5%8F%AF%E5%9C%A8%E7%B5%82%E7%AB%AF%E6%A9%9F%E7%9B%B4%E6%8E%A5%E6%89%93%20greeter%EF%BC%8C%E2%89%88%20Maven%20%E7%9A%84%E5%8F%AF%E5%9F%B7%E8%A1%8C%20jar%20%E9%80%B2%E5%85%A5%E9%BB%9E%0A%0A%5Bbuild-system%5D%0Arequires%20%3D%20%5B%22hatchling%22%5D%0Abuild-backend%20%3D%20%22hatchling.build%22'), 'copy-btn-8')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-toml"><code class="language-toml">[project]
+name = "greeter"
+version = "0.1.0"
+description = "A friendly greeting service"
+readme = "README.md"
+requires-python = "&gt;=3.12"
+dependencies = [
+    "httpx&gt;=0.28",
+    "rich&gt;=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["ruff", "mypy", "pytest"]
+
+[project.scripts]
+greeter = "greeter.cli:main"   # 安裝後可在終端機直接打 greeter，≈ Maven 的可執行 jar 進入點
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"</code></pre>
+      </div>
+    <p>對照表：</p>
+<table>
+<thead>
+<tr>
+<th>pom.xml / build.gradle</th>
+<th>pyproject.toml</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&lt;groupId&gt;</code>/<code>&lt;artifactId&gt;</code></td>
+<td><code>[project] name</code></td>
+<td>專案座標</td>
+</tr>
+<tr>
+<td><code>&lt;version&gt;</code></td>
+<td><code>[project] version</code></td>
+<td>版本</td>
+</tr>
+<tr>
+<td><code>&lt;dependencies&gt;</code></td>
+<td><code>[project] dependencies</code></td>
+<td>直接依賴</td>
+</tr>
+<tr>
+<td><code>&lt;scope&gt;test&lt;/scope&gt;</code></td>
+<td><code>[project.optional-dependencies] dev</code></td>
+<td>開發/測試依賴</td>
+</tr>
+<tr>
+<td>Maven 外掛 build 設定</td>
+<td><code>[build-system]</code></td>
+<td>建置後端</td>
+</tr>
+<tr>
+<td><code>&lt;java.version&gt;</code></td>
+<td><code>requires-python</code></td>
+<td>執行環境要求</td>
+</tr>
+</tbody></table>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>pyproject.toml</code> 不只放依賴，還是 ruff、mypy、pytest 等工具的共用設定檔（用 <code>[tool.ruff]</code>、<code>[tool.mypy]</code> 區段）。一個檔案統管整個工具鏈——比 Java 散落在多個 plugin 設定中乾淨。</p>
+</div><h3 id="lock-檔可重現建置">lock 檔：可重現建置</h3><p><code>pyproject.toml</code> 宣告的是<strong>意圖</strong>（「我要 httpx 0.28 以上」），但要做到<strong>可重現建置（reproducible build）</strong>，你需要鎖定<strong>確切解析出來的整棵依賴樹與雜湊值</strong>。這就是 <strong>lock 檔</strong>的角色，對照觀念是 Gradle 的 <code>gradle.lockfile</code> 或 npm 的 <code>package-lock.json</code>。</p>
+<p>差別在於：<code>pyproject.toml</code> 進版控且人類可讀可編輯；lock 檔進版控但由工具產生、不該手改。團隊成員與 CI 用 lock 檔安裝，就能保證大家拿到<strong>位元級相同</strong>的依賴集合，徹底消滅「在我機器上能跑」。</p>
+<p>過去 Python 在 lock 檔這塊一片混亂（各家工具各搞一套格式），這正是下一節主角 <code>uv</code> 帶來的最大價值之一。</p>
+<hr>
+<h2 id="14-uv現代一體化工具">1.4 uv：現代一體化工具</h2><p>過去 Python 工具鏈是「拼裝車」：<code>venv</code> 管環境、<code>pip</code> 裝套件、<code>pip-tools</code>/<code>poetry</code> 管 lock、<code>pyenv</code> 管 Python 版本……每個工具一個指令、一套心智模型。<strong><code>uv</code></strong>（用 Rust 寫成）把這些<strong>全部整合</strong>進一個指令，而且<strong>極快</strong>——依賴解析與安裝常比 pip 快一到兩個數量級。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：uv 之於 Python，就像 Gradle wrapper 給你的「一個入口管全部」體驗：建環境、解依賴、裝套件、跑程式、鎖版本，全在一個工具裡——只是它快到讓你懷疑人生。</p>
+</div><p>安裝（macOS/Linux）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-9" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('curl%20-LsSf%20https%3A%2F%2Fastral.sh%2Fuv%2Finstall.sh%20%7C%20sh'), 'copy-btn-9')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">curl -LsSf https://astral.sh/uv/install.sh | sh</code></pre>
+      </div>
+    <p>核心指令：</p>
+<table>
+<thead>
+<tr>
+<th>uv 指令</th>
+<th>作用</th>
+<th>Maven/Gradle 類比</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>uv init</code></td>
+<td>初始化新專案（建 <code>pyproject.toml</code>、git、範本）</td>
+<td><code>mvn archetype:generate</code> / <code>gradle init</code></td>
+</tr>
+<tr>
+<td><code>uv add &lt;pkg&gt;</code></td>
+<td>加依賴並安裝、同步更新 lock</td>
+<td>編輯 <code>pom.xml</code> + 下載</td>
+</tr>
+<tr>
+<td><code>uv remove &lt;pkg&gt;</code></td>
+<td>移除依賴</td>
+<td>反向操作</td>
+</tr>
+<tr>
+<td><code>uv sync</code></td>
+<td>依 lock 檔重建環境</td>
+<td><code>mvn dependency:resolve</code>（鎖定版本）</td>
+</tr>
+<tr>
+<td><code>uv run &lt;cmd&gt;</code></td>
+<td>在專案環境中執行命令（自動確保環境同步）</td>
+<td><code>gradle run</code> / <code>./gradlew &lt;task&gt;</code></td>
+</tr>
+<tr>
+<td><code>uv lock</code></td>
+<td>重新解析並寫出 lock 檔</td>
+<td>更新 lockfile</td>
+</tr>
+<tr>
+<td><code>uv python install 3.12</code></td>
+<td>安裝指定 Python 版本</td>
+<td>≈ 管理 toolchain（pyenv 的活）</td>
+</tr>
+</tbody></table>
+<p><code>uv</code> 還有個殺手級體驗：你<strong>幾乎不用手動啟用 venv</strong>。<code>uv run</code> 會自動建立並使用 <code>.venv</code>、確保依賴與 lock 一致，然後在那個環境裡跑你的命令。<code>.python-version</code> 檔則記錄專案要用哪個 Python 版本，uv 會自動下載安裝對應版本——連 <code>pyenv</code> 都省了。</p>
+<hr>
+<h2 id="15-工具鏈ruff-與-mypy">1.5 工具鏈：ruff 與 mypy</h2><h3 id="rufflinter-formatter-一體且快上百倍">ruff：linter + formatter 一體（且快上百倍）</h3><p>Java 端你大概用過一整套：<strong>Checkstyle</strong>（風格）、<strong>SpotBugs/PMD</strong>（找 bug）、<strong>google-java-format / Spotless</strong>（排版）。每個工具獨立設定、各跑各的。</p>
+<p><strong><code>ruff</code></strong>（同樣 Rust 寫成）把 <strong>linter</strong> 與 <strong>formatter</strong> 合而為一，涵蓋數百條規則（吸收了 Flake8、isort、pyupgrade、pydocstyle 等老工具的能力），而且快到誇張——大型專案的檢查常在毫秒級完成。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-10" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('uv%20run%20ruff%20check%20.%20%20%20%20%20%20%20%20%20%20%23%20%E6%AA%A2%E6%9F%A5%EF%BC%88%E2%89%88%20Checkstyle%20%2B%20SpotBugs%20%2B%20isort%EF%BC%89%0Auv%20run%20ruff%20check%20--fix%20.%20%20%20%20%23%20%E8%87%AA%E5%8B%95%E4%BF%AE%E5%8F%AF%E4%BF%AE%E7%9A%84%E5%95%8F%E9%A1%8C%0Auv%20run%20ruff%20format%20.%20%20%20%20%20%20%20%20%20%23%20%E6%8E%92%E7%89%88%EF%BC%88%E2%89%88%20google-java-format%EF%BC%89'), 'copy-btn-10')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">uv run ruff check .          # 檢查（≈ Checkstyle + SpotBugs + isort）
+uv run ruff check --fix .    # 自動修可修的問題
+uv run ruff format .         # 排版（≈ google-java-format）</code></pre>
+      </div>
+    <p>實際抓出問題的樣子（對一段刻意寫爛的程式碼）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-11" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20ruff%20check%20bad.py%0AF401%20%5B*%5D%20%60os%60%20imported%20but%20unused%0A%20--%3E%20bad.py%3A1%3A8%0A%20%20%7C%0A1%20%7C%20import%20os%0A%20%20%7C%20%20%20%20%20%20%20%20%5E%5E%0A2%20%7C%0A3%20%7C%20def%20f()%3A%0A%20%20%7C%0Ahelp%3A%20Remove%20unused%20import%3A%20%60os%60%0A%0AF841%20Local%20variable%20%60y%60%20is%20assigned%20to%20but%20never%20used%0A%20--%3E%20bad.py%3A4%3A5%0A%20%20%7C%0A3%20%7C%20def%20f()%3A%0A4%20%7C%20%20%20%20%20y%20%3D%201%0A%20%20%7C%20%20%20%20%20%5E%0A5%20%7C%20%20%20%20%20return%202%0A%20%20%7C%0Ahelp%3A%20Remove%20assignment%20to%20unused%20variable%20%60y%60%0A%0AFound%202%20errors.%0A%5B*%5D%201%20fixable%20with%20the%20%60--fix%60%20option%20(1%20hidden%20fix%20can%20be%20enabled%20with%20the%20%60--unsafe-fixes%60%20option).'), 'copy-btn-11')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ ruff check bad.py
+F401 [*] `os` imported but unused
+ --&gt; bad.py:1:8
+  |
+1 | import os
+  |        ^^
+2 |
+3 | def f():
+  |
+help: Remove unused import: `os`
+
+F841 Local variable `y` is assigned to but never used
+ --&gt; bad.py:4:5
+  |
+3 | def f():
+4 |     y = 1
+  |     ^
+5 |     return 2
+  |
+help: Remove assignment to unused variable `y`
+
+Found 2 errors.
+[*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).</code></pre>
+      </div>
+    <p>每個診斷下方會貼出對應的程式碼片段（含 <code>|</code> 與指向問題位置的 <code>^</code>）與 <code>help:</code> 修法建議；結尾的 <code>[*]</code> 標示有多少問題能用 <code>--fix</code> 自動修好。</p>
+<p>設定就寫在 <code>pyproject.toml</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">toml</span>
+          <button id="copy-btn-12" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%5Btool.ruff%5D%0Aline-length%20%3D%20100%0Atarget-version%20%3D%20%22py312%22%0A%0A%5Btool.ruff.lint%5D%0Aselect%20%3D%20%5B%22E%22%2C%20%22F%22%2C%20%22I%22%2C%20%22UP%22%5D%20%20%20%23%20%E5%95%9F%E7%94%A8%20pycodestyle%2Fpyflakes%2Fisort%2Fpyupgrade%20%E8%A6%8F%E5%89%87%E9%9B%86'), 'copy-btn-12')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-toml"><code class="language-toml">[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]   # 啟用 pycodestyle/pyflakes/isort/pyupgrade 規則集</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>ruff check</code> ≈ Checkstyle + SpotBugs + import 排序，<code>ruff format</code> ≈ google-java-format。差別是它們合一、設定集中、且快上百倍。</p>
+</div><h3 id="mypy-pyright靜態型別檢查選用漸進式">mypy / pyright：靜態型別檢查（選用、漸進式）</h3><p>這是 Java 工程師最需要調整心態的地方。Java 的型別檢查是<strong>強制</strong>的——<code>javac</code> 不過你就無法產出 <code>.class</code>。Python 的型別檢查是<strong>選用且漸進的（gradual typing）</strong>：你可以加型別提示（type hints），也可以不加；直譯器<strong>執行時不會強制</strong>它們，型別提示純粹是給靜態檢查工具與 IDE 看的標註。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-13" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20greet(name%3A%20str)%20-%3E%20str%3A%0A%20%20%20%20return%20%22Hello%2C%20%22%20%2B%20name%0A%0Agreet(42)%20%20%20%23%20%E7%9B%B4%E8%AD%AF%E5%99%A8%E7%85%A7%E8%B7%91%E4%B8%8D%E8%AA%A4%E2%80%A6%E2%80%A6%E7%9B%B4%E5%88%B0%20%22Hello%2C%20%22%20%2B%2042%20%E5%9C%A8%E5%9F%B7%E8%A1%8C%E6%9C%9F%E6%89%8D%20TypeError'), 'copy-btn-13')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def greet(name: str) -&gt; str:
+    return "Hello, " + name
+
+greet(42)   # 直譯器照跑不誤……直到 "Hello, " + 42 在執行期才 TypeError</code></pre>
+      </div>
+    <p>把 <code>mypy</code>（或 Microsoft 的 <code>pyright</code>，VS Code Pylance 的引擎）接上去，這個錯誤在<strong>寫程式當下</strong>就被抓到：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-14" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20mypy%20typed.py%0Atyped.py%3A4%3A%20error%3A%20Argument%201%20to%20%22greet%22%20has%20incompatible%20type%20%22int%22%3B%20expected%20%22str%22%20%20%5Barg-type%5D%0AFound%201%20error%20in%201%20file%20(checked%201%20source%20file)'), 'copy-btn-14')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ mypy typed.py
+typed.py:4: error: Argument 1 to "greet" has incompatible type "int"; expected "str"  [arg-type]
+Found 1 error in 1 file (checked 1 source file)</code></pre>
+      </div>
+    <table>
+<thead>
+<tr>
+<th>面向</th>
+<th>Java（javac）</th>
+<th>Python（mypy/pyright）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>是否強制</td>
+<td>是，不過編譯不出檔</td>
+<td>否，獨立工具、選用</td>
+</tr>
+<tr>
+<td>執行期效果</td>
+<td>型別保證</td>
+<td>提示在執行期被忽略（無保證）</td>
+</tr>
+<tr>
+<td>採用方式</td>
+<td>全有或全無</td>
+<td>漸進式，可逐檔逐函式加</td>
+</tr>
+<tr>
+<td>典型用法</td>
+<td>編譯流程內建</td>
+<td>CI 內或 pre-commit 跑</td>
+</tr>
+</tbody></table>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：別把型別提示當負擔，把它當成你帶進 Python 的「工程紀律」。在共享的函式庫、模組邊界、資料模型上加好型別 + mypy/pyright，你就把 Python 的安全網拉到接近 Java 的水準。型別系統的深入（泛型、<code>Protocol</code>、<code>TypeVar</code>）見第 9 章。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：型別提示<strong>不會</strong>在執行期驗證。<code>greet(42)</code> 不會因為標了 <code>name: str</code> 就在進入函式時報錯——它照樣執行，直到實際的型別不相容運算才炸。要執行期驗證請用 pydantic（第 9 章）。</p>
+</div><h3 id="idevs-code-與-pycharm">IDE：VS Code 與 PyCharm</h3><ul>
+<li><strong>VS Code + Python/Pylance 擴充</strong>：輕量、免費、生態活躍。Pylance 底層是 pyright，提供即時型別檢查與自動補全。搭配 ruff 擴充可存檔自動排版。多數現代 Python 開發者的首選。</li>
+<li><strong>PyCharm（JetBrains）</strong>：若你來自 IntelliJ IDEA，這是最無痛的過渡——重構、除錯、測試整合一應俱全，介面與快捷鍵幾乎一致。Community 版免費足以應付多數需求。</li>
+</ul>
+<p>兩者都能讀懂 <code>pyproject.toml</code> 與 <code>.venv</code>，自動把專案環境接上。</p>
+<hr>
+<h2 id="16-repl-與互動式開發java-工程師相對陌生的工作流">1.6 REPL 與互動式開發：Java 工程師相對陌生的工作流</h2><p>Java 直到 9 才有 <code>jshell</code>，而且用的人不多——你的肌肉記憶是「改 code → 編譯 → 跑」的批次循環。Python 的核心工作流之一是 <strong>REPL（Read-Eval-Print Loop）</strong>：開一個直譯器，<strong>逐行輸入、立即看結果</strong>，探索式地試 API、驗證想法。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-15" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20python3%0A%3E%3E%3E%20import%20datetime%0A%3E%3E%3E%20datetime.date.today()%0Adatetime.date(2026%2C%206%2C%2014)%0A%3E%3E%3E%20%5Bx**2%20for%20x%20in%20range(5)%5D%0A%5B0%2C%201%2C%204%2C%209%2C%2016%5D%0A%3E%3E%3E%20help(str.split)%20%20%20%23%20%E7%9B%B4%E6%8E%A5%E5%9C%A8%20REPL%20%E6%9F%A5%E6%96%87%E4%BB%B6'), 'copy-btn-15')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">$ python3
+&gt;&gt;&gt; import datetime
+&gt;&gt;&gt; datetime.date.today()
+datetime.date(2026, 6, 14)
+&gt;&gt;&gt; [x**2 for x in range(5)]
+[0, 1, 4, 9, 16]
+&gt;&gt;&gt; help(str.split)   # 直接在 REPL 查文件</code></pre>
+      </div>
+    <p>這種「想到就試、試了就知道」的即時回饋，是 Python 探索性極強的原因。不確定某個函式回傳什麼？貼進 REPL 跑一下，比翻文件快。</p>
+<p>進階選項：</p>
+<ul>
+<li><strong>IPython</strong>：增強版 REPL。tab 補全、語法高亮、<code>?</code> 查物件（<code>str.split?</code>）、<code>%timeit</code> 微基準、shell 整合（<code>!ls</code>）。互動開發的標配。</li>
+<li><strong>Jupyter Notebook/Lab</strong>：把 REPL 變成可儲存的「筆記本」，程式碼、輸出、圖表、文字混排。資料科學與教學的主流；對需要「邊算邊看圖」的探索工作極強大。</li>
+</ul>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-16" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('uv%20run%20--with%20ipython%20ipython%20%20%20%20%20%23%20%E4%B8%8D%E6%B1%A1%E6%9F%93%E5%B0%88%E6%A1%88%EF%BC%8C%E8%87%A8%E6%99%82%E6%8B%89%20ipython%20%E8%B5%B7%E4%BE%86%E7%8E%A9'), 'copy-btn-16')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">uv run --with ipython ipython     # 不污染專案，臨時拉 ipython 起來玩</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：把 REPL 當成你的第二雙手。寫複雜的 comprehension 或 regex 前，先在 REPL 拆小步驗證，遠比寫完整支程式再 debug 有效率。<code>uv run --with &lt;pkg&gt;</code> 能臨時引入工具而不動到專案依賴，很適合一次性探索。</p>
+</div><div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：REPL ≈ jshell，但 Python 的 REPL 是生態系的一級公民，從教學到生產除錯無所不在，遠比 jshell 在 Java 圈的存在感強。</p>
+</div><hr>
+<h2 id="17-完整走查從零建立一個最小專案">1.7 完整走查：從零建立一個最小專案</h2><p>把上面所有概念串起來。我們用 <code>uv</code> 從零做一個會打招呼的小工具，跑完依賴、lint、型別檢查、執行的完整循環。</p>
+<h3 id="步驟-1初始化專案">步驟 1：初始化專案</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-17" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20init%20--name%20greeter%20demo-greeter%0AInitialized%20project%20%60greeter%60%20at%20%2Fpath%2Fto%2Fdemo-greeter%0A%0A%24%20cd%20demo-greeter%0A%24%20ls%20-A%0A.git%20%20.gitignore%20%20.python-version%20%20main.py%20%20pyproject.toml%20%20README.md'), 'copy-btn-17')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">$ uv init --name greeter demo-greeter
+Initialized project `greeter` at /path/to/demo-greeter
+
+$ cd demo-greeter
+$ ls -A
+.git  .gitignore  .python-version  main.py  pyproject.toml  README.md</code></pre>
+      </div>
+    <p><code>uv init</code> 一次給你：git 倉庫、<code>.gitignore</code>（已包含 <code>.venv</code>、<code>__pycache__</code>）、鎖定 Python 版本的 <code>.python-version</code>、範本 <code>main.py</code>、以及 <code>pyproject.toml</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">toml</span>
+          <button id="copy-btn-18" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%5Bproject%5D%0Aname%20%3D%20%22greeter%22%0Aversion%20%3D%20%220.1.0%22%0Adescription%20%3D%20%22Add%20your%20description%20here%22%0Areadme%20%3D%20%22README.md%22%0Arequires-python%20%3D%20%22%3E%3D3.12%22%0Adependencies%20%3D%20%5B%5D'), 'copy-btn-18')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-toml"><code class="language-toml">[project]
+name = "greeter"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = "&gt;=3.12"
+dependencies = []</code></pre>
+      </div>
+    <h3 id="步驟-2寫一支小程式">步驟 2：寫一支小程式</h3><p>把 <code>main.py</code> 改成用 <code>httpx</code> 抓資料、用型別提示寫清楚：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-19" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20main.py%0Aimport%20httpx%0A%0A%0Adef%20fetch_user_name(user_id%3A%20int)%20-%3E%20str%3A%0A%20%20%20%20%22%22%22%E5%BE%9E%20JSONPlaceholder%20%E5%8F%96%E5%BE%97%E4%BD%BF%E7%94%A8%E8%80%85%E5%90%8D%E7%A8%B1%E3%80%82%22%22%22%0A%20%20%20%20resp%20%3D%20httpx.get(f%22https%3A%2F%2Fjsonplaceholder.typicode.com%2Fusers%2F%7Buser_id%7D%22)%0A%20%20%20%20resp.raise_for_status()%0A%20%20%20%20data%3A%20dict%5Bstr%2C%20object%5D%20%3D%20resp.json()%0A%20%20%20%20return%20str(data%5B%22name%22%5D)%0A%0A%0Adef%20main()%20-%3E%20None%3A%0A%20%20%20%20name%20%3D%20fetch_user_name(1)%0A%20%20%20%20print(f%22Hello%2C%20%7Bname%7D!%22)%0A%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20main()'), 'copy-btn-19')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># main.py
+import httpx
+
+
+def fetch_user_name(user_id: int) -&gt; str:
+    """從 JSONPlaceholder 取得使用者名稱。"""
+    resp = httpx.get(f"https://jsonplaceholder.typicode.com/users/{user_id}")
+    resp.raise_for_status()
+    data: dict[str, object] = resp.json()
+    return str(data["name"])
+
+
+def main() -&gt; None:
+    name = fetch_user_name(1)
+    print(f"Hello, {name}!")
+
+
+if __name__ == "__main__":
+    main()</code></pre>
+      </div>
+    <p>（<code>if __name__ == &quot;__main__&quot;:</code> 的完整意義見第 11 章；現在先理解成「這支檔案被直接執行時才跑 <code>main()</code>」，類似 Java 的 <code>public static void main</code>。）</p>
+<p>注意這裡刻意寫 <code>data: dict[str, object]</code> 而非裸 <code>dict</code>：JSON 回應的值型別不一（<code>name</code> 是字串，但 <code>id</code> 是數字、<code>address</code> 是巢狀物件），用 <code>object</code> 如實標註；取出 <code>data[&quot;name&quot;]</code> 後再用 <code>str(...)</code> 收斂回宣告的回傳型別 <code>str</code>。這個範本在 <code>mypy</code> 預設與 <code>mypy --strict</code> 下都是全綠的——可以安心當成你的個人起手式。</p>
+<h3 id="步驟-3加依賴">步驟 3：加依賴</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-20" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20add%20httpx%0AUsing%20CPython%203.12.12%0ACreating%20virtual%20environment%20at%3A%20.venv%0AResolved%208%20packages%20in%20336ms%0AInstalled%207%20packages%20in%2014ms%0A%20%2B%20httpx%3D%3D0.28.1%0A%20%2B%20...%EF%BC%88%E5%90%AB%E9%81%9E%E7%A7%BB%E4%BE%9D%E8%B3%B4%20anyio%E3%80%81certifi%E3%80%81h11%E3%80%81httpcore%E3%80%81idna%E3%80%81typing-extensions%EF%BC%89'), 'copy-btn-20')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">$ uv add httpx
+Using CPython 3.12.12
+Creating virtual environment at: .venv
+Resolved 8 packages in 336ms
+Installed 7 packages in 14ms
+ + httpx==0.28.1
+ + ...（含遞移依賴 anyio、certifi、h11、httpcore、idna、typing-extensions）</code></pre>
+      </div>
+    <p>注意 uv 自動完成了三件事：<strong>建立 <code>.venv</code></strong>（你沒下任何 <code>venv</code> 指令）、<strong>解析並安裝</strong>整棵依賴樹、<strong>寫出 <code>uv.lock</code></strong>。<code>pyproject.toml</code> 的 <code>dependencies</code> 也自動更新成 <code>[&quot;httpx&gt;=0.28.1&quot;]</code>。<code>uv.lock</code> 釘死了每個套件的確切版本與雜湊——這就是可重現建置的保證，請進版控。</p>
+<p>加開發工具到獨立的依賴群組（不會混進正式依賴）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-21" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20add%20--dev%20ruff%20mypy'), 'copy-btn-21')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">$ uv add --dev ruff mypy</code></pre>
+      </div>
+    <h3 id="步驟-4ruff-與-mypy-把關">步驟 4：ruff 與 mypy 把關</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-22" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20run%20ruff%20check%20.%0AAll%20checks%20passed!%0A%0A%24%20uv%20run%20ruff%20format%20.%0A1%20file%20left%20unchanged%0A%0A%24%20uv%20run%20mypy%20main.py%0ASuccess%3A%20no%20issues%20found%20in%201%20source%20file'), 'copy-btn-22')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">$ uv run ruff check .
+All checks passed!
+
+$ uv run ruff format .
+1 file left unchanged
+
+$ uv run mypy main.py
+Success: no issues found in 1 source file</code></pre>
+      </div>
+    <p>（<code>uv init</code> 產生的範本本來就是 ruff 格式化過的，加上我們上面照規範手寫的程式也合乎排版，所以 <code>ruff format</code> 回報 <code>1 file left unchanged</code>；只有當檔案實際被改動過排版時才會看到 <code>1 file reformatted</code>。）</p>
+<p>刻意製造一個型別錯誤試試——把 <code>fetch_user_name(1)</code> 改成 <code>fetch_user_name(&quot;1&quot;)</code>（傳字串給標註為 <code>int</code> 的參數）：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-23" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20run%20mypy%20main.py%0Amain.py%3A14%3A%20error%3A%20Argument%201%20to%20%22fetch_user_name%22%20has%20incompatible%20type%20%22str%22%3B%20expected%20%22int%22%20%20%5Barg-type%5D%0AFound%201%20error%20in%201%20file%20(checked%201%20source%20file)'), 'copy-btn-23')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">$ uv run mypy main.py
+main.py:14: error: Argument 1 to "fetch_user_name" has incompatible type "str"; expected "int"  [arg-type]
+Found 1 error in 1 file (checked 1 source file)</code></pre>
+      </div>
+    <p>mypy 在執行前就攔下了這個 Java 工程師最在意的型別錯誤。改回來。</p>
+<h3 id="步驟-5執行">步驟 5：執行</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-24" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20run%20main.py%0AHello%2C%20Leanne%20Graham!'), 'copy-btn-24')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">$ uv run main.py
+Hello, Leanne Graham!</code></pre>
+      </div>
+    <p><code>uv run</code> 在背後確保 <code>.venv</code> 與 lock 同步後才執行——你從頭到尾<strong>沒有手動啟用過 venv</strong>。</p>
+<h3 id="步驟-6在另一台機器重現">步驟 6：在另一台機器重現</h3><p>同事 clone 你的 repo（含 <code>pyproject.toml</code> 與 <code>uv.lock</code>，但不含 <code>.venv</code>）後，只要：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">bash</span>
+          <button id="copy-btn-25" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%24%20uv%20sync%20%20%20%20%20%23%20%E4%BE%9D%20uv.lock%20%E9%87%8D%E5%BB%BA%E5%87%BA%E4%BD%8D%E5%85%83%E7%B4%9A%E7%9B%B8%E5%90%8C%E7%9A%84%E7%92%B0%E5%A2%83%0A%24%20uv%20run%20main.py%0AHello%2C%20Leanne%20Graham!'), 'copy-btn-25')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-bash"><code class="language-bash">$ uv sync     # 依 uv.lock 重建出位元級相同的環境
+$ uv run main.py
+Hello, Leanne Graham!</code></pre>
+      </div>
+    <p>整個循環——初始化、寫程式、加依賴、lint、型別檢查、執行、重現——就是你未來每個 Python 專案的骨架。它在概念上完全對應你熟悉的 Maven/Gradle 工作流，只是更快、更集中、心智負擔更低。</p>
+<hr>
+<h2 id="本章小結">本章小結</h2><ol>
+<li><strong>Python 不是「純直譯」</strong>：CPython 會把 <code>.py</code> 編譯成 bytecode（快取於 <code>__pycache__/*.pyc</code>），再由 PVM 解譯執行——模型上與 Java 的 <code>javac</code> → <code>.class</code> → JVM 高度相似，最大差別是 CPython 預設無 JIT。</li>
+<li><strong>CPython 是事實標準</strong>：PyPy（帶 JIT）、Jython、GraalPy 各有定位，但因為 C 擴充生態系，實務上「Python」≈「CPython」。GIL 的影響留待第 14 章。</li>
+<li><strong>venv 解決 Java 工程師沒遇過的痛</strong>：Python 預設裝到全域 <code>site-packages</code>，必須用虛擬環境做每專案隔離（Java 的 per-project classpath 是免費的）。<code>.venv</code> 不進版控。</li>
+<li><strong><code>pyproject.toml</code> 是新標準</strong>：它是 <code>pom.xml</code>/<code>build.gradle</code> 的對應物，統管依賴與工具設定；<code>requirements.txt</code> 的攤平、不可重現問題由 lock 檔解決。</li>
+<li><strong><code>uv</code> 一統江湖</strong>：環境、依賴解析、lock、執行、Python 版本管理全整合，且極快。記住 <code>uv init</code> / <code>uv add</code> / <code>uv run</code> / <code>uv sync</code> 四個動詞就能走完全流程。</li>
+<li><strong>ruff = linter + formatter 合一</strong>（≈ Checkstyle + SpotBugs + format，但快上百倍）；<strong>mypy/pyright</strong> 是選用、漸進式的型別檢查——把它當成你帶進 Python 的工程紀律。</li>
+<li><strong>型別提示執行期不強制</strong>：標了 <code>name: str</code> 不代表執行期會擋下 <code>int</code>，要靠 mypy/pyright 在 CI 把關，或用 pydantic 做執行期驗證（第 9 章）。</li>
+<li><strong>REPL 是一級工作流</strong>：<code>python</code> / <code>ipython</code> / Jupyter 的「逐行試、立即看」探索模式，是比 jshell 普及得多的 Python 開發習慣。</li>
+</ol>
+<hr>
+<h2 id="練習">練習</h2><ol>
+<li><p><strong>看穿 bytecode</strong>：在 REPL 用 <code>dis.dis</code> 反組譯一個含 <code>if/else</code> 的函式，找出對應的條件跳轉 opcode。再寫一個等價的三元運算式 <code>x if cond else y</code>（Python 沒有 <code>?:</code>，見第 2 章），比較兩者 bytecode 差異。</p>
+<ul>
+<li>提示：<code>import dis; dis.dis(your_func)</code>，留意 <code>POP_JUMP_IF_FALSE</code> 之類的指令。</li>
+</ul>
+</li>
+<li><p><strong>製造並理解相依衝突</strong>：建兩個 uv 專案，一個 <code>uv add &quot;httpx&lt;0.27&quot;</code>、另一個 <code>uv add &quot;httpx&gt;=0.28&quot;</code>，確認兩者的 <code>.venv</code> 互不影響。思考：若沒有 venv，這兩個版本要如何共存於同一台機器？</p>
+<ul>
+<li>提示：分別在各專案 <code>uv run python -c &quot;import httpx; print(httpx.__version__)&quot;</code>。</li>
+</ul>
+</li>
+<li><p><strong>把 requirements.txt 升級成 pyproject.toml</strong>：給定一份 <code>requirements.txt</code>（含 <code>requests</code>、<code>flask</code>、<code>pytest</code>），用 <code>uv init</code> 起新專案，把正式依賴用 <code>uv add</code>、測試依賴用 <code>uv add --dev</code> 分別加入，產生 <code>pyproject.toml</code> 與 <code>uv.lock</code>。對照思考它與 Maven <code>compile</code>/<code>test</code> scope 的關係。</p>
+</li>
+<li><p><strong>讓 mypy 抓到一個真實 bug</strong>：寫一個函式 <code>def average(nums: list[int]) -&gt; float</code>，但內部故意回傳 <code>sum(nums)</code>（漏了除以長度，回傳 <code>int</code>）。先確認直譯器照跑不報錯，再用 <code>uv run mypy</code> 觀察它是否抓到回傳型別不符；接著修正並讓 mypy 通過。</p>
+<ul>
+<li>提示：<code>int</code> 是 <code>float</code> 的相容子型別，這題可能比你想的微妙——試試把回傳改成明顯錯誤的 <code>str</code> 看 mypy 反應。</li>
+</ul>
+</li>
+<li><p><strong>建立你自己的專案範本</strong>：從零跑完 1.7 的完整走查（<code>uv init</code> → 寫程式 → <code>uv add</code> → <code>ruff</code> → <code>mypy</code> → <code>uv run</code>），在 <code>pyproject.toml</code> 加上 <code>[tool.ruff]</code> 與 <code>[tool.mypy]</code> 設定區段，讓 <code>ruff check</code>、<code>ruff format --check</code>、<code>mypy</code> 三者全綠。把它存成你個人的起手式範本。</p>
+<ul>
+<li>提示：<code>[tool.mypy]</code> 可加 <code>strict = true</code> 體驗 Java 等級的嚴格度。注意 strict 模式會收緊許多檢查：裸 <code>dict</code> 會觸發 <code>type-arg</code> 錯誤（要求你補上 <code>dict[str, str]</code> 之類的型別參數）、把 <code>Any</code> 當宣告型別回傳也會被擋。這正呼應本書「用 <code>dict[str, str]</code> 而非裸 <code>dict</code>」的現代型別提示規範。</li>
+</ul>
+</li>
+</ol>

@@ -1,0 +1,916 @@
+{
+  "chapters": [
+    {
+      "id": "README",
+      "filename": "README.md",
+      "title": "Python 教材（為資深 Java 工程師設計）",
+      "part": "前言",
+      "sections": [
+        {
+          "title": "進度",
+          "id": "進度"
+        },
+        {
+          "title": "第一部分：快速上手與思維轉換",
+          "id": "第一部分快速上手與思維轉換"
+        },
+        {
+          "title": "第二部分：資料結構與 Pythonic 寫法",
+          "id": "第二部分資料結構與-pythonic-寫法"
+        },
+        {
+          "title": "第三部分：物件導向與型別系統",
+          "id": "第三部分物件導向與型別系統"
+        },
+        {
+          "title": "第四部分：工程實務",
+          "id": "第四部分工程實務"
+        },
+        {
+          "title": "第五部分：實戰應用（依興趣選修）",
+          "id": "第五部分實戰應用依興趣選修"
+        },
+        {
+          "title": "附錄",
+          "id": "附錄"
+        },
+        {
+          "title": "閱讀方式",
+          "id": "閱讀方式"
+        }
+      ]
+    },
+    {
+      "id": "ch01-ecosystem-and-tooling",
+      "filename": "ch01-ecosystem-and-tooling.md",
+      "title": "第 1 章：Python 生態系與開發環境",
+      "part": "第一部分：快速上手與思維轉換",
+      "sections": [
+        {
+          "title": "1.1 執行模型：CPython、bytecode 與虛擬機",
+          "id": "11-執行模型cpythonbytecode-與虛擬機"
+        },
+        {
+          "title": "1.2 虛擬環境（venv）：一個 Java 工程師沒有的痛點",
+          "id": "12-虛擬環境venv一個-java-工程師沒有的痛點"
+        },
+        {
+          "title": "1.3 套件與專案設定：從 pip 到 pyproject.toml",
+          "id": "13-套件與專案設定從-pip-到-pyprojecttoml"
+        },
+        {
+          "title": "1.4 uv：現代一體化工具",
+          "id": "14-uv現代一體化工具"
+        },
+        {
+          "title": "1.5 工具鏈：ruff 與 mypy",
+          "id": "15-工具鏈ruff-與-mypy"
+        },
+        {
+          "title": "1.6 REPL 與互動式開發：Java 工程師相對陌生的工作流",
+          "id": "16-repl-與互動式開發java-工程師相對陌生的工作流"
+        },
+        {
+          "title": "1.7 完整走查：從零建立一個最小專案",
+          "id": "17-完整走查從零建立一個最小專案"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch02-syntax-overview",
+      "filename": "ch02-syntax-overview.md",
+      "title": "第 2 章：語法速覽——從 Java 翻譯到 Python",
+      "part": "第一部分：快速上手與思維轉換",
+      "sections": [
+        {
+          "title": "縮排即區塊：沒有大括號，沒有分號",
+          "id": "縮排即區塊沒有大括號沒有分號"
+        },
+        {
+          "title": "動態型別與 name binding：變數只是名字",
+          "id": "動態型別與-name-binding變數只是名字"
+        },
+        {
+          "title": "一切皆物件：沒有 primitive，int 不會溢位",
+          "id": "一切皆物件沒有-primitiveint-不會溢位"
+        },
+        {
+          "title": "基本型別對照表",
+          "id": "基本型別對照表"
+        },
+        {
+          "title": "運算子差異：別把 C/Java 習慣帶進來",
+          "id": "運算子差異別把-cjava-習慣帶進來"
+        },
+        {
+          "title": "None vs null、is vs ==",
+          "id": "none-vs-nullis-vs-"
+        },
+        {
+          "title": "真值判斷（truthiness）：不只 boolean 能進條件",
+          "id": "真值判斷truthiness不只-boolean-能進條件"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch03-functions",
+      "filename": "ch03-functions.md",
+      "title": "第 3 章：函式——Python 的一等公民",
+      "part": "第一部分：快速上手與思維轉換",
+      "sections": [
+        {
+          "title": "函式是一等物件",
+          "id": "函式是一等物件"
+        },
+        {
+          "title": "參數機制",
+          "id": "參數機制"
+        },
+        {
+          "title": "預設參數的可變物件陷阱",
+          "id": "預設參數的可變物件陷阱"
+        },
+        {
+          "title": "lambda 的限制",
+          "id": "lambda-的限制"
+        },
+        {
+          "title": "closure 與 nonlocal",
+          "id": "closure-與-nonlocal"
+        },
+        {
+          "title": "型別提示（type hints）",
+          "id": "型別提示type-hints"
+        },
+        {
+          "title": "Docstring：給人看的文件字串",
+          "id": "docstring給人看的文件字串"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch04-data-structures",
+      "filename": "ch04-data-structures.md",
+      "title": "第 4 章：核心資料結構深入",
+      "part": "第二部分：資料結構與 Pythonic 寫法",
+      "sections": [
+        {
+          "title": "四大結構與內部實作",
+          "id": "四大結構與內部實作"
+        },
+        {
+          "title": "可變 vs 不可變",
+          "id": "可變-vs-不可變"
+        },
+        {
+          "title": "切片（slicing）",
+          "id": "切片slicing"
+        },
+        {
+          "title": "解包（unpacking）",
+          "id": "解包unpacking"
+        },
+        {
+          "title": "collections 模組",
+          "id": "collections-模組"
+        },
+        {
+          "title": "淺拷貝 vs 深拷貝",
+          "id": "淺拷貝-vs-深拷貝"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch05-pythonic-idioms",
+      "filename": "ch05-pythonic-idioms.md",
+      "title": "第 5 章：Pythonic 慣用法（Idiomatic Python）",
+      "part": "第二部分：資料結構與 Pythonic 寫法",
+      "sections": [
+        {
+          "title": "5.1 comprehension：取代 Stream 樣板的核心武器",
+          "id": "51-comprehension取代-stream-樣板的核心武器"
+        },
+        {
+          "title": "5.2 generator expression 與惰性求值",
+          "id": "52-generator-expression-與惰性求值"
+        },
+        {
+          "title": "5.3 內建高階工具：別再寫 C 風格迴圈",
+          "id": "53-內建高階工具別再寫-c-風格迴圈"
+        },
+        {
+          "title": "5.4 EAFP vs LBYL：先做再說，出錯再接",
+          "id": "54-eafp-vs-lbyl先做再說出錯再接"
+        },
+        {
+          "title": "5.5 duck typing：會叫的就是鴨子",
+          "id": "55-duck-typing會叫的就是鴨子"
+        },
+        {
+          "title": "5.6 with 與 context manager：try-with-resources 的進階版",
+          "id": "56-with-與-context-managertry-with-resources-的進階版"
+        },
+        {
+          "title": "5.7 海象運算子 := 與 f-string",
+          "id": "57-海象運算子-與-f-string"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch06-iterators-and-generators",
+      "filename": "ch06-iterators-and-generators.md",
+      "title": "第 6 章：迭代器與產生器（Iterator & Generator）",
+      "part": "第二部分：資料結構與 Pythonic 寫法",
+      "sections": [
+        {
+          "title": "迭代協定：for 迴圈底下發生了什麼",
+          "id": "迭代協定for-迴圈底下發生了什麼"
+        },
+        {
+          "title": "yield 與 generator：可暫停的函式",
+          "id": "yield-與-generator可暫停的函式"
+        },
+        {
+          "title": "itertools 模組：迭代器的瑞士刀",
+          "id": "itertools-模組迭代器的瑞士刀"
+        },
+        {
+          "title": "用 generator 組裝資料處理管線（pipeline）",
+          "id": "用-generator-組裝資料處理管線pipeline"
+        },
+        {
+          "title": "yield from 與委派",
+          "id": "yield-from-與委派"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch07-classes-and-objects",
+      "filename": "ch07-classes-and-objects.md",
+      "title": "第 7 章：Python 的類別與物件",
+      "part": "第三部分：物件導向與型別系統",
+      "sections": [
+        {
+          "title": "class 語法、`__init__` 與 `self`",
+          "id": "class-語法init-與-self"
+        },
+        {
+          "title": "沒有 access modifier：`_protected` 與 `__private` 的名稱改編",
+          "id": "沒有-access-modifierprotected-與-private-的名稱改編"
+        },
+        {
+          "title": "類別屬性 vs 實例屬性",
+          "id": "類別屬性-vs-實例屬性"
+        },
+        {
+          "title": "`@property`：取代 getter/setter",
+          "id": "property取代-gettersetter"
+        },
+        {
+          "title": "`@classmethod` 與 `@staticmethod`",
+          "id": "classmethod-與-staticmethod"
+        },
+        {
+          "title": "`@dataclass`：對照 Java record / Lombok",
+          "id": "dataclass對照-java-record-lombok"
+        },
+        {
+          "title": "`__repr__`、`__eq__`、`__hash__`",
+          "id": "repreqhash"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch08-inheritance-protocols-magic-methods",
+      "filename": "ch08-inheritance-protocols-magic-methods.md",
+      "title": "第 8 章：繼承、協定與魔術方法",
+      "part": "第三部分：物件導向與型別系統",
+      "sections": [
+        {
+          "title": "繼承與 `super()`",
+          "id": "繼承與-super"
+        },
+        {
+          "title": "多重繼承與 MRO",
+          "id": "多重繼承與-mro"
+        },
+        {
+          "title": "抽象類別：`abc.ABC` 與 `@abstractmethod`",
+          "id": "抽象類別abcabc-與-abstractmethod"
+        },
+        {
+          "title": "`Protocol`（結構型別）vs ABC（名義型別）",
+          "id": "protocol結構型別vs-abc名義型別"
+        },
+        {
+          "title": "魔術方法（dunder methods）",
+          "id": "魔術方法dunder-methods"
+        },
+        {
+          "title": "mixin 模式",
+          "id": "mixin-模式"
+        },
+        {
+          "title": "組合優於繼承在 Python 中的實踐",
+          "id": "組合優於繼承在-python-中的實踐"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch09-type-hints-and-static-checking",
+      "filename": "ch09-type-hints-and-static-checking.md",
+      "title": "第 9 章：型別提示與靜態檢查（Java 工程師的舒適圈）",
+      "part": "第三部分：物件導向與型別系統",
+      "sections": [
+        {
+          "title": "`typing` 模組：找回靜態型別的詞彙",
+          "id": "typing-模組找回靜態型別的詞彙"
+        },
+        {
+          "title": "泛型：`TypeVar`、`Generic`，與型別抹除的另一面",
+          "id": "泛型typevargeneric與型別抹除的另一面"
+        },
+        {
+          "title": "`Protocol` 與結構型別檢查",
+          "id": "protocol-與結構型別檢查"
+        },
+        {
+          "title": "mypy / pyright 的導入與 CI 整合",
+          "id": "mypy-pyright-的導入與-ci-整合"
+        },
+        {
+          "title": "pydantic：執行期驗證（對照 Bean Validation）",
+          "id": "pydantic執行期驗證對照-bean-validation"
+        },
+        {
+          "title": "漸進式型別（gradual typing）的取捨",
+          "id": "漸進式型別gradual-typing的取捨"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch10-decorators-and-metaprogramming",
+      "filename": "ch10-decorators-and-metaprogramming.md",
+      "title": "第 10 章：裝飾器與元程式設計",
+      "part": "第三部分：物件導向與型別系統",
+      "sections": [
+        {
+          "title": "裝飾器原理：`@deco` 只是語法糖",
+          "id": "裝飾器原理deco-只是語法糖"
+        },
+        {
+          "title": "`functools.wraps`：別讓包裝抹掉身分",
+          "id": "functoolswraps別讓包裝抹掉身分"
+        },
+        {
+          "title": "類別裝飾器：裝飾的是類別",
+          "id": "類別裝飾器裝飾的是類別"
+        },
+        {
+          "title": "`__getattr__` / `__setattr__`：攔截屬性存取",
+          "id": "getattr-setattr攔截屬性存取"
+        },
+        {
+          "title": "Descriptor 協定：`@property` 的底層",
+          "id": "descriptor-協定property-的底層"
+        },
+        {
+          "title": "Metaclass 簡介：類別也是物件",
+          "id": "metaclass-簡介類別也是物件"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch11-modules-packages-project-structure",
+      "filename": "ch11-modules-packages-project-structure.md",
+      "title": "第 11 章：模組、套件與專案結構",
+      "part": "第四部分：工程實務",
+      "sections": [
+        {
+          "title": "module 與 package：執行期的命名空間",
+          "id": "module-與-package執行期的命名空間"
+        },
+        {
+          "title": "import 機制：sys.path、sys.modules 與只載入一次",
+          "id": "import-機制syspathsysmodules-與只載入一次"
+        },
+        {
+          "title": "`__init__.py`、`__all__` 與相對 vs 絕對匯入",
+          "id": "initpyall-與相對-vs-絕對匯入"
+        },
+        {
+          "title": "`if __name__ == \"__main__\"`：可執行又可被 import",
+          "id": "if-name-main可執行又可被-import"
+        },
+        {
+          "title": "標準專案結構：src layout",
+          "id": "標準專案結構src-layout"
+        },
+        {
+          "title": "`pyproject.toml`：完整解析與發佈到 PyPI",
+          "id": "pyprojecttoml完整解析與發佈到-pypi"
+        },
+        {
+          "title": "循環匯入：成因與三種解法",
+          "id": "循環匯入成因與三種解法"
+        },
+        {
+          "title": "跑起來：測試與執行整個範例",
+          "id": "跑起來測試與執行整個範例"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch12-exceptions-and-defensive-programming",
+      "filename": "ch12-exceptions-and-defensive-programming.md",
+      "title": "第 12 章：例外處理與防禦性程式設計",
+      "part": "第四部分：工程實務",
+      "sections": [
+        {
+          "title": "例外階層與「沒有 checked exception」",
+          "id": "例外階層與沒有-checked-exception"
+        },
+        {
+          "title": "try / except / else / finally：四個區塊各司其職",
+          "id": "try-except-else-finally四個區塊各司其職"
+        },
+        {
+          "title": "自訂例外與 exception chaining",
+          "id": "自訂例外與-exception-chaining"
+        },
+        {
+          "title": "logging：千萬別用 print",
+          "id": "logging千萬別用-print"
+        },
+        {
+          "title": "warnings 與棄用策略",
+          "id": "warnings-與棄用策略"
+        },
+        {
+          "title": "防禦性設計：把紀律從編譯器搬到自己身上",
+          "id": "防禦性設計把紀律從編譯器搬到自己身上"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch13-testing",
+      "filename": "ch13-testing.md",
+      "title": "第 13 章：測試",
+      "part": "第四部分：工程實務",
+      "sections": [
+        {
+          "title": "pytest 基礎：對照 JUnit 5",
+          "id": "pytest-基礎對照-junit-5"
+        },
+        {
+          "title": "fixture：依賴注入，但更輕",
+          "id": "fixture依賴注入但更輕"
+        },
+        {
+          "title": "參數化與 marker",
+          "id": "參數化與-marker"
+        },
+        {
+          "title": "unittest.mock：對照 Mockito",
+          "id": "unittestmock對照-mockito"
+        },
+        {
+          "title": "coverage、hypothesis、doctest、tox/nox",
+          "id": "coveragehypothesisdoctesttoxnox"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch14-concurrency-and-async",
+      "filename": "ch14-concurrency-and-async.md",
+      "title": "第 14 章：並行與非同步（Concurrency & Async）",
+      "part": "第四部分：工程實務",
+      "sections": [
+        {
+          "title": "GIL：理解 CPython 並行的第一原理",
+          "id": "gil理解-cpython-並行的第一原理"
+        },
+        {
+          "title": "threading：I/O bound 的主力",
+          "id": "threadingio-bound-的主力"
+        },
+        {
+          "title": "multiprocessing：CPU bound 的解法",
+          "id": "multiprocessingcpu-bound-的解法"
+        },
+        {
+          "title": "concurrent.futures：你該優先用的那一層",
+          "id": "concurrentfutures你該優先用的那一層"
+        },
+        {
+          "title": "asyncio：單執行緒的協作式並行",
+          "id": "asyncio單執行緒的協作式並行"
+        },
+        {
+          "title": "決策樹：到底該用哪一個",
+          "id": "決策樹到底該用哪一個"
+        },
+        {
+          "title": "free-threading（no-GIL）的現況",
+          "id": "free-threadingno-gil的現況"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch15-files-io-stdlib",
+      "filename": "ch15-files-io-stdlib.md",
+      "title": "第 15 章：檔案、I/O 與標準函式庫巡禮",
+      "part": "第四部分：工程實務",
+      "sections": [
+        {
+          "title": "pathlib：物件式的路徑，告別字串拼接",
+          "id": "pathlib物件式的路徑告別字串拼接"
+        },
+        {
+          "title": "檔案讀寫與編碼：那個會在 CI 上炸掉的 encoding",
+          "id": "檔案讀寫與編碼那個會在-ci-上炸掉的-encoding"
+        },
+        {
+          "title": "json / csv / sqlite3：序列化與內建資料庫",
+          "id": "json-csv-sqlite3序列化與內建資料庫"
+        },
+        {
+          "title": "datetime 與時區：naive vs aware 的世界",
+          "id": "datetime-與時區naive-vs-aware-的世界"
+        },
+        {
+          "title": "re：正規表示式",
+          "id": "re正規表示式"
+        },
+        {
+          "title": "subprocess：取代 shell script 的正路",
+          "id": "subprocess取代-shell-script-的正路"
+        },
+        {
+          "title": "argparse / click：寫 CLI 工具",
+          "id": "argparse-click寫-cli-工具"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch16-web-development",
+      "filename": "ch16-web-development.md",
+      "title": "第 16 章：Web 開發",
+      "part": "第五部分：實戰應用",
+      "sections": [
+        {
+          "title": "FastAPI 入門：型別提示驅動的殺手鏈",
+          "id": "fastapi-入門型別提示驅動的殺手鏈"
+        },
+        {
+          "title": "依賴注入：`Depends` 對照 Spring DI",
+          "id": "依賴注入depends-對照-spring-di"
+        },
+        {
+          "title": "ORM：SQLAlchemy 2.0 對照 JPA/Hibernate",
+          "id": "ormsqlalchemy-20-對照-jpahibernate"
+        },
+        {
+          "title": "把它們串起來：可測試的 items CRUD 服務",
+          "id": "把它們串起來可測試的-items-crud-服務"
+        },
+        {
+          "title": "ASGI vs WSGI：對照 Servlet 容器",
+          "id": "asgi-vs-wsgi對照-servlet-容器"
+        },
+        {
+          "title": "部署：uvicorn / gunicorn / Docker",
+          "id": "部署uvicorn-gunicorn-docker"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch17-data-processing-automation",
+      "filename": "ch17-data-processing-automation.md",
+      "title": "第 17 章：資料處理與自動化腳本",
+      "part": "第五部分：實戰應用",
+      "sections": [
+        {
+          "title": "HTTP client：requests vs httpx",
+          "id": "http-clientrequests-vs-httpx"
+        },
+        {
+          "title": "pandas 入門：DataFrame 思維",
+          "id": "pandas-入門dataframe-思維"
+        },
+        {
+          "title": "網頁爬蟲：BeautifulSoup",
+          "id": "網頁爬蟲beautifulsoup"
+        },
+        {
+          "title": "Excel／報表自動化：openpyxl",
+          "id": "excel報表自動化openpyxl"
+        },
+        {
+          "title": "排程任務與系統腳本：Python 取代 shell script",
+          "id": "排程任務與系統腳本python-取代-shell-script"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "ch18-capstone-project",
+      "filename": "ch18-capstone-project.md",
+      "title": "第 18 章：總整專案（Capstone）",
+      "part": "第五部分：實戰應用",
+      "sections": [
+        {
+          "title": "專案規格與架構",
+          "id": "專案規格與架構"
+        },
+        {
+          "title": "型別與資料模型三分",
+          "id": "型別與資料模型三分"
+        },
+        {
+          "title": "API 與 CLI 兩個入口",
+          "id": "api-與-cli-兩個入口"
+        },
+        {
+          "title": "測試策略",
+          "id": "測試策略"
+        },
+        {
+          "title": "工程品質門檻：ruff + mypy + coverage 全綠",
+          "id": "工程品質門檻ruff-mypy-coverage-全綠"
+        },
+        {
+          "title": "打包與發佈",
+          "id": "打包與發佈"
+        },
+        {
+          "title": "收尾：全書 checklist",
+          "id": "收尾全書-checklist"
+        },
+        {
+          "title": "本章小結",
+          "id": "本章小結"
+        },
+        {
+          "title": "練習",
+          "id": "練習"
+        }
+      ]
+    },
+    {
+      "id": "appendix-a-java-python-cheatsheet",
+      "filename": "appendix-a-java-python-cheatsheet.md",
+      "title": "附錄 A：Java ↔ Python 速查對照表",
+      "part": "附錄",
+      "sections": [
+        {
+          "title": "A.1 語法與運算子",
+          "id": "a1-語法與運算子"
+        },
+        {
+          "title": "A.2 型別與基本資料",
+          "id": "a2-型別與基本資料"
+        },
+        {
+          "title": "A.3 集合與資料結構",
+          "id": "a3-集合與資料結構"
+        },
+        {
+          "title": "A.4 控制流程與迭代",
+          "id": "a4-控制流程與迭代"
+        },
+        {
+          "title": "A.5 OOP 與型別系統",
+          "id": "a5-oop-與型別系統"
+        },
+        {
+          "title": "A.6 函式式 / Pythonic",
+          "id": "a6-函式式-pythonic"
+        },
+        {
+          "title": "A.7 例外與資源",
+          "id": "a7-例外與資源"
+        },
+        {
+          "title": "A.8 並行",
+          "id": "a8-並行"
+        },
+        {
+          "title": "A.9 工程工具鏈",
+          "id": "a9-工程工具鏈"
+        },
+        {
+          "title": "最關鍵的 10 個思維轉換",
+          "id": "最關鍵的-10-個思維轉換"
+        }
+      ]
+    },
+    {
+      "id": "appendix-b-pitfalls",
+      "filename": "appendix-b-pitfalls.md",
+      "title": "附錄 B：常見陷阱清單（Java 工程師專屬）",
+      "part": "附錄",
+      "sections": [
+        {
+          "title": "B.1 綁定與求值時機",
+          "id": "b1-綁定與求值時機"
+        },
+        {
+          "title": "B.2 身分、相等與數值",
+          "id": "b2-身分相等與數值"
+        },
+        {
+          "title": "B.3 容器、別名與共享狀態",
+          "id": "b3-容器別名與共享狀態"
+        },
+        {
+          "title": "B.4 語法陷阱",
+          "id": "b4-語法陷阱"
+        },
+        {
+          "title": "B.5 例外與日誌",
+          "id": "b5-例外與日誌"
+        },
+        {
+          "title": "B.6 並行與 import",
+          "id": "b6-並行與-import"
+        },
+        {
+          "title": "B.7 自我檢查清單（Review Checklist）",
+          "id": "b7-自我檢查清單review-checklist"
+        }
+      ]
+    },
+    {
+      "id": "appendix-c-resources",
+      "filename": "appendix-c-resources.md",
+      "title": "附錄 C：建議學習資源",
+      "part": "附錄",
+      "sections": [
+        {
+          "title": "C.1 官方文件（docs.python.org）",
+          "id": "c1-官方文件docspythonorg"
+        },
+        {
+          "title": "C.2 書籍",
+          "id": "c2-書籍"
+        },
+        {
+          "title": "C.3 線上教學與部落格",
+          "id": "c3-線上教學與部落格"
+        },
+        {
+          "title": "C.4 練習平台",
+          "id": "c4-練習平台"
+        },
+        {
+          "title": "C.5 工具官方文件",
+          "id": "c5-工具官方文件"
+        },
+        {
+          "title": "C.6 社群",
+          "id": "c6-社群"
+        },
+        {
+          "title": "C.7 給 Java 工程師的閱讀路線圖",
+          "id": "c7-給-java-工程師的閱讀路線圖"
+        }
+      ]
+    }
+  ]
+}

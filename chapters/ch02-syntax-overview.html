@@ -1,0 +1,696 @@
+<h1 id="第-2-章語法速覽從-java-翻譯到-python">第 2 章：語法速覽——從 Java 翻譯到 Python</h1><p>身為 Java 工程師，你看 Python 的第一眼通常會有兩種反應：「沒有大括號跟分號，這樣怎麼讀？」以及「<code>x = 5</code> 連型別都不寫，編譯器怎麼幫我抓錯？」這章的目的不是教你 <code>if</code>、<code>for</code> 怎麼寫——你早就會了——而是要拆掉幾個被 Java 訓練了十幾年的直覺：縮排是有語意的、變數不是一塊有型別的記憶體、<code>int</code> 永遠不會溢位、<code>None</code> 不是 <code>null</code>。先把心智模型（mental model）換掉，後面所有章節才不會卡住。</p>
+<h2 id="縮排即區塊沒有大括號沒有分號">縮排即區塊：沒有大括號，沒有分號</h2><p>Java 用 <code>{}</code> 界定區塊，用 <code>;</code> 結束陳述式，縮排只是給人看的排版，編譯器完全無視。Python 反過來：<strong>縮排本身就是語法</strong>，編譯器靠它判斷區塊邊界。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-26" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9A%E5%A4%A7%E6%8B%AC%E8%99%9F%E6%B1%BA%E5%AE%9A%E5%8D%80%E5%A1%8A%EF%BC%8C%E7%B8%AE%E6%8E%92%E5%8F%AF%E6%9C%89%E5%8F%AF%E7%84%A1%0Apublic%20int%20classify(int%20n)%20%7B%0A%20%20%20%20if%20(n%20%3E%200)%20%7B%0A%20%20%20%20%20%20%20%20return%201%3B%0A%20%20%20%20%7D%20else%20if%20(n%20%3C%200)%20%7B%0A%20%20%20%20%20%20%20%20return%20-1%3B%0A%20%20%20%20%7D%20else%20%7B%0A%20%20%20%20%20%20%20%20return%200%3B%0A%20%20%20%20%7D%0A%7D'), 'copy-btn-26')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：大括號決定區塊，縮排可有可無
+public int classify(int n) {
+    if (n &gt; 0) {
+        return 1;
+    } else if (n &lt; 0) {
+        return -1;
+    } else {
+        return 0;
+    }
+}</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-27" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20Python%EF%BC%9A%E5%86%92%E8%99%9F%20%2B%20%E7%B8%AE%E6%8E%92%E6%B1%BA%E5%AE%9A%E5%8D%80%E5%A1%8A%0Adef%20classify(n)%3A%0A%20%20%20%20if%20n%20%3E%200%3A%0A%20%20%20%20%20%20%20%20return%201%0A%20%20%20%20elif%20n%20%3C%200%3A%0A%20%20%20%20%20%20%20%20return%20-1%0A%20%20%20%20else%3A%0A%20%20%20%20%20%20%20%20return%200'), 'copy-btn-27')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># Python：冒號 + 縮排決定區塊
+def classify(n):
+    if n &gt; 0:
+        return 1
+    elif n &lt; 0:
+        return -1
+    else:
+        return 0</code></pre>
+      </div>
+    <p>注意三個變化：</p>
+<ol>
+<li><strong>冒號 <code>:</code></strong> 是「以下進入一個新區塊」的宣告。<code>if</code>、<code>elif</code>、<code>else</code>、<code>for</code>、<code>while</code>、<code>def</code>、<code>class</code>、<code>with</code>、<code>try</code> 後面都要冒號。少一個冒號就是 <code>SyntaxError</code>。</li>
+<li><strong>縮排層級</strong>取代 <code>{}</code>。同一層級的陳述式必須對齊；縮排變深代表進入子區塊，縮排變淺代表離開。</li>
+<li><strong>不需要分號</strong>。一行一個陳述式，換行就是結束。分號在 Python 合法但只用來把多個短陳述式塞在一行（<code>a = 1; b = 2</code>），PEP 8 不鼓勵，實務上幾乎看不到。</li>
+</ol>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 的 <code>}</code> 在 Python 是「縮排退回上一層」；Java 的 <code>;</code> 在 Python 是「換行」。</p>
+</div><h3 id="4-空格別碰-tab">4 空格、別碰 tab</h3><p>PEP 8（Python 官方風格指南，地位等同你心中的 Google Java Style）規定縮排用 <strong>4 個空格</strong>，且<strong>不要用 tab</strong>。原因很實際：tab 在不同編輯器寬度不一，而 Python 3 直接<strong>禁止在同一份檔案混用 tab 和空格</strong>做縮排——混用會丟出 <code>TabError</code>，不是警告，是直接掛掉。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-28" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20f()%3A%0A%20%20%20%20x%20%3D%201%20%20%20%20%20%20%23%204%20%E5%80%8B%E7%A9%BA%E6%A0%BC%0A%09y%20%3D%202%20%20%20%20%20%20%23%20%E9%80%99%E8%A1%8C%E7%94%A8%20tab%20%E2%86%92%20TabError%3A%20inconsistent%20use%20of%20tabs%20and%20spaces'), 'copy-btn-28')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def f():
+    x = 1      # 4 個空格
+	y = 2      # 這行用 tab → TabError: inconsistent use of tabs and spaces</code></pre>
+      </div>
+    <p>這在 Java 世界不存在問題，因為縮排沒語意。在 Python，<strong>縮排錯了等於邏輯錯了</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-29" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E5%85%A9%E6%AE%B5%E7%A8%8B%E5%BC%8F%E7%A2%BC%E5%B7%AE%E5%88%A5%E5%8F%AA%E5%9C%A8%20print%20%E7%9A%84%E7%B8%AE%E6%8E%92%EF%BC%8C%E8%AA%9E%E6%84%8F%E5%AE%8C%E5%85%A8%E4%B8%8D%E5%90%8C%0Atotal%20%3D%200%0Afor%20i%20in%20range(3)%3A%0A%20%20%20%20total%20%2B%3D%20i%0A%20%20%20%20print(total)%20%20%20%23%20%E6%AF%8F%E5%9C%88%E9%83%BD%E5%8D%B0%EF%BC%88%E5%9C%A8%E8%BF%B4%E5%9C%88%E5%85%A7%EF%BC%89%0A%0Atotal%20%3D%200%0Afor%20i%20in%20range(3)%3A%0A%20%20%20%20total%20%2B%3D%20i%0Aprint(total)%20%20%20%20%20%20%20%23%20%E5%8F%AA%E5%8D%B0%E4%B8%80%E6%AC%A1%EF%BC%88%E5%9C%A8%E8%BF%B4%E5%9C%88%E5%A4%96%EF%BC%89'), 'copy-btn-29')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># 兩段程式碼差別只在 print 的縮排，語意完全不同
+total = 0
+for i in range(3):
+    total += i
+    print(total)   # 每圈都印（在迴圈內）
+
+total = 0
+for i in range(3):
+    total += i
+print(total)       # 只印一次（在迴圈外）</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：從網路複製貼上程式碼最容易踩到 tab/space 混用。把編輯器設成「顯示空白字元」並開啟「tab 自動轉 4 空格」，ruff/black（詳見第 1 章）也會自動幫你修正。別靠肉眼。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：縮排有語意這件事，逼著所有人寫出視覺結構一致的程式碼。你看不到「把整個方法擠成一行」或「大括號放錯地方」的爭論——這在 Java code review 省不掉，在 Python 直接由語法消滅。</p>
+</div><h3 id="多行陳述式怎麼換行">多行陳述式怎麼換行</h3><p>既然換行就是陳述式結束，那一行太長怎麼辦？兩種方式：括號內可以自由換行（推薦），或用反斜線 <code>\</code> 續行（不推薦，容易出錯）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-30" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E6%8E%A8%E8%96%A6%EF%BC%9A%E6%8B%AC%E8%99%9F%EF%BC%88%E5%90%AB%20()%2C%20%5B%5D%2C%20%7B%7D%EF%BC%89%E5%85%A7%E6%8F%9B%E8%A1%8C%E4%B8%8D%E9%9C%80%E8%A6%81%E4%BB%BB%E4%BD%95%E8%A8%98%E8%99%9F%0Atotal%20%3D%20(first_value%0A%20%20%20%20%20%20%20%20%20%2B%20second_value%0A%20%20%20%20%20%20%20%20%20%2B%20third_value)%0A%0Anames%20%3D%20%5B%0A%20%20%20%20%22Alice%22%2C%0A%20%20%20%20%22Bob%22%2C%0A%20%20%20%20%22Carol%22%2C%20%20%20%23%20%E7%B5%90%E5%B0%BE%E9%80%97%E8%99%9F%E5%90%88%E6%B3%95%EF%BC%8C%E5%8A%A0%E4%B8%8A%E5%8F%8D%E8%80%8C%20diff%20%E6%9B%B4%E4%B9%BE%E6%B7%A8%0A%5D%0A%0A%23%20%E4%B8%8D%E6%8E%A8%E8%96%A6%EF%BC%9A%E5%8F%8D%E6%96%9C%E7%B7%9A%E7%BA%8C%E8%A1%8C%EF%BC%8C%E8%A1%8C%E5%B0%BE%E4%B8%8D%E8%83%BD%E6%9C%89%E4%BB%BB%E4%BD%95%E7%A9%BA%E7%99%BD%E5%90%A6%E5%89%87%E5%87%BA%E9%8C%AF%0Atotal%20%3D%20first_value%20%5C%0A%20%20%20%20%2B%20second_value'), 'copy-btn-30')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># 推薦：括號（含 (), [], {}）內換行不需要任何記號
+total = (first_value
+         + second_value
+         + third_value)
+
+names = [
+    "Alice",
+    "Bob",
+    "Carol",   # 結尾逗號合法，加上反而 diff 更乾淨
+]
+
+# 不推薦：反斜線續行，行尾不能有任何空白否則出錯
+total = first_value \
+    + second_value</code></pre>
+      </div>
+    <h2 id="動態型別與-name-binding變數只是名字">動態型別與 name binding：變數只是名字</h2><p>這是 Java 工程師最需要重新接線的觀念。在 Java，<code>int x = 5;</code> 的意思是：「配置一塊標記為 <code>int</code> 的記憶體，把 <code>5</code> 這個值放進去。」變數<strong>有型別</strong>，值<strong>住在變數裡</strong>。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-31" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('int%20x%20%3D%205%3B%20%20%20%20%20%20%20%2F%2F%20x%20%E6%98%AF%E4%B8%80%E5%80%8B%20int%20%E5%9E%8B%E5%88%A5%E7%9A%84%E7%9B%92%E5%AD%90%EF%BC%8C%E8%A3%9D%E8%91%97%205%0Ax%20%3D%2010%3B%20%20%20%20%20%20%20%20%20%20%2F%2F%20%E6%8A%8A%E7%9B%92%E5%AD%90%E8%A3%A1%E7%9A%84%E5%85%A7%E5%AE%B9%E6%8F%9B%E6%88%90%2010%0A%2F%2F%20x%20%3D%20%22hi%22%3B%20%20%20%20%20%2F%2F%20%E7%B7%A8%E8%AD%AF%E9%8C%AF%E8%AA%A4%EF%BC%9A%E5%9E%8B%E5%88%A5%E4%B8%8D%E7%AC%A6'), 'copy-btn-31')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">int x = 5;       // x 是一個 int 型別的盒子，裝著 5
+x = 10;          // 把盒子裡的內容換成 10
+// x = "hi";     // 編譯錯誤：型別不符</code></pre>
+      </div>
+    <p>Python 的 <code>x = 5</code> 是完全不同的機制：它<strong>建立一個 int 物件 <code>5</code>，然後把名字 <code>x</code> 綁定（bind）到那個物件上</strong>。名字沒有型別，物件才有型別。名字只是一個指向物件的標籤。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-32" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('x%20%3D%205%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%BB%BA%E7%AB%8B%20int%20%E7%89%A9%E4%BB%B6%205%EF%BC%8C%E5%90%8D%E5%AD%97%20x%20%E6%8C%87%E5%90%91%E5%AE%83%0Ax%20%3D%2010%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%90%8D%E5%AD%97%20x%20%E6%94%B9%E6%8C%87%E5%90%91%E5%8F%A6%E4%B8%80%E5%80%8B%20int%20%E7%89%A9%E4%BB%B6%2010%EF%BC%88%E5%8E%9F%E6%9C%AC%E7%9A%84%205%20%E6%B2%92%E8%A2%AB%E3%80%8C%E6%94%B9%E5%AF%AB%E3%80%8D%EF%BC%89%0Ax%20%3D%20%22hi%22%20%20%20%20%20%20%20%20%20%23%20%E5%90%8D%E5%AD%97%20x%20%E6%94%B9%E6%8C%87%E5%90%91%E4%B8%80%E5%80%8B%20str%20%E7%89%A9%E4%BB%B6%EF%BC%8C%E5%AE%8C%E5%85%A8%E5%90%88%E6%B3%95'), 'copy-btn-32')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">x = 5            # 建立 int 物件 5，名字 x 指向它
+x = 10           # 名字 x 改指向另一個 int 物件 10（原本的 5 沒被「改寫」）
+x = "hi"         # 名字 x 改指向一個 str 物件，完全合法</code></pre>
+      </div>
+    <p>心智模型這樣畫：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">text</span>
+          <button id="copy-btn-33" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('Java%EF%BC%9A%20%20%20x%20%E2%94%8C%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%90%0A%20%20%20%20%20%20%20%20%20%20%20%E2%94%82%20int%3A%205%20%20%E2%94%82%20%20%20%20%20%20%E8%AE%8A%E6%95%B8%20%3D%20%E6%9C%89%E5%9E%8B%E5%88%A5%E7%9A%84%E7%9B%92%E5%AD%90%EF%BC%8C%E5%80%BC%E5%9C%A8%E8%A3%A1%E9%9D%A2%0A%20%20%20%20%20%20%20%20%20%20%20%E2%94%94%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%98%0A%0APython%3A%20%20x%20%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%96%B6%20(%20int%20%E7%89%A9%E4%BB%B6%3A%205%20)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%E2%96%B2%0A%20%20%20%20%20%20%20%20%20y%20%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%98%20%20%20%20%20%20%20%20%20%20%20%20%E5%90%8D%E5%AD%97%20%3D%20%E6%A8%99%E7%B1%A4%EF%BC%8C%E5%8F%AF%E4%BB%A5%E5%A4%9A%E5%80%8B%E6%8C%87%E5%90%91%E5%90%8C%E4%B8%80%E7%89%A9%E4%BB%B6'), 'copy-btn-33')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-text"><code class="language-text">Java：   x ┌─────────┐
+           │ int: 5  │      變數 = 有型別的盒子，值在裡面
+           └─────────┘
+
+Python:  x ──────────▶ ( int 物件: 5 )
+                          ▲
+         y ───────────────┘            名字 = 標籤，可以多個指向同一物件</code></pre>
+      </div>
+    <p>「賦值」在 Python 從來不是「把值搬進變數」，而是「讓名字指向某個物件」。一旦接受這點，很多現象就順了：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-34" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20a%20%3D%20%5B1%2C%202%2C%203%5D%0A%3E%3E%3E%20b%20%3D%20a%20%20%20%20%20%20%20%20%20%20%20%20%23%20b%20%E4%B8%8D%E6%98%AF%E3%80%8C%E8%A4%87%E8%A3%BD%20a%E3%80%8D%EF%BC%8C%E8%80%8C%E6%98%AF%E3%80%8Cb%20%E4%B9%9F%E6%8C%87%E5%90%91%E5%90%8C%E4%B8%80%E5%80%8B%20list%20%E7%89%A9%E4%BB%B6%E3%80%8D%0A%3E%3E%3E%20b.append(4)%0A%3E%3E%3E%20a%0A%5B1%2C%202%2C%203%2C%204%5D%20%20%20%20%20%20%20%20%20%23%20%E9%80%8F%E9%81%8E%20b%20%E6%94%B9%E5%8B%95%EF%BC%8Ca%20%E7%9C%8B%E5%BE%97%E5%88%B0%EF%BC%8C%E5%9B%A0%E7%82%BA%E5%AE%83%E5%80%91%E6%98%AF%E5%90%8C%E4%B8%80%E5%80%8B%E7%89%A9%E4%BB%B6'), 'copy-btn-34')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; a = [1, 2, 3]
+&gt;&gt;&gt; b = a            # b 不是「複製 a」，而是「b 也指向同一個 list 物件」
+&gt;&gt;&gt; b.append(4)
+&gt;&gt;&gt; a
+[1, 2, 3, 4]         # 透過 b 改動，a 看得到，因為它們是同一個物件</code></pre>
+      </div>
+    <p>如果你以 Java 的「值在變數裡」直覺看上面這段，會覺得 <code>a</code> 不該變。但 <code>a</code> 和 <code>b</code> 是貼在同一個 list 上的兩張標籤，動了物件本身，兩個名字當然都反映出來。這個「可變性（mutability）」議題是第 4 章的重頭戲，這裡先把根埋下：<strong>Python 沒有「值傳遞 vs 參考傳遞」的二分，它是「物件參考傳遞」——傳的永遠是指向物件的名字。</strong></p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：Java 工程師看到 <code>b = a</code> 會直覺以為複製了一份。對 immutable 物件（int、str、tuple）感覺不出差別，但對 list、dict、自訂物件就會產生非預期行為。要複製請用 <code>b = a.copy()</code> 或 <code>copy.deepcopy(a)</code>（第 4 章詳述）。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：別問「這個變數是什麼型別」，要問「這個名字現在指向什麼物件」。變數重新賦值不改變舊物件，只是換一個指向。</p>
+</div><h3 id="動態型別不代表沒型別">動態型別不代表沒型別</h3><p>「動態型別（dynamic typing）」常被誤解成「沒有型別」。錯。Python 是**強型別（strongly typed）<strong>語言——<code>&quot;3&quot; + 5</code> 會直接拋 <code>TypeError</code>，不像 JavaScript 會默默幫你轉。差別在於型別檢查發生在</strong>執行期（runtime）**而非編譯期。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-35" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20%223%22%20%2B%205%0ATraceback%20(most%20recent%20call%20last)%3A%0ATypeError%3A%20can%20only%20concatenate%20str%20(not%20%22int%22)%20to%20str'), 'copy-btn-35')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; "3" + 5
+Traceback (most recent call last):
+TypeError: can only concatenate str (not "int") to str</code></pre>
+      </div>
+    <p>你在 Java 享受的編譯期型別安全，在 Python 可以用<strong>型別提示（type hints）+ mypy/pyright</strong> 找回來。這是第 3 章和第 9 章的主題，現在只要知道：型別提示是「給工具看的註解」，直譯器執行時根本不檢查它。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-36" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20greet(name%3A%20str)%20-%3E%20str%3A%20%20%20%20%20%20%23%20%E5%9E%8B%E5%88%A5%E6%8F%90%E7%A4%BA%EF%BC%9A%E7%B5%A6%20IDE%20%E5%92%8C%20mypy%20%E7%9C%8B%0A%20%20%20%20return%20f%22Hello%2C%20%7Bname%7D%22%0A%0Agreet(123)%20%20%20%23%20%E5%9F%B7%E8%A1%8C%E6%9C%9F%E7%85%A7%E6%A8%A3%E8%B7%91%EF%BC%8C%E4%B8%8D%E6%9C%83%E5%9B%A0%E7%82%BA%E6%8F%90%E7%A4%BA%E8%AA%AA%E8%A6%81%20str%20%E5%B0%B1%E5%A0%B1%E9%8C%AF%EF%BC%9Bmypy%20%E6%89%8D%E6%9C%83%E6%8A%93'), 'copy-btn-36')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def greet(name: str) -&gt; str:      # 型別提示：給 IDE 和 mypy 看
+    return f"Hello, {name}"
+
+greet(123)   # 執行期照樣跑，不會因為提示說要 str 就報錯；mypy 才會抓</code></pre>
+      </div>
+    <h2 id="一切皆物件沒有-primitiveint-不會溢位">一切皆物件：沒有 primitive，int 不會溢位</h2><p>Java 有 8 種 primitive type（<code>int</code>、<code>long</code>、<code>double</code>、<code>boolean</code>…），它們不是物件、沒有方法，要當物件用得靠 autoboxing 包成 <code>Integer</code>、<code>Double</code>。Python <strong>沒有 primitive</strong>——<code>int</code>、<code>float</code>、<code>bool</code>、<code>str</code> 全都是貨真價實的物件，有自己的方法。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-37" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20(5).bit_length()%20%20%20%20%20%20%20%23%20int%20%E6%9C%89%E6%96%B9%E6%B3%95%EF%BC%8C5%20%E5%9C%A8%E4%BA%8C%E9%80%B2%E4%BD%8D%E9%9C%80%E8%A6%81%203%20%E5%80%8B%E4%BD%8D%E5%85%83%0A3%0A%3E%3E%3E%20(255).bit_length()%0A8%0A%3E%3E%3E%20(3.0).is_integer()%20%20%20%20%20%23%20float%20%E4%B9%9F%E6%9C%89%E6%96%B9%E6%B3%95%0ATrue%0A%3E%3E%3E%20%22hello%22.upper()%20%20%20%20%20%20%20%20%23%20str%20%E7%95%B6%E7%84%B6%E6%9C%89%E6%96%B9%E6%B3%95%0A%27HELLO%27'), 'copy-btn-37')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; (5).bit_length()       # int 有方法，5 在二進位需要 3 個位元
+3
+&gt;&gt;&gt; (255).bit_length()
+8
+&gt;&gt;&gt; (3.0).is_integer()     # float 也有方法
+True
+&gt;&gt;&gt; "hello".upper()        # str 當然有方法
+'HELLO'</code></pre>
+      </div>
+    <p>（<code>5.bit_length()</code> 會語法錯誤，因為 <code>5.</code> 被當成 float 的開頭，所以加括號 <code>(5)</code>。）</p>
+<p>連型別本身也是物件。每個物件都有 <code>__class__</code>，而每個類別最終都繼承自 <code>object</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-38" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20type(5).__mro__%20%20%20%20%20%20%20%20%23%20int%20%E7%9A%84%E7%B9%BC%E6%89%BF%E9%8F%88%EF%BC%9Aint%20%E2%86%92%20object%0A(%3Cclass%20%27int%27%3E%2C%20%3Cclass%20%27object%27%3E)%0A%3E%3E%3E%20isinstance(5%2C%20object)%0ATrue'), 'copy-btn-38')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; type(5).__mro__        # int 的繼承鏈：int → object
+(&lt;class 'int'&gt;, &lt;class 'object'&gt;)
+&gt;&gt;&gt; isinstance(5, object)
+True</code></pre>
+      </div>
+    <h3 id="int-任意精度永不溢位">int 任意精度，永不溢位</h3><p>這是會讓 Java 工程師鬆一口氣的一點。Java 的 <code>int</code> 是 32-bit，超過 <code>2^31 - 1</code> 就**靜默溢位（silent overflow）**成負數，這是無數金融與計時 bug 的源頭；要算大數得換 <code>long</code>（64-bit，一樣會溢位）或 <code>BigInteger</code>（笨重）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-39" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('int%20x%20%3D%20Integer.MAX_VALUE%3B%20%20%20%2F%2F%202147483647%0Ax%20%3D%20x%20%2B%201%3B%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%2F%2F%20-2147483648%EF%BC%8C%E6%BA%A2%E4%BD%8D%E4%B8%94%E4%B8%8D%E5%A0%B1%E9%8C%AF%EF%BC%81%0A%2F%2F%20%E5%A4%A7%E6%95%B8%E8%A6%81%E7%94%A8%20BigInteger%EF%BC%8C%E8%AA%9E%E6%B3%95%E5%9B%89%E5%97%A6%0ABigInteger%20big%20%3D%20BigInteger.valueOf(10).pow(100)%3B'), 'copy-btn-39')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">int x = Integer.MAX_VALUE;   // 2147483647
+x = x + 1;                   // -2147483648，溢位且不報錯！
+// 大數要用 BigInteger，語法囉嗦
+BigInteger big = BigInteger.valueOf(10).pow(100);</code></pre>
+      </div>
+    <p>Python 的 <code>int</code> 是<strong>任意精度（arbitrary precision）</strong>，會自動隨數值大小擴展，<strong>永遠不會溢位</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-40" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%202%20**%2031%20%20%20%20%20%20%20%20%20%20%20%23%20Java%20int%20%E6%97%A9%E5%B0%B1%E7%88%86%E4%BA%86%0A2147483648%0A%3E%3E%3E%2010%20**%20100%20%20%20%20%20%20%20%20%20%23%20%E4%B8%80%E5%80%8B%201%20%E5%BE%8C%E9%9D%A2%20100%20%E5%80%8B%200%EF%BC%8C%E7%9B%B4%E6%8E%A5%E7%AE%97%0A10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000%0A%3E%3E%3E%20import%20math%0A%3E%3E%3E%20math.factorial(50)%20%20%20%23%2050!%20%E6%98%AF%E5%80%8B%2065%20%E4%BD%8D%E6%95%B8%0A30414093201713378043612608166064768844377641568960512000000000000'), 'copy-btn-40')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; 2 ** 31           # Java int 早就爆了
+2147483648
+&gt;&gt;&gt; 10 ** 100         # 一個 1 後面 100 個 0，直接算
+10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+&gt;&gt;&gt; import math
+&gt;&gt;&gt; math.factorial(50)   # 50! 是個 65 位數
+30414093201713378043612608166064768844377641568960512000000000000</code></pre>
+      </div>
+    <p>代價是大數運算比固定寬度的 CPU 整數慢（CPython 的 <code>int</code> 統一以多精度物件表示——內部是約 30-bit 的 digit 陣列——但對單一 digit 以內的小數值有快取與快速路徑最佳化），但對絕大多數應用而言，「永遠正確」遠勝「偶爾溢位」。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Python 的 <code>int</code> ≈ Java 的 <code>BigInteger</code>，但有 <code>+ - * /</code> 的原生語法、且效能對小數字有最佳化。你再也不用為「會不會溢位」操心。</p>
+</div><div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>bool</code> 在 Python 是 <code>int</code> 的<strong>子類別</strong>。<code>True == 1</code>、<code>False == 0</code>，而且 <code>True + True</code> 會得到 <code>2</code>。這偶爾很方便（<code>sum(x &gt; 0 for x in data)</code> 直接數正數個數），但也可能在不經意處讓你踩到陷阱。</p>
+</div>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-41" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20True%20%2B%20True%0A2%0A%3E%3E%3E%20isinstance(True%2C%20int)%0ATrue%0A%3E%3E%3E%20sum(%5Bx%20%3E%205%20for%20x%20in%20%5B3%2C%207%2C%209%2C%202%5D%5D)%20%20%20%23%20%E6%95%B8%E5%87%BA%E6%9C%89%E5%B9%BE%E5%80%8B%20%3E%205%0A2'), 'copy-btn-41')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; True + True
+2
+&gt;&gt;&gt; isinstance(True, int)
+True
+&gt;&gt;&gt; sum([x &gt; 5 for x in [3, 7, 9, 2]])   # 數出有幾個 &gt; 5
+2</code></pre>
+      </div>
+    <h2 id="基本型別對照表">基本型別對照表</h2><p>下表是 Java 集合/字串到 Python 的速查。內部實作與時間複雜度留到第 4 章深入，這裡先建立對應關係。</p>
+<table>
+<thead>
+<tr>
+<th>Java</th>
+<th>Python</th>
+<th>可變?</th>
+<th>一句話特性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>String</code></td>
+<td><code>str</code></td>
+<td>不可變</td>
+<td>兩者都 immutable；Python 用單引號或雙引號皆可</td>
+</tr>
+<tr>
+<td><code>ArrayList&lt;T&gt;</code></td>
+<td><code>list</code></td>
+<td>可變</td>
+<td>動態陣列；<code>[1, 2, 3]</code>，異質元素 OK</td>
+</tr>
+<tr>
+<td><code>HashMap&lt;K,V&gt;</code></td>
+<td><code>dict</code></td>
+<td>可變</td>
+<td>雜湊表；<code>{&quot;a&quot;: 1}</code>；Python 3.7+ 保證插入順序</td>
+</tr>
+<tr>
+<td><code>HashSet&lt;T&gt;</code></td>
+<td><code>set</code></td>
+<td>可變</td>
+<td>不重複元素的雜湊集合；<code>{1, 2, 3}</code></td>
+</tr>
+<tr>
+<td>（無直接對應）</td>
+<td><code>tuple</code></td>
+<td>不可變</td>
+<td>固定長度、不可變序列；<code>(1, &quot;a&quot;, True)</code></td>
+</tr>
+<tr>
+<td><code>Integer</code>/<code>int</code></td>
+<td><code>int</code></td>
+<td>不可變</td>
+<td>任意精度</td>
+</tr>
+<tr>
+<td><code>Double</code>/<code>double</code></td>
+<td><code>float</code></td>
+<td>不可變</td>
+<td>IEEE 754 雙精度</td>
+</tr>
+<tr>
+<td><code>Boolean</code>/<code>boolean</code></td>
+<td><code>bool</code></td>
+<td>不可變</td>
+<td><code>True</code>/<code>False</code>（首字大寫！）</td>
+</tr>
+<tr>
+<td><code>null</code></td>
+<td><code>None</code></td>
+<td>—</td>
+<td>單例物件，不是關鍵字常數</td>
+</tr>
+</tbody></table>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-42" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('s%20%3D%20%22immutable%22%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20str%0Anums%20%3D%20%5B1%2C%202%2C%203%5D%20%20%20%20%20%20%20%20%20%20%20%20%23%20list%EF%BC%88%E2%89%88%20ArrayList%EF%BC%89%0Auser%20%3D%20%7B%22id%22%3A%201%2C%20%22name%22%3A%20%22Ann%22%7D%20%20%20%23%20dict%EF%BC%88%E2%89%88%20HashMap%EF%BC%89%0Atags%20%3D%20%7B%22py%22%2C%20%22java%22%7D%20%20%20%20%20%20%23%20set%EF%BC%88%E2%89%88%20HashSet%EF%BC%89%0Apoint%20%3D%20(3%2C%204)%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20tuple%EF%BC%8C%E7%84%A1%20Java%20%E5%B0%8D%E6%87%89'), 'copy-btn-42')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">s = "immutable"             # str
+nums = [1, 2, 3]            # list（≈ ArrayList）
+user = {"id": 1, "name": "Ann"}   # dict（≈ HashMap）
+tags = {"py", "java"}      # set（≈ HashSet）
+point = (3, 4)             # tuple，無 Java 對應</code></pre>
+      </div>
+    <p><code>tuple</code> 是 Java 沒有的型別，可以把它想成「不可變、固定長度的輕量級值物件」，常用於回傳多個值（<code>return name, age</code>）和當 dict 的 key（因為它 immutable 所以可雜湊）。它就是你常想用 Java 的「臨時 record」或「Pair 類別」來解決的那些場景。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>{}</code> 是<strong>空 dict</strong>，不是空 set！空 set 要寫 <code>set()</code>。<code>{1, 2}</code> 才是 set。這是初學者最常搞混的字面量（literal）。</p>
+</div>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-43" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20type(%7B%7D)%0A%3Cclass%20%27dict%27%3E%0A%3E%3E%3E%20type(set())%0A%3Cclass%20%27set%27%3E'), 'copy-btn-43')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; type({})
+&lt;class 'dict'&gt;
+&gt;&gt;&gt; type(set())
+&lt;class 'set'&gt;</code></pre>
+      </div>
+    <h2 id="運算子差異別把-cjava-習慣帶進來">運算子差異：別把 C/Java 習慣帶進來</h2><h3 id="沒有-">沒有 ++ / --</h3><p>Python <strong>沒有</strong> <code>++</code> 和 <code>--</code>。沒有。原因之一是「名字綁定」模型下「自增」語意不清，之二是 Python 設計哲學偏好明確。請用 <code>+= 1</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-44" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('i%2B%2B%3B%20%20%20%20%20%20%20%20%20%20%2F%2F%20Java%0Acount--%3B'), 'copy-btn-44')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">i++;          // Java
+count--;</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-45" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('i%20%2B%3D%201%20%20%20%20%20%20%20%20%23%20Python%EF%BC%9B%E6%B2%92%E6%9C%89%20i%2B%2B%EF%BC%8C%E5%AF%AB%E4%BA%86%E6%98%AF%E8%AA%9E%E6%B3%95%E9%8C%AF%E8%AA%A4%0Acount%20-%3D%201'), 'copy-btn-45')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">i += 1        # Python；沒有 i++，寫了是語法錯誤
+count -= 1</code></pre>
+      </div>
+    <h3 id="沒有-c-式三元用-if-else-運算式">沒有 C 式三元，用 if-else 運算式</h3><p>Java 的 <code>cond ? a : b</code> 在 Python 寫成 <code>a if cond else b</code>——把「正常情況的值」放前面，讀起來像英文。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-46" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('String%20label%20%3D%20(n%20%3E%200)%20%3F%20%22positive%22%20%3A%20%22non-positive%22%3B'), 'copy-btn-46')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">String label = (n &gt; 0) ? "positive" : "non-positive";</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-47" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('label%20%3D%20%22positive%22%20if%20n%20%3E%200%20else%20%22non-positive%22'), 'copy-btn-47')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">label = "positive" if n &gt; 0 else "non-positive"</code></pre>
+      </div>
+    <h3 id="除法-是真除法-是整除">除法：/ 是真除法，// 是整除</h3><p>這是另一個容易出錯的點。Java 的 <code>/</code> 對兩個 <code>int</code> 做<strong>整數除法</strong>（<code>7 / 2 == 3</code>）。Python 的 <code>/</code> 永遠是<strong>真除法（true division）</strong>，回傳 <code>float</code>；要整數除法得用 <code>//</code>。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-48" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('System.out.println(7%20%2F%202)%3B%20%20%20%20%2F%2F%203%20%20%20%EF%BC%88int%20%E6%95%B4%E9%99%A4%EF%BC%89%0ASystem.out.println(7%20%2F%202.0)%3B%20%20%2F%2F%203.5'), 'copy-btn-48')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">System.out.println(7 / 2);    // 3   （int 整除）
+System.out.println(7 / 2.0);  // 3.5</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-49" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%207%20%2F%202%20%20%20%20%20%20%20%20%23%20%E7%9C%9F%E9%99%A4%E6%B3%95%EF%BC%8C%E6%B0%B8%E9%81%A0%E5%9B%9E%E5%82%B3%20float%0A3.5%0A%3E%3E%3E%207%20%2F%2F%202%20%20%20%20%20%20%20%23%20%E6%95%B4%E9%99%A4%EF%BC%88floor%20division%EF%BC%89%EF%BC%8C%E5%90%91%E4%B8%8B%E5%8F%96%E6%95%B4%0A3%0A%3E%3E%3E%207%20%25%202%20%20%20%20%20%20%20%20%23%20%E5%8F%96%E9%A4%98%0A1%0A%3E%3E%3E%202%20**%2010%20%20%20%20%20%20%23%20%E6%AC%A1%E6%96%B9%EF%BC%8C%E4%B8%8D%E7%94%A8%20Math.pow%0A1024'), 'copy-btn-49')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; 7 / 2        # 真除法，永遠回傳 float
+3.5
+&gt;&gt;&gt; 7 // 2       # 整除（floor division），向下取整
+3
+&gt;&gt;&gt; 7 % 2        # 取餘
+1
+&gt;&gt;&gt; 2 ** 10      # 次方，不用 Math.pow
+1024</code></pre>
+      </div>
+    <p>注意 <code>//</code> 是 <strong>floor division（向下取整）</strong>，對負數的行為和 Java 的「向零取整」不同：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-50" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20-7%20%2F%2F%202%20%20%20%20%20%20%23%20%E5%90%91%E4%B8%8B%E5%8F%96%E6%95%B4%E5%88%B0%20-4%EF%BC%8C%E4%B8%8D%E6%98%AF%20-3%0A-4%0A%3E%3E%3E%20-7%20%25%202%20%20%20%20%20%20%20%23%20Python%20%E7%9A%84%E9%A4%98%E6%95%B8%E7%AC%A6%E8%99%9F%E8%B7%9F%E9%99%A4%E6%95%B8%E4%B8%80%E8%87%B4%0A1'), 'copy-btn-50')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; -7 // 2      # 向下取整到 -4，不是 -3
+-4
+&gt;&gt;&gt; -7 % 2       # Python 的餘數符號跟除數一致
+1</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-51" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('System.out.println(-7%20%2F%202)%3B%20%20%20%2F%2F%20-3%EF%BC%88%E5%90%91%E9%9B%B6%E5%8F%96%E6%95%B4%EF%BC%89%0ASystem.out.println(-7%20%25%202)%3B%20%20%20%2F%2F%20-1'), 'copy-btn-51')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">System.out.println(-7 / 2);   // -3（向零取整）
+System.out.println(-7 % 2);   // -1</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：把 Java 程式碼直譯成 Python 時，所有靠 <code>int / int</code> 拿整數結果的地方都會變成 float，索引、計數可能因此爆 <code>TypeError</code>（list 索引不收 float）。需要整數務必用 <code>//</code>。</p>
+</div><h3 id="連鎖比較">連鎖比較</h3><p>Python 允許把比較串起來，語意等同數學寫法，而且<strong>中間運算元只求值一次</strong>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-52" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20x%20%3D%205%0A%3E%3E%3E%200%20%3C%20x%20%3C%2010%20%20%20%20%20%20%20%20%23%20%E7%AD%89%E5%90%8C%20(0%20%3C%20x)%20and%20(x%20%3C%2010)%0ATrue%0A%3E%3E%3E%20a%20%3D%20b%20%3D%20c%20%3D%201%0A%3E%3E%3E%20a%20%3D%3D%20b%20%3D%3D%20c%20%20%20%20%20%20%20%23%20%E7%AD%89%E5%90%8C%20(a%20%3D%3D%20b)%20and%20(b%20%3D%3D%20c)%EF%BC%8C%E4%B8%89%E8%80%85%E5%85%A8%E7%9B%B8%E7%AD%89%0ATrue'), 'copy-btn-52')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; x = 5
+&gt;&gt;&gt; 0 &lt; x &lt; 10        # 等同 (0 &lt; x) and (x &lt; 10)
+True
+&gt;&gt;&gt; a = b = c = 1
+&gt;&gt;&gt; a == b == c       # 等同 (a == b) and (b == c)，三者全相等
+True</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-53" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%20%E5%BF%85%E9%A0%88%E6%8B%86%E9%96%8B%E5%AF%AB%0Aif%20(0%20%3C%20x%20%26%26%20x%20%3C%2010)%20%7B%20...%20%7D'), 'copy-btn-53')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java 必須拆開寫
+if (0 &lt; x &amp;&amp; x &lt; 10) { ... }</code></pre>
+      </div>
+    <h3 id="and-or-not-取代-而且回傳運算元">and / or / not 取代 &&、||、!——而且回傳運算元</h3><p>邏輯運算子在 Python 是英文單字：<code>and</code>、<code>or</code>、<code>not</code>，取代 Java 的 <code>&amp;&amp;</code>、<code>||</code>、<code>!</code>。兩者都是<strong>短路求值（short-circuit）</strong>。</p>
+<p>但有個關鍵差異：Python 的 <code>and</code>/<code>or</code> <strong>回傳的是運算元本身，不是布林值</strong>。<code>and</code> 回傳第一個 falsy 值（否則最後一個值）；<code>or</code> 回傳第一個 truthy 值（否則最後一個值）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-54" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%202%20and%203%20%20%20%20%20%20%20%20%20%20%23%202%20truthy%EF%BC%8C%E7%B9%BC%E7%BA%8C%E7%9C%8B%203%EF%BC%8C%E5%9B%9E%E5%82%B3%203%0A3%0A%3E%3E%3E%200%20or%20%22default%22%20%20%20%23%200%20falsy%EF%BC%8C%E5%9B%9E%E5%82%B3%20%22default%22%0A%27default%27%0A%3E%3E%3E%20%22%22%20or%20%22fallback%22%20%23%20%E7%A9%BA%E5%AD%97%E4%B8%B2%20falsy%0A%27fallback%27%0A%3E%3E%3E%20None%20and%205%20%20%20%20%20%20%20%23%20None%20falsy%EF%BC%8C%E7%9F%AD%E8%B7%AF%EF%BC%8C%E5%9B%9E%E5%82%B3%20None'), 'copy-btn-54')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; 2 and 3          # 2 truthy，繼續看 3，回傳 3
+3
+&gt;&gt;&gt; 0 or "default"   # 0 falsy，回傳 "default"
+'default'
+&gt;&gt;&gt; "" or "fallback" # 空字串 falsy
+'fallback'
+&gt;&gt;&gt; None and 5       # None falsy，短路，回傳 None</code></pre>
+      </div>
+    <p>這帶來一個經典慣用法：用 <code>or</code> 提供預設值（類似 Java 的 <code>Objects.requireNonNullElse</code> 或 <code>?:</code>）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-55" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('name%20%3D%20user_input%20or%20%22anonymous%22%20%20%20%23%20user_input%20%E7%82%BA%E7%A9%BA%E5%AD%97%E4%B8%B2%2FNone%20%E6%99%82%E7%94%A8%E9%A0%90%E8%A8%AD%E5%80%BC'), 'copy-btn-55')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">name = user_input or "anonymous"   # user_input 為空字串/None 時用預設值</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<code>x or default</code> 在 <code>x</code> 是 <code>0</code>、<code>&quot;&quot;</code>、<code>[]</code>、<code>False</code> 這些<strong>合法但 falsy</strong> 的值時，會錯誤地套用預設值。如果你只想處理「<code>None</code> 的情況」，請明確寫 <code>x if x is not None else default</code>，別偷懶用 <code>or</code>。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>and</code>/<code>or</code> 回傳運算元是特性不是 bug。但別過度濫用（例如用 <code>cond and a or b</code> 模擬三元——當 <code>a</code> 為 falsy 時會出錯），明確的 <code>a if cond else b</code> 永遠是首選。</p>
+</div><h2 id="none-vs-nullis-vs-">None vs null、is vs ==</h2><h3 id="none-是單例物件不是關鍵字">None 是單例物件，不是關鍵字</h3><p>Java 的 <code>null</code> 是一個型別系統層級的特殊字面量，代表「沒有指向任何物件的參考」。Python 的 <code>None</code> 是一個<strong>真正的物件</strong>——<code>NoneType</code> 這個型別的<strong>唯一實例（singleton）</strong>。整個直譯器生命週期中，<code>None</code> 只有一個，所有 <code>None</code> 都是同一個物件。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-56" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20type(None)%0A%3Cclass%20%27NoneType%27%3E%0A%3E%3E%3E%20None%20is%20None%20%20%20%20%23%20%E6%B0%B8%E9%81%A0%E6%98%AF%E5%90%8C%E4%B8%80%E5%80%8B%E7%89%A9%E4%BB%B6%0ATrue'), 'copy-btn-56')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; type(None)
+&lt;class 'NoneType'&gt;
+&gt;&gt;&gt; None is None    # 永遠是同一個物件
+True</code></pre>
+      </div>
+    <p>正因為它是單例，判斷「是不是 None」的慣用法是用 <code>is</code>（比較身份），不是 <code>==</code>（比較值）。</p>
+<h3 id="is-比身份-比值">is 比身份，== 比值</h3><p>這組對照直接對應你熟悉的 Java：</p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>Java</th>
+<th>Python</th>
+<th>比較什麼</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>同一個物件?</td>
+<td><code>a == b</code>（參考相等）</td>
+<td><code>a is b</code></td>
+<td>記憶體身份（identity，<code>id()</code> 相同）</td>
+</tr>
+<tr>
+<td>值相等?</td>
+<td><code>a.equals(b)</code></td>
+<td><code>a == b</code></td>
+<td>值相等（呼叫 <code>__eq__</code>）</td>
+</tr>
+</tbody></table>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-57" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('String%20a%20%3D%20new%20String(%22hi%22)%3B%0AString%20b%20%3D%20new%20String(%22hi%22)%3B%0ASystem.out.println(a%20%3D%3D%20b)%3B%20%20%20%20%20%20%20%20%2F%2F%20false%EF%BC%9A%E4%B8%8D%E5%90%8C%E7%89%A9%E4%BB%B6%0ASystem.out.println(a.equals(b))%3B%20%20%20%2F%2F%20true%EF%BC%9A%E5%80%BC%E7%9B%B8%E5%90%8C'), 'copy-btn-57')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">String a = new String("hi");
+String b = new String("hi");
+System.out.println(a == b);        // false：不同物件
+System.out.println(a.equals(b));   // true：值相同</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-58" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20a%20%3D%20%5B1%2C%202%2C%203%5D%0A%3E%3E%3E%20b%20%3D%20%5B1%2C%202%2C%203%5D%0A%3E%3E%3E%20a%20%3D%3D%20b%20%20%20%20%20%20%20%20%23%20%E5%80%BC%E7%9B%B8%E7%AD%89%EF%BC%88%E5%85%A7%E5%AE%B9%E4%B8%80%E6%A8%A3%EF%BC%89%E2%86%92%20%E5%91%BC%E5%8F%AB%20__eq__%0ATrue%0A%3E%3E%3E%20a%20is%20b%20%20%20%20%20%20%20%20%23%20%E8%BA%AB%E4%BB%BD%E4%B8%8D%E5%90%8C%EF%BC%88%E5%85%A9%E5%80%8B%E7%8D%A8%E7%AB%8B%E7%9A%84%20list%20%E7%89%A9%E4%BB%B6%EF%BC%89%0AFalse%0A%3E%3E%3E%20a%20is%20a%0ATrue'), 'copy-btn-58')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; a = [1, 2, 3]
+&gt;&gt;&gt; b = [1, 2, 3]
+&gt;&gt;&gt; a == b        # 值相等（內容一樣）→ 呼叫 __eq__
+True
+&gt;&gt;&gt; a is b        # 身份不同（兩個獨立的 list 物件）
+False
+&gt;&gt;&gt; a is a
+True</code></pre>
+      </div>
+    <p>所以判斷 None 永遠寫 <code>x is None</code> / <code>x is not None</code>，而不是 <code>x == None</code>。原因有二：(1) 語意正確——你問的就是「是不是那個唯一的 None 物件」；(2) 安全——<code>==</code> 會呼叫 <code>__eq__</code>，某些惡意或奇怪的物件可能重載 <code>__eq__</code> 讓 <code>x == None</code> 回傳 <code>True</code>，但 <code>is</code> 比的是身份，騙不了。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：<code>if x is None:</code>、<code>if x is not None:</code> 是判斷 None 的<strong>唯一</strong>正確寫法。linter（ruff）會在你寫 <code>== None</code> 時直接警告。</p>
+</div><h3 id="整數快取造成的-is-假象">整數快取造成的 is 假象</h3><p>這是附錄 B 點名的經典陷阱。CPython 為了效能，<strong>預先快取了 -5 到 256 的小整數物件</strong>並重複使用。於是：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-59" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20a%20%3D%20256%0A%3E%3E%3E%20b%20%3D%20256%0A%3E%3E%3E%20a%20is%20b%20%20%20%20%20%20%20%23%20256%20%E5%9C%A8%E5%BF%AB%E5%8F%96%E7%AF%84%E5%9C%8D%EF%BC%8C%E5%85%A9%E5%80%8B%E5%90%8D%E5%AD%97%E6%8C%87%E5%90%91%E5%90%8C%E4%B8%80%E5%80%8B%E5%BF%AB%E5%8F%96%E7%89%A9%E4%BB%B6%0ATrue%0A%3E%3E%3E%20a%20%3D%20257%0A%3E%3E%3E%20b%20%3D%20257%0A%3E%3E%3E%20a%20is%20b%20%20%20%20%20%20%20%23%20257%20%E8%B6%85%E5%87%BA%E5%BF%AB%E5%8F%96%EF%BC%8C%E5%90%84%E8%87%AA%E5%BB%BA%E7%AB%8B%E6%96%B0%E7%89%A9%E4%BB%B6%0AFalse'), 'copy-btn-59')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; a = 256
+&gt;&gt;&gt; b = 256
+&gt;&gt;&gt; a is b       # 256 在快取範圍，兩個名字指向同一個快取物件
+True
+&gt;&gt;&gt; a = 257
+&gt;&gt;&gt; b = 257
+&gt;&gt;&gt; a is b       # 257 超出快取，各自建立新物件
+False</code></pre>
+      </div>
+    <p>（注意：在同一行或同一段編譯單元內 <code>a = 257; b = 257</code>，CPython 的常數摺疊可能讓它們共用同一物件而回傳 <code>True</code>，這更證明了——<strong><code>is</code> 對數值的結果是實作細節，不可依賴</strong>。）</p>
+<p>教訓很簡單：<strong><code>is</code> 只用在 <code>None</code>、<code>True</code>、<code>False</code> 這些單例，以及刻意要比較物件身份的場合。比較數值、字串、容器內容，永遠用 <code>==</code>。</strong> Python 3.12+ 甚至會在你對字面量用 <code>is</code> 時丟出 <code>SyntaxWarning</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-60" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20x%20%3D%201000%0A%3E%3E%3E%20x%20is%201000%0A%3Cstdin%3E%3A1%3A%20SyntaxWarning%3A%20%22is%22%20with%20%27int%27%20literal.%20Did%20you%20mean%20%22%3D%3D%22%3F'), 'copy-btn-60')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; x = 1000
+&gt;&gt;&gt; x is 1000
+&lt;stdin&gt;:1: SyntaxWarning: "is" with 'int' literal. Did you mean "=="?</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：別寫 <code>if x is 0:</code> 或 <code>if name is &quot;admin&quot;:</code>。看起來能動是因為快取/駐留（interning）的巧合，換個值或換個 Python 版本就會炸。一律用 <code>==</code>。</p>
+</div><h2 id="真值判斷truthiness不只-boolean-能進條件">真值判斷（truthiness）：不只 boolean 能進條件</h2><p>Java 的條件式<strong>只接受 <code>boolean</code></strong>。<code>if (list)</code>、<code>if (str)</code>、<code>if (5)</code> 在 Java 全是編譯錯誤——你得明確寫 <code>if (list.isEmpty())</code>、<code>if (str != null &amp;&amp; !str.isEmpty())</code>。</p>
+<p>Python 反過來：<strong>任何物件都能放進條件式</strong>，直譯器會問它「你是真還是假？」（呼叫 <code>__bool__</code>，沒有則看 <code>__len__</code>）。內建型別的 falsy 規則很好記——「空的、零的、None 的」都是假：</p>
+<table>
+<thead>
+<tr>
+<th>Falsy（視為 False）</th>
+<th>Truthy（視為 True）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>None</code></td>
+<td>任何非空容器</td>
+</tr>
+<tr>
+<td><code>False</code></td>
+<td>任何非零數字</td>
+</tr>
+<tr>
+<td><code>0</code>、<code>0.0</code>、<code>0j</code></td>
+<td>非空字串 <code>&quot;x&quot;</code></td>
+</tr>
+<tr>
+<td>空字串 <code>&quot;&quot;</code></td>
+<td>字串 <code>&quot;0&quot;</code>、<code>&quot;False&quot;</code>（非空就是真！）</td>
+</tr>
+<tr>
+<td>空容器 <code>[]</code>、<code>{}</code>、<code>()</code>、<code>set()</code></td>
+<td>自訂物件預設為真</td>
+</tr>
+</tbody></table>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-61" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20bool(%5B%5D)%2C%20bool(%22%22)%2C%20bool(0)%2C%20bool(None)%0A(False%2C%20False%2C%20False%2C%20False)%0A%3E%3E%3E%20bool(%220%22)%2C%20bool(%5B0%5D)%2C%20bool(%22%20%22)%20%20%20%20%23%20%E6%B3%A8%E6%84%8F%EF%BC%9A%E5%85%A7%E5%AE%B9%E6%98%AF%200%20%E6%88%96%E7%A9%BA%E7%99%BD%EF%BC%8C%E4%BD%86%E5%AE%B9%E5%99%A8%2F%E5%AD%97%E4%B8%B2%E9%9D%9E%E7%A9%BA%20%E2%86%92%20%E7%9C%9F%0A(True%2C%20True%2C%20True)'), 'copy-btn-61')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; bool([]), bool(""), bool(0), bool(None)
+(False, False, False, False)
+&gt;&gt;&gt; bool("0"), bool([0]), bool(" ")    # 注意：內容是 0 或空白，但容器/字串非空 → 真
+(True, True, True)</code></pre>
+      </div>
+    <p>這帶來兩個極常見的慣用法：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-62" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('items%20%3D%20get_items()%0A%0A%23%20%E5%88%A4%E6%96%B7%E5%AE%B9%E5%99%A8%E9%9D%9E%E7%A9%BA%EF%BC%9A%E7%9B%B4%E6%8E%A5%E7%94%A8%E5%AE%B9%E5%99%A8%E6%9C%AC%E8%BA%AB%0Aif%20items%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%80%8C%E4%B8%8D%E6%98%AF%20if%20len(items)%20%3E%200%3A%0A%20%20%20%20process(items)%0A%0A%23%20%E5%88%A4%E6%96%B7%E5%AD%97%E4%B8%B2%E7%82%BA%E7%A9%BA%EF%BC%9A%E7%94%A8%20not%0Aif%20not%20name%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E8%80%8C%E4%B8%8D%E6%98%AF%20if%20name%20%3D%3D%20%22%22%20or%20name%20is%20None%3A%0A%20%20%20%20name%20%3D%20%22anonymous%22'), 'copy-btn-62')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">items = get_items()
+
+# 判斷容器非空：直接用容器本身
+if items:                      # 而不是 if len(items) &gt; 0:
+    process(items)
+
+# 判斷字串為空：用 not
+if not name:                   # 而不是 if name == "" or name is None:
+    name = "anonymous"</code></pre>
+      </div>
+    <p>對照 Java，你會驚覺省了多少樣板：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-63" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%EF%BC%9A%E8%A6%81%E6%98%8E%E7%A2%BA%E6%AA%A2%E6%9F%A5%20null%20%E5%92%8C%20empty%0Aif%20(items%20!%3D%20null%20%26%26%20!items.isEmpty())%20%7B%20process(items)%3B%20%7D%0Aif%20(name%20%3D%3D%20null%20%7C%7C%20name.isEmpty())%20%7B%20name%20%3D%20%22anonymous%22%3B%20%7D'), 'copy-btn-63')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java：要明確檢查 null 和 empty
+if (items != null &amp;&amp; !items.isEmpty()) { process(items); }
+if (name == null || name.isEmpty()) { name = "anonymous"; }</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 的 <code>if (!list.isEmpty())</code> 在 Python 就是 <code>if list:</code>；<code>if (str == null || str.isEmpty())</code> 就是 <code>if not str:</code>。</p>
+</div><div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：判斷容器是否有內容、字串是否有字，直接用 <code>if x:</code> / <code>if not x:</code>，這是 Pythonic 的標誌。寫 <code>if len(x) &gt; 0:</code> 不算錯但被視為「帶著 Java 口音的 Python」。</p>
+</div><h3 id="truthiness-最大的陷阱把falsy和是-none搞混">truthiness 最大的陷阱：把「falsy」和「是 None」搞混</h3><p>這是 Java 工程師轉 Python 後最容易埋的 bug。<code>if not x:</code> 對 <code>None</code>、<code>0</code>、<code>&quot;&quot;</code>、<code>[]</code> <strong>全部成立</strong>。但很多時候你真正想問的只是「<code>x</code> 是不是 None」。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-64" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20set_quantity(qty)%3A%0A%20%20%20%20if%20not%20qty%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E2%9D%8C%20qty%20%E6%98%AF%200%20%E4%B9%9F%E6%9C%83%E9%80%B2%E9%80%99%E8%A3%A1%EF%BC%81%0A%20%20%20%20%20%20%20%20qty%20%3D%201%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%B5%90%E6%9E%9C%E3%80%8C%E8%A8%AD%E5%AE%9A%E6%95%B8%E9%87%8F%E7%82%BA%200%E3%80%8D%E8%A2%AB%E6%82%84%E6%82%84%E6%94%B9%E6%88%90%201%0A%20%20%20%20save(qty)%0A%0Adef%20set_quantity(qty)%3A%0A%20%20%20%20if%20qty%20is%20None%3A%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E2%9C%85%20%E5%8F%AA%E5%9C%A8%E7%9C%9F%E7%9A%84%E6%B2%92%E7%B5%A6%E5%80%BC%E6%99%82%E5%A5%97%E7%94%A8%E9%A0%90%E8%A8%AD%0A%20%20%20%20%20%20%20%20qty%20%3D%201%0A%20%20%20%20save(qty)'), 'copy-btn-64')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def set_quantity(qty):
+    if not qty:                 # ❌ qty 是 0 也會進這裡！
+        qty = 1                 # 結果「設定數量為 0」被悄悄改成 1
+    save(qty)
+
+def set_quantity(qty):
+    if qty is None:             # ✅ 只在真的沒給值時套用預設
+        qty = 1
+    save(qty)</code></pre>
+      </div>
+    <p>同理，函式參數預設值常見 <code>def f(data=None)</code> 然後 <code>if data is None: data = []</code>，這裡<strong>一定</strong>要用 <code>is None</code> 而非 <code>if not data:</code>，否則使用者刻意傳入的空 list <code>[]</code> 會被你的預設值覆蓋，這是極隱蔽的 bug（可變預設參數的進階陷阱詳見第 3 章）。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：「這個值存不存在」用 <code>is None</code> 判斷；「這個容器有沒有內容」才用 truthiness。把 <code>0</code>、<code>&quot;&quot;</code>、<code>[]</code> 當成「存在但為空的合法值」，不要讓它們被 <code>if not x:</code> 連坐處理掉。這是整章最重要的一個分辨。</p>
+</div><h2 id="本章小結">本章小結</h2><ul>
+<li><strong>縮排即語法</strong>：冒號 <code>:</code> 開區塊、4 空格縮排取代 <code>{}</code>、換行取代 <code>;</code>。禁止混用 tab/space，縮排錯了就是邏輯錯了。</li>
+<li><strong>變數是名字不是盒子</strong>：<code>x = 5</code> 是「名字 <code>x</code> 綁定到 int 物件 <code>5</code>」，不是「把 5 裝進有型別的盒子」。賦值只是換指向，這是理解第 4 章可變性的根。</li>
+<li><strong>一切皆物件，沒有 primitive</strong>：<code>int</code>/<code>float</code>/<code>bool</code>/<code>str</code> 都有方法；<code>int</code> 任意精度永不溢位（≈ Java <code>BigInteger</code> 但有原生語法）。<code>bool</code> 是 <code>int</code> 的子類別。</li>
+<li><strong>運算子差異</strong>：用 <code>+= 1</code>（無 <code>++</code>）、<code>a if cond else b</code>（無 <code>?:</code>）、<code>/</code> 是真除法 <code>//</code> 是整除 <code>**</code> 是次方、支援連鎖比較 <code>0 &lt; x &lt; 10</code>。</li>
+<li><strong>and/or 回傳運算元</strong>：短路求值且回傳運算元本身，<code>x or default</code> 是慣用法但小心 falsy 值誤觸。</li>
+<li><strong>None 是單例，用 is 判斷</strong>：<code>x is None</code> 是唯一正解；<code>is</code> 比身份（≈ Java <code>==</code>），<code>==</code> 比值（≈ Java <code>.equals()</code>）。</li>
+<li><strong>整數快取（-5..256）是實作細節</strong>：<code>is</code> 只用於 <code>None</code>/<code>True</code>/<code>False</code> 與刻意的身份比較，數值與字串一律用 <code>==</code>。</li>
+<li><strong>truthiness</strong>：空容器、空字串、<code>0</code>、<code>None</code> 皆 falsy；<code>if items:</code> / <code>if not name:</code> 很 Pythonic，但別把「falsy」和「是 None」混為一談——這是最毒的隱蔽 bug。</li>
+</ul>
+<h2 id="練習">練習</h2><ol>
+<li><p><strong>除法翻譯</strong>：下面這段 Java 計算平均後取中間索引，直譯成 Python 會在哪裡出錯，為什麼？請寫出正確的 Pythonic 版本。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-65" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('int%20mid%20%3D%20list.size()%20%2F%202%3B%0AObject%20item%20%3D%20list.get(mid)%3B'), 'copy-btn-65')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">int mid = list.size() / 2;
+Object item = list.get(mid);</code></pre>
+      </div>
+    <blockquote><p>提示：<code>/</code> 在 Python 回傳 float，list 索引不收 float。</p>
+</blockquote></li>
+<li><p><strong>None vs falsy</strong>：寫一個函式 <code>apply_discount(price, discount)</code>，當呼叫者沒有提供 <code>discount</code>（沒傳這個參數）時不打折，但允許呼叫者明確傳入 <code>0</code>（代表「就是不打折，但我有意識地指定了」）並正確記錄。想想 <code>if not discount:</code> 為什麼會出事，該怎麼寫。</p>
+<blockquote><p>提示：預設值用 <code>None</code>，用 <code>is None</code> 區分「沒給」和「給了 0」。</p>
+</blockquote></li>
+<li><p><strong>改掉 Java 口音</strong>：把下面這段「帶 Java 口音的 Python」改寫成 Pythonic。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-66" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('if%20len(errors)%20%3E%200%3A%0A%20%20%20%20return%20False%0Aif%20name%20%3D%3D%20None%3A%0A%20%20%20%20name%20%3D%20%22guest%22%0Aflag%20%3D%20True%20if%20count%20%3E%200%20else%20False'), 'copy-btn-66')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">if len(errors) &gt; 0:
+    return False
+if name == None:
+    name = "guest"
+flag = True if count &gt; 0 else False</code></pre>
+      </div>
+    <blockquote><p>提示：三處都有更短的寫法；<code>flag</code> 那行其實 <code>count &gt; 0</code> 本身就是 bool。</p>
+</blockquote></li>
+<li><p><strong>快取偵探</strong>：在 REPL 試 <code>a = 256; b = 256; a is b</code> 與用 <code>a = int(&quot;257&quot;); b = int(&quot;257&quot;); a is b</code>（用 <code>int(str(...))</code> 避免常數摺疊），解釋兩者結果不同的原因，並說明為什麼絕不該在程式裡依賴這個行為。</p>
+<blockquote><p>提示：CPython 對 -5..256 有小整數快取。</p>
+</blockquote></li>
+<li><p><strong>連鎖比較</strong>：用一行 Python 判斷三個變數 <code>a, b, c</code> 是否「嚴格遞增且都落在 0 到 100 之間」。對比你會怎麼用 Java 寫，數一數省了幾個 <code>&amp;&amp;</code>。</p>
+<blockquote><p>提示：連鎖比較可以串很長，<code>0 &lt;= a &lt; b &lt; c &lt;= 100</code>。</p>
+</blockquote></li>
+</ol>

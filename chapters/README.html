@@ -1,0 +1,98 @@
+<h1 id="python-教材為資深-java-工程師設計">Python 教材（為資深 Java 工程師設計）</h1><p>以 <strong>Java ↔ Python 對照</strong> 切入，重點放在思維轉換（mindset shift）與 Pythonic 寫法。
+完整課程規劃見 <a href="#curriculum">`curriculum.md`</a>；本書範例以 <strong>Python 3.12+</strong> 為準。</p>
+<blockquote><p>心法：不要把 Java 的寫法直接翻譯成 Python——先學會「Python 怎麼想」，
+再利用你的工程經驗（測試、架構、型別）讓 Python 程式碼比一般人寫得更穩。</p>
+</blockquote><h2 id="進度">進度</h2><table>
+<thead>
+<tr>
+<th>部分</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>第一部分：快速上手與思維轉換（第 1–3 章）</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td>第二部分：資料結構與 Pythonic 寫法（第 4–6 章）</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td>第三部分：物件導向與型別系統（第 7–10 章）</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td>第四部分：工程實務（第 11–15 章）</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td>第五部分：實戰應用（第 16–18 章）</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td>附錄 A／B／C（速查表、陷阱清單、學習資源）</td>
+<td>✅ 已完成</td>
+</tr>
+</tbody></table>
+<h2 id="第一部分快速上手與思維轉換">第一部分：快速上手與思維轉換</h2><ul>
+<li><a href="#ch01-ecosystem-and-tooling">第 1 章：Python 生態系與開發環境</a>
+— CPython / bytecode / PVM 對照 JVM、venv 與 uv、pyproject.toml、ruff 與 mypy、REPL 互動式開發。</li>
+<li><a href="#ch02-syntax-overview">第 2 章：語法速覽——從 Java 翻譯到 Python</a>
+— 縮排即區塊、name binding、一切皆物件（int 不溢位）、<code>is</code> vs <code>==</code>、<code>None</code>、truthiness。</li>
+<li><a href="#ch03-functions">第 3 章：函式——Python 的一等公民</a>
+— 函式即物件、<code>*args</code>/<code>**kwargs</code>、可變預設參數陷阱、closure 與 <code>nonlocal</code>、type hints、docstring 與 PEP 257（對照 JavaDoc）。</li>
+</ul>
+<h2 id="第二部分資料結構與-pythonic-寫法">第二部分：資料結構與 Pythonic 寫法</h2><ul>
+<li><a href="#ch04-data-structures">第 4 章：核心資料結構深入</a>
+— list/tuple/dict/set 內部實作與複雜度、可變性、切片、解包、<code>collections</code>、深淺拷貝。</li>
+<li><a href="#ch05-pythonic-idioms">第 5 章：Pythonic 慣用法</a>
+— comprehension 對照 Stream、惰性求值、<code>enumerate</code>/<code>zip</code>/<code>sorted</code>、EAFP、duck typing、<code>with</code>、海象運算子與 f-string。</li>
+<li><a href="#ch06-iterators-and-generators">第 6 章：迭代器與產生器</a>
+— 迭代協定、<code>yield</code> 與 generator、<code>itertools</code>、generator pipeline、<code>yield from</code>。</li>
+</ul>
+<h2 id="第三部分物件導向與型別系統">第三部分：物件導向與型別系統</h2><ul>
+<li><a href="#ch07-classes-and-objects">第 7 章：Python 的類別與物件</a>
+— <code>class</code>/<code>__init__</code>/<code>self</code>、name mangling、類別 vs 實例屬性、<code>@property</code>、<code>@classmethod</code>/<code>@staticmethod</code>、<code>@dataclass</code>、<code>__repr__</code>/<code>__eq__</code>/<code>__hash__</code>。</li>
+<li><a href="#ch08-inheritance-protocols-magic-methods">第 8 章：繼承、協定與魔術方法</a>
+— <code>super()</code>、多重繼承與 MRO、<code>abc.ABC</code>、<code>Protocol</code>（結構型別）vs ABC（名義型別）、魔術方法、mixin、組合優於繼承。</li>
+<li><a href="#ch09-type-hints-and-static-checking">第 9 章：型別提示與靜態檢查</a>
+— 現代 <code>typing</code> 寫法、泛型（3.12 <code>[T]</code> 語法）與型別抹除、<code>Protocol</code>、mypy/pyright 與 CI、pydantic 執行期驗證、漸進式型別。</li>
+<li><a href="#ch10-decorators-and-metaprogramming">第 10 章：裝飾器與元程式設計</a>
+— 裝飾器與 <code>functools.wraps</code>、帶參數裝飾器、類別裝飾器、描述器（descriptor）、<code>__getattr__</code>/<code>__getattribute__</code>、metaclass 與 <code>__init_subclass__</code>。</li>
+</ul>
+<h2 id="第四部分工程實務">第四部分：工程實務</h2><ul>
+<li><a href="#ch11-modules-packages-project-structure">第 11 章：模組、套件與專案結構</a>
+— <code>import</code> 機制與 <code>sys.path</code>、套件與 <code>__init__.py</code>、<code>__main__.py</code>、src layout、<code>pyproject.toml</code> 與 entry points、uv 相依管理。</li>
+<li><a href="#ch12-exceptions-and-defensive-programming">第 12 章：例外處理與防禦性程式設計</a>
+— 例外階層、EAFP、<code>try/except/else/finally</code>、自訂例外、例外鏈（<code>raise from</code>）、<code>contextlib</code>、防禦性設計與 logging。</li>
+<li><a href="#ch13-testing">第 13 章：測試</a>
+— pytest、assert rewriting、fixture 與 <code>conftest.py</code>、參數化、<code>unittest.mock</code> 與 <code>@patch</code>、coverage、property-based testing（hypothesis）。</li>
+<li><a href="#ch14-concurrency-and-async">第 14 章：並行與非同步</a>
+— GIL 與 free-threading（PEP 703/779）、threading vs multiprocessing、<code>concurrent.futures</code>、async/await 與函式著色、asyncio、<code>Queue</code>。</li>
+<li><a href="#ch15-files-io-stdlib">第 15 章：檔案、I/O 與標準函式庫巡禮</a>
+— <code>pathlib</code>、文字/二進位 I/O 與編碼、<code>json</code>/<code>csv</code>、<code>datetime</code>、<code>tempfile</code>、<code>subprocess</code>、常用標準函式庫地圖。</li>
+</ul>
+<h2 id="第五部分實戰應用依興趣選修">第五部分：實戰應用（依興趣選修）</h2><ul>
+<li><a href="#ch16-web-development">第 16 章：Web 開發</a>
+— FastAPI（型別驅動驗證 + 自動 OpenAPI）對照 Spring Boot、<code>Depends</code> 函式式 DI 與 <code>dependency_overrides</code>、SQLAlchemy 2.0（<code>Mapped</code>/<code>mapped_column</code>/<code>select</code>、identity map）對照 JPA/Hibernate、ASGI vs WSGI、uvicorn/gunicorn worker 與 Docker 部署。</li>
+<li><a href="#ch17-data-processing-automation">第 17 章：資料處理與自動化腳本</a>
+— requests vs httpx（連線池與 async）、pandas DataFrame 與向量化思維、BeautifulSoup（本地 HTML 可重現解析）對照 Jsoup、openpyxl 報表自動化對照 Apache POI、排程與系統腳本取代 shell script。</li>
+<li><a href="#ch18-capstone-project">第 18 章：總整專案（Capstone）</a>
+— src layout 分層（API/service/持久層）、型別三分（pydantic 邊界／SQLAlchemy 持久／dataclass 內部）、FastAPI + click 雙入口共用 service、pytest + TestClient + in-memory DB 測試、ruff + mypy + coverage 全綠、GitHub Actions CI、<code>uv build</code> 打包。</li>
+</ul>
+<h2 id="附錄">附錄</h2><ul>
+<li><a href="#appendix-a-java-python-cheatsheet">附錄 A：Java ↔ Python 速查對照表</a>
+— 分 10 大類（語法運算子、型別、集合、控制流程與迭代、OOP、函式式、例外與資源、並行、工具鏈）的對照速查表，每列附章節連結與思維差異，結尾「最關鍵的 10 個思維轉換」。</li>
+<li><a href="#appendix-b-pitfalls">附錄 B：常見陷阱清單（Java 工程師專屬）</a>
+— 19 個高頻坑（可變預設參數、<code>is</code>/<code>==</code> 與整數快取、closure 延遲綁定、GIL、循環匯入、<code>x in list</code> 為 O(n)、requests 無預設 timeout、mock/patch 打使用端…），每個附可重現程式碼、真實輸出、為什麼與正解，結尾自我檢查清單。</li>
+<li><a href="#appendix-c-resources">附錄 C：建議學習資源</a>
+— 官方文件與重點 PEP、給資深工程師的書單（Fluent Python、Effective Python、Robust Python…）、線上資源與練習平台、工具文件、社群，以及一條「給 Java 工程師的閱讀路線圖」。</li>
+</ul>
+<h2 id="閱讀方式">閱讀方式</h2><p>每章獨立成檔，結構一致：</p>
+<ol>
+<li><strong>引言</strong>——從 Java 工程師視角點出本章會顛覆的直覺。</li>
+<li><strong>Java ↔ Python 三段式對照</strong>——「Java 怎麼做 → Python 怎麼做 → 思維差異」。</li>
+<li><strong>陷阱框（⚠️）／Pythonic 重點框（💡）／Java 對照框（🔁）</strong>。</li>
+<li><strong>本章小結 + 練習</strong>。</li>
+</ol>
+<p>所有 Python 範例皆經 <code>python3</code> 實際執行驗證，型別提示範例經 <code>mypy</code> 檢查。</p>

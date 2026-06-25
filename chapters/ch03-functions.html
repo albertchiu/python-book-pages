@@ -1,0 +1,699 @@
+<h1 id="第-3-章函式python-的一等公民">第 3 章：函式——Python 的一等公民</h1><p>在 Java 裡，「函式」從來不是獨立存在的東西——它得依附在類別上，叫做方法（method）。你想把一段行為當資料傳遞，得先發明一個介面、塞進匿名類別，直到 Java 8 才有 lambda 與 method reference 把這件事變得勉強優雅。Python 的世界完全相反：函式從第一天起就是一等物件（first-class object），跟 <code>int</code>、<code>str</code>、<code>list</code> 平起平坐。這個差異看似小，卻會徹底改變你組織程式碼的方式——許多你習慣用設計模式（design pattern）解決的問題，在 Python 裡只是「把函式放進變數」這麼簡單。本章還會帶你踩兩個 Java 工程師幾乎 100% 會踩的坑：可變預設參數與 closure 的延遲綁定。</p>
+<hr>
+<h2 id="函式是一等物件">函式是一等物件</h2><p>「一等物件」的意思很具體：函式可以被賦值給變數、放進資料結構、當參數傳入、當回傳值傳出。在 Python 裡，<code>def</code> 並不是宣告語法，而是一個會在執行期建立函式物件、並把它綁定到某個名字的陳述式。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-67" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20def%20greet(name)%3A%0A...%20%20%20%20%20%22%22%22say%20hi%22%22%22%0A...%20%20%20%20%20return%20f%22Hi%20%7Bname%7D%22%0A...%0A%3E%3E%3E%20type(greet)%0A%3Cclass%20%27function%27%3E%0A%3E%3E%3E%20greet.__name__%0A%27greet%27%0A%3E%3E%3E%20greet.__doc__%0A%27say%20hi%27%0A%3E%3E%3E%20say_hello%20%3D%20greet%20%20%20%20%20%20%23%20%E6%8A%8A%E5%87%BD%E5%BC%8F%E8%B3%A6%E5%80%BC%E7%B5%A6%E5%8F%A6%E4%B8%80%E5%80%8B%E5%90%8D%E5%AD%97%0A%3E%3E%3E%20say_hello(%22Albert%22)%0A%27Hi%20Albert%27'), 'copy-btn-67')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; def greet(name):
+...     """say hi"""
+...     return f"Hi {name}"
+...
+&gt;&gt;&gt; type(greet)
+&lt;class 'function'&gt;
+&gt;&gt;&gt; greet.__name__
+'greet'
+&gt;&gt;&gt; greet.__doc__
+'say hi'
+&gt;&gt;&gt; say_hello = greet      # 把函式賦值給另一個名字
+&gt;&gt;&gt; say_hello("Albert")
+'Hi Albert'</code></pre>
+      </div>
+    <p><code>greet</code> 只是一個指向函式物件的名字（name），跟 <code>x = 5</code> 裡的 <code>x</code> 在語意上沒有本質差別（變數即名字綁定的觀念詳見第 2 章）。它甚至有屬性、有型別，是個如假包換的物件。</p>
+<h3 id="java-的演進史就是在補這一課">Java 的演進史，就是在補這一課</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-68" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%208%20%E4%B9%8B%E5%89%8D%EF%BC%9A%E8%A6%81%E5%82%B3%E9%81%9E%E8%A1%8C%E7%82%BA%EF%BC%8C%E5%BE%97%E7%99%BC%E6%98%8E%E4%BB%8B%E9%9D%A2%20%2B%20%E5%8C%BF%E5%90%8D%E9%A1%9E%E5%88%A5%0AComparator%3CString%3E%20byLength%20%3D%20new%20Comparator%3CString%3E()%20%7B%0A%20%20%20%20public%20int%20compare(String%20a%2C%20String%20b)%20%7B%0A%20%20%20%20%20%20%20%20return%20a.length()%20-%20b.length()%3B%0A%20%20%20%20%7D%0A%7D%3B%0A%0A%2F%2F%20Java%208%2B%EF%BC%9Alambda%20%E8%88%87%20method%20reference%20%E7%B5%82%E6%96%BC%E6%8A%8A%E5%AE%83%E8%AE%8A%E7%9F%AD%0AComparator%3CString%3E%20byLen%20%3D%20(a%2C%20b)%20-%3E%20a.length()%20-%20b.length()%3B%0AFunction%3CString%2C%20Integer%3E%20len%20%3D%20String%3A%3Alength%3B'), 'copy-btn-68')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java 8 之前：要傳遞行為，得發明介面 + 匿名類別
+Comparator&lt;String&gt; byLength = new Comparator&lt;String&gt;() {
+    public int compare(String a, String b) {
+        return a.length() - b.length();
+    }
+};
+
+// Java 8+：lambda 與 method reference 終於把它變短
+Comparator&lt;String&gt; byLen = (a, b) -&gt; a.length() - b.length();
+Function&lt;String, Integer&gt; len = String::length;</code></pre>
+      </div>
+    <p>Java 的 lambda 與 <code>::</code> 本質上仍是「介面的單一方法實作」的語法糖——<code>byLen</code> 的型別是 <code>Comparator&lt;String&gt;</code>，是個物件，不是「函式本身」。Python 不需要這層包裝，函式就是函式。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-69" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20Python%EF%BC%9A%E5%87%BD%E5%BC%8F%E5%A4%A9%E7%94%9F%E5%B0%B1%E8%83%BD%E5%82%B3%E9%81%9E%EF%BC%8C%E4%B8%8D%E9%9C%80%E8%A6%81%E4%BB%8B%E9%9D%A2%0Adef%20by_length(s%3A%20str)%20-%3E%20int%3A%0A%20%20%20%20return%20len(s)%0A%0Awords%20%3D%20%5B%22banana%22%2C%20%22apple%22%2C%20%22cherry%22%5D%0Aprint(sorted(words%2C%20key%3Dby_length))%20%20%20%23%20%5B%27apple%27%2C%20%27banana%27%2C%20%27cherry%27%5D'), 'copy-btn-69')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># Python：函式天生就能傳遞，不需要介面
+def by_length(s: str) -&gt; int:
+    return len(s)
+
+words = ["banana", "apple", "cherry"]
+print(sorted(words, key=by_length))   # ['apple', 'banana', 'cherry']</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 的 <code>Function&lt;T,R&gt;</code>／<code>Comparator&lt;T&gt;</code> 是「把函式包進物件」；Python 的函式本來就是物件，省掉了那層 <code>@FunctionalInterface</code>。</p>
+</div><h3 id="把函式放進-dictdispatch-table-取代-strategy-pattern">把函式放進 dict：dispatch table 取代 strategy pattern</h3><p>Java 工程師遇到「根據某個 key 選擇不同行為」時，本能反應是 strategy pattern：定義介面、寫一堆實作類別、用 <code>Map&lt;String, Strategy&gt;</code> 註冊。Python 直接把函式塞進 dict 就好——這叫做 dispatch table（分派表）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-70" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20collections.abc%20import%20Callable%0A%0Adef%20add(a%3A%20float%2C%20b%3A%20float)%20-%3E%20float%3A%0A%20%20%20%20return%20a%20%2B%20b%0A%0Adef%20sub(a%3A%20float%2C%20b%3A%20float)%20-%3E%20float%3A%0A%20%20%20%20return%20a%20-%20b%0A%0Adef%20mul(a%3A%20float%2C%20b%3A%20float)%20-%3E%20float%3A%0A%20%20%20%20return%20a%20*%20b%0A%0A%23%20dispatch%20table%EF%BC%9Akey%20%E5%B0%8D%E6%87%89%E5%88%B0%E3%80%8C%E8%A1%8C%E7%82%BA%E6%9C%AC%E8%BA%AB%E3%80%8D%0A%23%20%E5%9E%8B%E5%88%A5%E6%A8%99%E6%B3%A8%E7%94%A8%20Callable%5B%5Bfloat%2C%20float%5D%2C%20float%5D%EF%BC%8C%E8%80%8C%E4%B8%8D%E6%98%AF%E5%B0%8F%E5%AF%AB%E5%85%A7%E5%BB%BA%E7%9A%84%20callable%0A%23%20%EF%BC%88callable%20%E6%98%AF%20builtin%20%E5%87%BD%E5%BC%8F%E3%80%81%E4%B8%8D%E6%98%AF%E5%9E%8B%E5%88%A5%EF%BC%8Cmypy%20%E6%9C%83%E5%A0%B1%20valid-type%20%E9%8C%AF%E8%AA%A4%EF%BC%89%0AOPS%3A%20dict%5Bstr%2C%20Callable%5B%5Bfloat%2C%20float%5D%2C%20float%5D%5D%20%3D%20%7B%0A%20%20%20%20%22%2B%22%3A%20add%2C%0A%20%20%20%20%22-%22%3A%20sub%2C%0A%20%20%20%20%22*%22%3A%20mul%2C%0A%7D%0A%0Adef%20calculate(op%3A%20str%2C%20a%3A%20float%2C%20b%3A%20float)%20-%3E%20float%3A%0A%20%20%20%20handler%20%3D%20OPS%5Bop%5D%20%20%20%20%20%20%23%20%E5%8F%96%E5%87%BA%E5%87%BD%E5%BC%8F%0A%20%20%20%20return%20handler(a%2C%20b)%20%20%20%23%20%E5%91%BC%E5%8F%AB%E5%AE%83%0A%0Aprint(calculate(%22%2B%22%2C%203%2C%204))%20%20%20%23%207%0Aprint(calculate(%22*%22%2C%203%2C%204))%20%20%20%23%2012'), 'copy-btn-70')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from collections.abc import Callable
+
+def add(a: float, b: float) -&gt; float:
+    return a + b
+
+def sub(a: float, b: float) -&gt; float:
+    return a - b
+
+def mul(a: float, b: float) -&gt; float:
+    return a * b
+
+# dispatch table：key 對應到「行為本身」
+# 型別標注用 Callable[[float, float], float]，而不是小寫內建的 callable
+# （callable 是 builtin 函式、不是型別，mypy 會報 valid-type 錯誤）
+OPS: dict[str, Callable[[float, float], float]] = {
+    "+": add,
+    "-": sub,
+    "*": mul,
+}
+
+def calculate(op: str, a: float, b: float) -&gt; float:
+    handler = OPS[op]      # 取出函式
+    return handler(a, b)   # 呼叫它
+
+print(calculate("+", 3, 4))   # 7
+print(calculate("*", 3, 4))   # 12</code></pre>
+      </div>
+    <p>對照 Java 的 strategy pattern：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-71" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('interface%20Operation%20%7B%20double%20apply(double%20a%2C%20double%20b)%3B%20%7D%0A%0AMap%3CString%2C%20Operation%3E%20ops%20%3D%20Map.of(%0A%20%20%20%20%22%2B%22%2C%20(a%2C%20b)%20-%3E%20a%20%2B%20b%2C%0A%20%20%20%20%22-%22%2C%20(a%2C%20b)%20-%3E%20a%20-%20b%0A)%3B%0Adouble%20result%20%3D%20ops.get(%22%2B%22).apply(3%2C%204)%3B%20%20%2F%2F%207'), 'copy-btn-71')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">interface Operation { double apply(double a, double b); }
+
+Map&lt;String, Operation&gt; ops = Map.of(
+    "+", (a, b) -&gt; a + b,
+    "-", (a, b) -&gt; a - b
+);
+double result = ops.get("+").apply(3, 4);  // 7</code></pre>
+      </div>
+    <p>兩者邏輯一致，但 Python 版本沒有介面、沒有匿名類別、沒有樣板程式碼。當「策略」只是一個純函式時，Python 的寫法直接消滅了整個 pattern 的儀式感。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：當你想用 strategy / command pattern 時，先問自己「這個策略只是一個函式嗎？」如果是，dict + 函式就夠了，不需要類別階層。</p>
+</div><hr>
+<h2 id="參數機制">參數機制</h2><p>Python 的參數系統比 Java 靈活得多，但也因此有更多細節要掌握。核心觀念：<strong>Python 沒有方法多載（overloading）</strong>。Java 靠多個同名、不同簽章的方法來提供彈性；Python 靠的是預設值、可變參數與關鍵字參數，把所有彈性塞進<strong>一個</strong>函式定義裡。</p>
+<h3 id="位置參數關鍵字參數預設值">位置參數、關鍵字參數、預設值</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-72" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20connect(host%3A%20str%2C%20port%3A%20int%20%3D%205432%2C%20timeout%3A%20float%20%3D%2030.0)%20-%3E%20str%3A%0A%20%20%20%20return%20f%22%7Bhost%7D%3A%7Bport%7D%20(timeout%3D%7Btimeout%7D)%22%0A%0Aprint(connect(%22db.local%22))%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20db.local%3A5432%20(timeout%3D30.0)%0Aprint(connect(%22db.local%22%2C%206379))%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%94%A8%E4%BD%8D%E7%BD%AE%E5%82%B3%20port%0Aprint(connect(%22db.local%22%2C%20timeout%3D5.0))%20%20%20%20%20%20%20%20%20%20%23%20%E7%94%A8%E9%97%9C%E9%8D%B5%E5%AD%97%E8%B7%B3%E9%81%8E%20port%0Aprint(connect(port%3D3306%2C%20host%3D%22db.local%22))%20%20%20%20%20%20%20%23%20%E5%85%A8%E7%94%A8%E9%97%9C%E9%8D%B5%E5%AD%97%EF%BC%8C%E9%A0%86%E5%BA%8F%E9%9A%A8%E6%84%8F'), 'copy-btn-72')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def connect(host: str, port: int = 5432, timeout: float = 30.0) -&gt; str:
+    return f"{host}:{port} (timeout={timeout})"
+
+print(connect("db.local"))                       # db.local:5432 (timeout=30.0)
+print(connect("db.local", 6379))                 # 用位置傳 port
+print(connect("db.local", timeout=5.0))          # 用關鍵字跳過 port
+print(connect(port=3306, host="db.local"))       # 全用關鍵字，順序隨意</code></pre>
+      </div>
+    <p>任何參數都可以用「位置」或「關鍵字」兩種方式傳遞。關鍵字傳參在 Java 沒有對應物（Java 只能靠位置），它讓呼叫端更具自我說明性——<code>connect(&quot;db.local&quot;, timeout=5.0)</code> 比 <code>connect(&quot;db.local&quot;, 5432, 5.0)</code> 清楚得多。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 用多載 <code>connect(String)</code>、<code>connect(String, int)</code>、<code>connect(String, int, double)</code> 提供彈性；Python 一個帶預設值的函式就涵蓋全部組合。</p>
+</div><h3 id="args-與-kwargs可變參數">`*args` 與 `**kwargs`：可變參數</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-73" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20report(*args%2C%20**kwargs)%3A%0A%20%20%20%20return%20args%2C%20kwargs%0A%0Aprint(report(1%2C%202%2C%20x%3D3%2C%20y%3D4))%0A%23%20((1%2C%202)%2C%20%7B%27x%27%3A%203%2C%20%27y%27%3A%204%7D)'), 'copy-btn-73')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def report(*args, **kwargs):
+    return args, kwargs
+
+print(report(1, 2, x=3, y=4))
+# ((1, 2), {'x': 3, 'y': 4})</code></pre>
+      </div>
+    <ul>
+<li><code>*args</code> 把多餘的<strong>位置參數</strong>收進一個 tuple（對照 Java 的 varargs <code>Object... args</code>）。</li>
+<li><code>**kwargs</code> 把多餘的<strong>關鍵字參數</strong>收進一個 dict——這個 Java 完全沒有對應概念。</li>
+</ul>
+<p>反向操作叫做「解包（unpacking）」：在呼叫端用 <code>*</code> 把序列攤成位置參數、用 <code>**</code> 把 dict 攤成關鍵字參數。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-74" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20show(a%3A%20int%2C%20b%3A%20int)%20-%3E%20int%3A%0A%20%20%20%20return%20a%20%2B%20b%0A%0Anums%20%3D%20%5B3%2C%204%5D%0Aconfig%20%3D%20%7B%22a%22%3A%203%2C%20%22b%22%3A%204%7D%0Aprint(show(*nums))%20%20%20%20%20%23%20%E7%AD%89%E5%90%8C%20show(3%2C%204)%20-%3E%207%0Aprint(show(**config))%20%20%23%20%E7%AD%89%E5%90%8C%20show(a%3D3%2C%20b%3D4)%20-%3E%207'), 'copy-btn-74')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def show(a: int, b: int) -&gt; int:
+    return a + b
+
+nums = [3, 4]
+config = {"a": 3, "b": 4}
+print(show(*nums))     # 等同 show(3, 4) -&gt; 7
+print(show(**config))  # 等同 show(a=3, b=4) -&gt; 7</code></pre>
+      </div>
+    <p>這是寫「轉發型」函式（裝飾器、wrapper、middleware）的關鍵工具，第 10 章會大量用到。</p>
+<h3 id="keyword-only-與-positional-only-參數">keyword-only 與 positional-only 參數</h3><p><code>*</code> 與 <code>/</code> 這兩個分隔符讓你精確控制每個參數<strong>怎麼被傳</strong>。</p>
+<ul>
+<li>放在 <code>*</code> 之後的參數是 <strong>keyword-only</strong>：呼叫端只能用關鍵字傳。</li>
+<li>放在 <code>/</code> 之前的參數是 <strong>positional-only</strong>（PEP 570，Python 3.8+）：呼叫端只能用位置傳。</li>
+</ul>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-75" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20f(pos_only%2C%20%2F%2C%20normal%2C%20*%2C%20kw_only)%3A%0A%20%20%20%20return%20pos_only%2C%20normal%2C%20kw_only%0A%0Aprint(f(1%2C%202%2C%20kw_only%3D3))%20%20%20%20%20%20%20%20%20%20%23%20(1%2C%202%2C%203)%0Aprint(f(1%2C%20normal%3D2%2C%20kw_only%3D3))%20%20%20%23%20(1%2C%202%2C%203)%EF%BC%8Cnormal%20%E5%85%A9%E7%A8%AE%E9%83%BD%E5%8F%AF%0A%0A%23%20%E6%B2%BF%E7%94%A8%E4%B8%8A%E9%9D%A2%E7%9A%84%20f%EF%BC%9Apos_only%20%E4%B8%8D%E8%83%BD%E7%94%A8%E9%97%9C%E9%8D%B5%E5%AD%97%E5%82%B3%EF%BC%8C%E6%9C%83%E6%8B%8B%20TypeError%0Atry%3A%0A%20%20%20%20f(pos_only%3D1%2C%20normal%3D2%2C%20kw_only%3D3)%0Aexcept%20TypeError%20as%20e%3A%0A%20%20%20%20print(e)%0A%20%20%20%20%23%20f()%20got%20some%20positional-only%20arguments%20passed%20as%20keyword%20arguments%3A%20%27pos_only%27'), 'copy-btn-75')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def f(pos_only, /, normal, *, kw_only):
+    return pos_only, normal, kw_only
+
+print(f(1, 2, kw_only=3))          # (1, 2, 3)
+print(f(1, normal=2, kw_only=3))   # (1, 2, 3)，normal 兩種都可
+
+# 沿用上面的 f：pos_only 不能用關鍵字傳，會拋 TypeError
+try:
+    f(pos_only=1, normal=2, kw_only=3)
+except TypeError as e:
+    print(e)
+    # f() got some positional-only arguments passed as keyword arguments: 'pos_only'</code></pre>
+      </div>
+    <p>為什麼要這樣設計？<strong>keyword-only</strong> 強迫呼叫端寫出參數名，避免一長串布林旗標讓人看不懂：<code>create_user(name, admin=True, active=False)</code> 遠比 <code>create_user(name, True, False)</code> 安全。<strong>positional-only</strong> 則讓你保留把參數改名的自由（因為呼叫端不依賴名字），標準函式庫許多 C 實作的函式都用它。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：對於語意不明顯的布林或選項參數，把它放到 <code>*</code> 之後變成 keyword-only。這能讓呼叫端自我說明，是一種輕量的 API 防呆。</p>
+</div><h3 id="python-沒有多載這是特性不是缺陷">Python 沒有多載——這是特性不是缺陷</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-76" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20f(x)%3A%20...%0Adef%20f(x%2C%20y)%3A%20...%20%20%20%23%20%E6%B2%92%E6%9C%89%E5%A0%B1%E9%8C%AF%EF%BC%8C%E4%BD%86%E7%AC%AC%E4%BA%8C%E5%80%8B%E5%AE%9A%E7%BE%A9%E7%9B%B4%E6%8E%A5%E8%A6%86%E8%93%8B%E7%AC%AC%E4%B8%80%E5%80%8B%EF%BC%81'), 'copy-btn-76')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def f(x): ...
+def f(x, y): ...   # 沒有報錯，但第二個定義直接覆蓋第一個！</code></pre>
+      </div>
+    <p>在 Python 裡寫兩個同名函式，後者只是<strong>重新綁定</strong>了名字，第一個就此消失。想表達「不同參數數量的同名行為」，請用預設值或 <code>*args</code>。若真要根據型別分派，標準函式庫提供 <code>functools.singledispatch</code>（基於第一個參數的型別），但那是進階手法，先建立「一個函式涵蓋所有情況」的思維才是正道。</p>
+<hr>
+<h2 id="預設參數的可變物件陷阱">預設參數的可變物件陷阱</h2><p>這是 Java 工程師踩坑機率最高的一題，務必看透。</p>
+<p>先看這段「看起來很正常」的程式碼：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-77" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20add_item(item%2C%20items%3D%5B%5D)%3A%20%20%20%23%20%E9%80%99%E6%9C%83%E5%87%BA%E7%8F%BE%E6%84%8F%E6%96%99%E5%A4%96%E7%9A%84%E8%A1%8C%E7%82%BA%0A%20%20%20%20items.append(item)%0A%20%20%20%20return%20items'), 'copy-btn-77')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def add_item(item, items=[]):   # 這會出現意料外的行為
+    items.append(item)
+    return items</code></pre>
+      </div>
+    <p>你的 Java 直覺會說：「每次呼叫沒傳 <code>items</code> 時，就給一個新的空 list 嘛。」錯。實際行為是：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-78" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20add_item(%22a%22)%0A%5B%27a%27%5D%0A%3E%3E%3E%20add_item(%22b%22)%20%20%20%20%20%23%20%E4%BD%A0%E4%BB%A5%E7%82%BA%E6%9C%83%E6%98%AF%20%5B%27b%27%5D%0A%5B%27a%27%2C%20%27b%27%5D%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E7%B5%90%E6%9E%9C%E6%98%AF%E9%80%99%E6%A8%A3%EF%BC%81%0A%3E%3E%3E%20add_item(%22c%22)%0A%5B%27a%27%2C%20%27b%27%2C%20%27c%27%5D'), 'copy-btn-78')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; add_item("a")
+['a']
+&gt;&gt;&gt; add_item("b")     # 你以為會是 ['b']
+['a', 'b']            # 結果是這樣！
+&gt;&gt;&gt; add_item("c")
+['a', 'b', 'c']</code></pre>
+      </div>
+    <h3 id="為什麼預設值在定義時只算一次">為什麼？預設值在「定義時」只算一次</h3><p>關鍵在於：<strong>預設值是在函式「定義」的那一刻求值一次，而不是每次呼叫時重新求值。</strong> 那個 <code>[]</code> 在 <code>def</code> 執行時就被建立成<strong>一個</strong>list 物件，並存進函式物件的 <code>__defaults__</code>。之後每次呼叫沒傳 <code>items</code>，用的都是<strong>同一個</strong> list。</p>
+<p>你可以直接看到這個共用的物件：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-79" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20def%20g(items%3D%5B%5D)%3A%0A...%20%20%20%20%20items.append(1)%0A...%20%20%20%20%20return%20items%0A...%0A%3E%3E%3E%20g.__defaults__%20%20%20%20%20%20%20%23%20%E9%A0%90%E8%A8%AD%E5%80%BC%E5%B0%B1%E6%8E%9B%E5%9C%A8%E9%80%99%E8%A3%A1%EF%BC%8C%E6%98%AF%E5%80%8B%E7%89%A9%E4%BB%B6%0A(%5B%5D%2C)%0A%3E%3E%3E%20g()%0A%5B1%5D%0A%3E%3E%3E%20g.__defaults__%20%20%20%20%20%20%20%23%20%E5%90%8C%E4%B8%80%E5%80%8B%20list%20%E8%A2%AB%E6%94%B9%E4%BA%86%0A(%5B1%5D%2C)'), 'copy-btn-79')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; def g(items=[]):
+...     items.append(1)
+...     return items
+...
+&gt;&gt;&gt; g.__defaults__       # 預設值就掛在這裡，是個物件
+([],)
+&gt;&gt;&gt; g()
+[1]
+&gt;&gt;&gt; g.__defaults__       # 同一個 list 被改了
+([1],)</code></pre>
+      </div>
+    <p>對照 Java：Java 根本沒有預設參數這個語言特性（你得靠多載），所以也不會有這個坑——但這正是為什麼 Java 工程師第一次看到會完全沒有防備。</p>
+<h3 id="標準解法用-none-當哨兵">標準解法：用 `None` 當哨兵</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-80" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20add_item(item%2C%20items%3A%20list%20%7C%20None%20%3D%20None)%20-%3E%20list%3A%0A%20%20%20%20if%20items%20is%20None%3A%20%20%20%20%20%20%20%20%23%20%E6%AF%8F%E6%AC%A1%E5%91%BC%E5%8F%AB%E9%83%BD%E5%88%A4%E6%96%B7%EF%BC%8C%E9%9C%80%E8%A6%81%E6%99%82%E6%89%8D%E5%BB%BA%E6%96%B0%20list%0A%20%20%20%20%20%20%20%20items%20%3D%20%5B%5D%0A%20%20%20%20items.append(item)%0A%20%20%20%20return%20items%0A%0Aprint(add_item(%22a%22))%20%20%20%23%20%5B%27a%27%5D%0Aprint(add_item(%22b%22))%20%20%20%23%20%5B%27b%27%5D%20%20%E2%86%90%20%E6%AD%A3%E7%A2%BA%E4%BA%86'), 'copy-btn-80')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def add_item(item, items: list | None = None) -&gt; list:
+    if items is None:        # 每次呼叫都判斷，需要時才建新 list
+        items = []
+    items.append(item)
+    return items
+
+print(add_item("a"))   # ['a']
+print(add_item("b"))   # ['b']  ← 正確了</code></pre>
+      </div>
+    <p><code>None</code> 是不可變的單例，當預設值再安全不過。<code>if items is None</code> 把「建立新 list」這個動作從「定義時」移到「呼叫時」，問題迎刃而解。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：<strong>永遠不要用可變物件（<code>list</code>、<code>dict</code>、<code>set</code>）當預設參數值。</strong> 改用 <code>None</code> 當哨兵，在函式內判斷後再建立。這條規則沒有例外，linter（如 ruff 的 <code>B006</code>）會自動抓出來。</p>
+</div><h3 id="為什麼這個設計其實合理">為什麼這個設計其實合理？</h3><p>你可能覺得這設計很反直覺，但它其實是 Python「函式是物件、預設值是物件的一部分」這個一致性原則的自然結果。預設值跟函式物件一起活著，自然只算一次。理解這點的關鍵是 Python 的**可變性（mutability）**觀念：問題的根源不是「預設值只算一次」，而是「你拿一個可變物件去 <code>append</code>」。如果預設值是不可變的（像 <code>None</code>、<code>0</code>、<code>&quot;x&quot;</code>、tuple），就算共用同一個也不會有任何問題，因為你無法就地修改它。可變 vs 不可變的完整討論留到第 4 章，但這個坑正是它的最佳前導範例。</p>
+<hr>
+<h2 id="lambda-的限制">lambda 的限制</h2><p>Python 有 lambda，但它跟 Java 的 lambda 不是同一個量級的工具。</p>
+<p><strong>Python 的 lambda 只能是「單一運算式（expression）」</strong>，不能包含任何陳述式（statement）：不能賦值、不能 <code>if/else</code> 區塊、不能迴圈、不能 <code>try</code>、不能 <code>return</code>（運算式的值就是回傳值）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-81" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('square%20%3D%20lambda%20x%3A%20x%20*%20x%0Aprint(square(5))%20%20%20%23%2025%0A%0A%23%20%E4%B8%89%E5%85%83%E9%81%8B%E7%AE%97%E5%AD%90%EF%BC%88%E6%98%AF%E9%81%8B%E7%AE%97%E5%BC%8F%EF%BC%89%E5%8F%AF%E4%BB%A5%0Aclassify%20%3D%20lambda%20n%3A%20%22even%22%20if%20n%20%25%202%20%3D%3D%200%20else%20%22odd%22%0Aprint(classify(4))%20%20%20%23%20even'), 'copy-btn-81')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">square = lambda x: x * x
+print(square(5))   # 25
+
+# 三元運算子（是運算式）可以
+classify = lambda n: "even" if n % 2 == 0 else "odd"
+print(classify(4))   # even</code></pre>
+      </div>
+    <p>對照 Java 的 lambda——它可以有完整的程式區塊：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-82" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F%2F%20Java%20lambda%20%E5%8F%AF%E4%BB%A5%E5%A1%9E%E4%B8%80%E6%95%B4%E5%80%8B%20block%0AFunction%3CInteger%2C%20String%3E%20f%20%3D%20(n)%20-%3E%20%7B%0A%20%20%20%20String%20result%3B%0A%20%20%20%20if%20(n%20%25%202%20%3D%3D%200)%20result%20%3D%20%22even%22%3B%0A%20%20%20%20else%20result%20%3D%20%22odd%22%3B%0A%20%20%20%20return%20result%3B%20%20%20%2F%2F%20%E5%8F%AF%E4%BB%A5%E6%9C%89%E9%99%B3%E8%BF%B0%E5%BC%8F%E3%80%81%E5%8F%AF%E4%BB%A5%20return%0A%7D%3B'), 'copy-btn-82')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">// Java lambda 可以塞一整個 block
+Function&lt;Integer, String&gt; f = (n) -&gt; {
+    String result;
+    if (n % 2 == 0) result = "even";
+    else result = "odd";
+    return result;   // 可以有陳述式、可以 return
+};</code></pre>
+      </div>
+    <p>Python 的 lambda 故意被設計得這麼弱，是一種<strong>語言哲學的表態</strong>：Guido 認為如果你的邏輯複雜到需要多行，那它就值得有一個名字。硬塞進 lambda 只會犧牲可讀性。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-83" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E5%8F%8D%E4%BE%8B%EF%BC%9A%E4%B8%8D%E8%A6%81%E9%80%99%E6%A8%A3%E5%AF%AB%0Aprocess%20%3D%20lambda%20data%3A%20%5Bx%20*%202%20for%20x%20in%20data%20if%20x%20%3E%200%5D%20%20%20%23%20%E8%83%BD%E8%B7%91%EF%BC%8C%E4%BD%86%E4%BD%95%E5%BF%85%EF%BC%9F%0A%0A%23%20%E6%AD%A3%E4%BE%8B%EF%BC%9A%E7%B5%A6%E5%AE%83%E4%B8%80%E5%80%8B%E5%90%8D%E5%AD%97%0Adef%20process(data%3A%20list%5Bint%5D)%20-%3E%20list%5Bint%5D%3A%0A%20%20%20%20return%20%5Bx%20*%202%20for%20x%20in%20data%20if%20x%20%3E%200%5D'), 'copy-btn-83')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># 反例：不要這樣寫
+process = lambda data: [x * 2 for x in data if x &gt; 0]   # 能跑，但何必？
+
+# 正例：給它一個名字
+def process(data: list[int]) -&gt; list[int]:
+    return [x * 2 for x in data if x &gt; 0]</code></pre>
+      </div>
+    <h3 id="lambda-的正確用途即用即丟的-key-函式">lambda 的正確用途：即用即丟的 key 函式</h3><p>lambda 真正發光的地方是當「臨時的、一行的、用完即丟」的回呼，最經典的就是 <code>sorted</code>、<code>min</code>、<code>max</code>、<code>filter</code> 的 <code>key</code> 參數：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-84" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('words%20%3D%20%5B%22banana%22%2C%20%22apple%22%2C%20%22cherry%22%5D%0A%0A%23%20%E6%8C%89%E9%95%B7%E5%BA%A6%E6%8E%92%E5%BA%8F%0Aprint(sorted(words%2C%20key%3Dlambda%20w%3A%20len(w)))%20%20%20%20%20%20%23%20%E4%BD%86%E5%85%B6%E5%AF%A6%20key%3Dlen%20%E6%9B%B4%E5%A5%BD%0A%0A%23%20%E6%8C%89%E6%9C%80%E5%BE%8C%E4%B8%80%E5%80%8B%E5%AD%97%E6%AF%8D%E6%8E%92%E5%BA%8F%EF%BC%88%E9%80%99%E7%A8%AE%E5%B0%B1%E9%81%A9%E5%90%88%20lambda%EF%BC%89%0Aprint(sorted(words%2C%20key%3Dlambda%20w%3A%20w%5B-1%5D))%20%20%20%20%20%20%20%23%20%5B%27banana%27%2C%20%27apple%27%2C%20%27cherry%27%5D%0A%0A%23%20%E6%8C%89%20dict%20%E7%9A%84%E6%9F%90%E5%80%8B%E6%AC%84%E4%BD%8D%E6%8E%92%E5%BA%8F%0Apeople%20%3D%20%5B%7B%22name%22%3A%20%22Bob%22%2C%20%22age%22%3A%2030%7D%2C%20%7B%22name%22%3A%20%22Alice%22%2C%20%22age%22%3A%2025%7D%5D%0Aprint(sorted(people%2C%20key%3Dlambda%20p%3A%20p%5B%22age%22%5D))%20%20%20%23%20Alice%20%E5%85%88'), 'copy-btn-84')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">words = ["banana", "apple", "cherry"]
+
+# 按長度排序
+print(sorted(words, key=lambda w: len(w)))      # 但其實 key=len 更好
+
+# 按最後一個字母排序（這種就適合 lambda）
+print(sorted(words, key=lambda w: w[-1]))       # ['banana', 'apple', 'cherry']
+
+# 按 dict 的某個欄位排序
+people = [{"name": "Bob", "age": 30}, {"name": "Alice", "age": 25}]
+print(sorted(people, key=lambda p: p["age"]))   # Alice 先</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：lambda 限定在「一行就講完、且只用一次」的場景。需要重用、需要文件字串、或邏輯超過一個運算式，就寫具名函式。能用 <code>key=len</code>、<code>key=str.lower</code> 這類現成函式時，連 lambda 都別寫。comprehension 能取代的 <code>map</code>/<code>filter</code>+lambda（詳見第 5 章）也優先用 comprehension。</p>
+</div><hr>
+<h2 id="closure-與-nonlocal">closure 與 nonlocal</h2><p>巢狀函式（nested function）可以捕捉外層函式的區域變數，形成 closure（閉包）。這跟 Java 的 lambda 捕捉變數很像，但有一個關鍵差異。</p>
+<h3 id="基本-closure">基本 closure</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-85" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20make_multiplier(factor%3A%20int)%3A%0A%20%20%20%20def%20multiply(x%3A%20int)%20-%3E%20int%3A%0A%20%20%20%20%20%20%20%20return%20x%20*%20factor%20%20%20%20%20%20%23%20%E6%8D%95%E6%8D%89%E5%A4%96%E5%B1%A4%E7%9A%84%20factor%0A%20%20%20%20return%20multiply%0A%0Adouble%20%3D%20make_multiplier(2)%0Atriple%20%3D%20make_multiplier(3)%0Aprint(double(10))%20%20%20%23%2020%0Aprint(triple(10))%20%20%20%23%2030'), 'copy-btn-85')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def make_multiplier(factor: int):
+    def multiply(x: int) -&gt; int:
+        return x * factor      # 捕捉外層的 factor
+    return multiply
+
+double = make_multiplier(2)
+triple = make_multiplier(3)
+print(double(10))   # 20
+print(triple(10))   # 30</code></pre>
+      </div>
+    <p><code>factor</code> 在 <code>make_multiplier</code> 回傳後本該消失，但 <code>multiply</code> 仍記得它。你甚至能透過函式物件看到被捕捉的變數：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-86" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20double.__closure__%5B0%5D.cell_contents%0A2'), 'copy-btn-86')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; double.__closure__[0].cell_contents
+2</code></pre>
+      </div>
+    <h3 id="修改外層變數需要-nonlocal">修改外層變數需要 `nonlocal`</h3><p>預設情況下，內層函式<strong>只能讀取</strong>外層變數。一旦你在內層對它賦值，Python 會把它當成一個<strong>新的區域變數</strong>，而不是修改外層的那個。要明確表達「我要改外層的」，得用 <code>nonlocal</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-87" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20make_counter()%3A%0A%20%20%20%20count%20%3D%200%0A%20%20%20%20def%20increment()%20-%3E%20int%3A%0A%20%20%20%20%20%20%20%20nonlocal%20count%20%20%20%20%20%20%20%23%20%E6%B2%92%E6%9C%89%E9%80%99%E8%A1%8C%EF%BC%8C%E4%B8%8B%E4%B8%80%E8%A1%8C%E7%9A%84%20count%20%2B%3D%201%20%E6%9C%83%E5%A0%B1%20UnboundLocalError%0A%20%20%20%20%20%20%20%20count%20%2B%3D%201%0A%20%20%20%20%20%20%20%20return%20count%0A%20%20%20%20return%20increment%0A%0Ac%20%3D%20make_counter()%0Aprint(c()%2C%20c()%2C%20c())%20%20%20%23%201%202%203'), 'copy-btn-87')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def make_counter():
+    count = 0
+    def increment() -&gt; int:
+        nonlocal count       # 沒有這行，下一行的 count += 1 會報 UnboundLocalError
+        count += 1
+        return count
+    return increment
+
+c = make_counter()
+print(c(), c(), c())   # 1 2 3</code></pre>
+      </div>
+    <p>如果拿掉 <code>nonlocal count</code>，Python 看到 <code>count += 1</code>（等同 <code>count = count + 1</code>，含賦值）就認定 <code>count</code> 是 <code>increment</code> 的區域變數，於是在「讀取尚未賦值的區域變數」時拋出 <code>UnboundLocalError</code>。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：Java 的 lambda/匿名類別只能捕捉 <strong>effectively final</strong> 的變數——你根本不能修改被捕捉的變數，編譯器直接擋。Python 預設也是「只讀」，但給了你 <code>nonlocal</code>（改外層函式變數）和 <code>global</code>（改模組層級變數）這兩個逃生門。Java 工程師習慣的「包一個陣列 <code>int[] count = {0}</code> 來繞過 final 限制」的 hack，在 Python 不需要——直接 <code>nonlocal</code>。</p>
+</div><h3 id="late-binding-陷阱closure-綁的是變數不是值">late binding 陷阱：closure 綁的是「變數」不是「值」</h3><p>這是本章第二個高機率坑，跟可變預設參數一樣致命。</p>
+<p>考慮這段「製造一串函式」的程式碼：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-88" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('funcs%20%3D%20%5Blambda%3A%20i%20for%20i%20in%20range(3)%5D%0Aprint(%5Bf()%20for%20f%20in%20funcs%5D)%20%20%20%23%20%E4%BD%A0%E4%BB%A5%E7%82%BA%E6%98%AF%20%5B0%2C%201%2C%202%5D'), 'copy-btn-88')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">funcs = [lambda: i for i in range(3)]
+print([f() for f in funcs])   # 你以為是 [0, 1, 2]</code></pre>
+      </div>
+    
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-89" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20funcs%20%3D%20%5Blambda%3A%20i%20for%20i%20in%20range(3)%5D%0A%3E%3E%3E%20%5Bf()%20for%20f%20in%20funcs%5D%0A%5B2%2C%202%2C%202%5D%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E5%B1%85%E7%84%B6%E5%85%A8%E6%98%AF%202%EF%BC%81'), 'copy-btn-89')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; funcs = [lambda: i for i in range(3)]
+&gt;&gt;&gt; [f() for f in funcs]
+[2, 2, 2]                      # 居然全是 2！</code></pre>
+      </div>
+    <p><strong>為什麼？</strong> closure 捕捉的是<strong>變數 <code>i</code> 本身</strong>，而不是建立 lambda 那一刻 <code>i</code> 的值。所有三個 lambda 共享同一個 <code>i</code>。等到你<strong>呼叫</strong>它們時（迴圈早已跑完），<code>i</code> 的值停在最後一個 <code>2</code>，於是三個都回傳 2。這叫「延遲綁定（late binding）」——變數值是在<strong>呼叫時</strong>才查找，不是在<strong>定義時</strong>鎖定。</p>
+<p>你的 Java 直覺再次出賣你：Java 要求被捕捉變數 effectively final，所以這種「捕捉一個會變的迴圈變數」的程式碼<strong>根本編譯不過</strong>，等於 Java 編譯器幫你擋掉了這個錯誤。Python 不擋，就讓你踩。</p>
+<p><strong>解法：用預設參數在「定義時」立刻綁定值。</strong> 還記得前面說的嗎？預設值在定義時求值一次——這個特性在這裡反而成了救星：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-90" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20funcs%20%3D%20%5Blambda%20i%3Di%3A%20i%20for%20i%20in%20range(3)%5D%20%20%20%23%20i%3Di%20%E6%8A%8A%E7%95%B6%E4%B8%8B%E7%9A%84%E5%80%BC%E7%B6%81%E9%80%B2%E5%8E%BB%0A%3E%3E%3E%20%5Bf()%20for%20f%20in%20funcs%5D%0A%5B0%2C%201%2C%202%5D%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E6%AD%A3%E7%A2%BA%EF%BC%81'), 'copy-btn-90')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; funcs = [lambda i=i: i for i in range(3)]   # i=i 把當下的值綁進去
+&gt;&gt;&gt; [f() for f in funcs]
+[0, 1, 2]                                        # 正確！</code></pre>
+      </div>
+    <p><code>lambda i=i: i</code> 的意思是：建立 lambda 的當下，把外層 <code>i</code> 的<strong>值</strong>抓進來當作參數 <code>i</code> 的預設值。每個 lambda 都有自己獨立的、已經定值的 <code>i</code>。</p>
+<div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：在迴圈裡建立 closure（lambda 或巢狀函式）並捕捉迴圈變數時，捕捉到的是<strong>變數</strong>而非當下的值，等呼叫時才查找——你會拿到迴圈結束後的最終值。標準解法是用預設參數 <code>lambda x=x: ...</code> 在定義時就鎖定值。這在「迴圈裡註冊一堆 callback」的場景特別容易中招。</p>
+</div><hr>
+<h2 id="型別提示type-hints">型別提示（type hints）</h2><p>身為 Java 工程師，你大概一路看到這裡都在懷念那個「編譯器幫我擋型別錯誤」的安全感。好消息：Python 從 3.5 起有了型別提示（type hints，PEP 484），讓你把那份安全感找回來一大半。</p>
+<h3 id="基本語法">基本語法</h3>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-91" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20greet(name%3A%20str%2C%20times%3A%20int%20%3D%201)%20-%3E%20str%3A%0A%20%20%20%20return%20f%22Hi%20%7Bname%7D!%20%22%20*%20times%0A%0Adef%20find_user(uid%3A%20int)%20-%3E%20str%20%7C%20None%3A%20%20%20%20%23%20X%20%7C%20None%20%E7%AD%89%E5%90%8C%20Optional%5Bstr%5D%0A%20%20%20%20return%20None'), 'copy-btn-91')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def greet(name: str, times: int = 1) -&gt; str:
+    return f"Hi {name}! " * times
+
+def find_user(uid: int) -&gt; str | None:    # X | None 等同 Optional[str]
+    return None</code></pre>
+      </div>
+    <ul>
+<li>參數標注：<code>name: str</code>、<code>times: int</code></li>
+<li>回傳標注：<code>-&gt; str</code></li>
+<li>可空型別：<code>str | None</code>（Python 3.10+ 的寫法，取代舊的 <code>Optional[str]</code>）</li>
+</ul>
+<p>容器型別直接用內建泛型（Python 3.9+），<strong>不要</strong>再 <code>from typing import List</code>：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-92" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20total(prices%3A%20list%5Bfloat%5D)%20-%3E%20float%3A%0A%20%20%20%20return%20sum(prices%2C%200.0)%20%20%20%23%20%E7%B5%A6%20start%3D0.0%EF%BC%8C%E7%A9%BA%20list%20%E4%B9%9F%E5%9B%9E%E5%82%B3%20float%EF%BC%88sum(%5B%5D)%20%E6%9C%83%E6%98%AF%20int%200%EF%BC%89%0A%0Adef%20index_by_id(users%3A%20list%5Bdict%5Bstr%2C%20int%5D%5D)%20-%3E%20dict%5Bint%2C%20dict%5Bstr%2C%20int%5D%5D%3A%0A%20%20%20%20return%20%7Bu%5B%22id%22%5D%3A%20u%20for%20u%20in%20users%7D'), 'copy-btn-92')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def total(prices: list[float]) -&gt; float:
+    return sum(prices, 0.0)   # 給 start=0.0，空 list 也回傳 float（sum([]) 會是 int 0）
+
+def index_by_id(users: list[dict[str, int]]) -&gt; dict[int, dict[str, int]]:
+    return {u["id"]: u for u in users}</code></pre>
+      </div>
+    <div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>Map&lt;String, Integer&gt;</code> 對應 <code>dict[str, int]</code>；<code>List&lt;Double&gt;</code> 對應 <code>list[float]</code>；<code>Optional&lt;T&gt;</code> 對應 <code>T | None</code>。對照速查表見附錄 A。</p>
+</div><h3 id="函式型別callable">函式型別：`Callable`</h3><p>要標注「一個接受 int、回傳 str 的函式」這種高階參數，用 <code>Callable</code>——這正是 Java 的 <code>Function&lt;Integer, String&gt;</code> 的對應物：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-93" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('from%20collections.abc%20import%20Callable%0A%0Adef%20apply(fn%3A%20Callable%5B%5Bint%5D%2C%20int%5D%2C%20value%3A%20int)%20-%3E%20int%3A%0A%20%20%20%20return%20fn(value)%0A%0Aprint(apply(lambda%20x%3A%20x%20%2B%201%2C%2010))%20%20%20%23%2011'), 'copy-btn-93')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">from collections.abc import Callable
+
+def apply(fn: Callable[[int], int], value: int) -&gt; int:
+    return fn(value)
+
+print(apply(lambda x: x + 1, 10))   # 11</code></pre>
+      </div>
+    <p><code>Callable[[int, str], bool]</code> 表示「接受 (int, str)、回傳 bool 的可呼叫物件」。前面那個 dispatch table 的型別正是這樣寫成 <code>dict[str, Callable[[float, float], float]]</code>。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：<code>Callable</code> 同時存在於 <code>collections.abc</code> 與 <code>typing</code>，兩者皆可用且 mypy <code>--strict</code> 都不報錯。在 Python 3.9+，官方建議優先用 <code>from collections.abc import Callable</code>，<code>typing.Callable</code> 是偏舊的別名——這跟本章前面「不要再 <code>from typing import List</code>、改用內建泛型」是同一個現代化主張。</p>
+</div><h3 id="關鍵差異執行期不強制">關鍵差異：執行期「不」強制</h3><p>這是你最需要扭轉的觀念。<strong>Python 的型別提示在執行期完全不被強制。</strong> 它們只是註解（annotation），存在 <code>__annotations__</code> 裡，給「人」和「工具」看，直譯器執行時根本不檢查。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-94" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20def%20double(x%3A%20int)%20-%3E%20int%3A%0A...%20%20%20%20%20return%20x%20%2B%20x%0A...%0A%3E%3E%3E%20double(%22ab%22)%20%20%20%20%20%20%20%23%20%E6%A8%99%E6%B3%A8%E6%98%AF%20int%EF%BC%8C%E4%BD%86%E5%82%B3%20str%20%E4%B9%9F%E7%85%A7%E8%B7%91%E4%B8%8D%E8%AA%A4%0A%27abab%27%0A%3E%3E%3E%20double.__annotations__%0A%7B%27x%27%3A%20%3Cclass%20%27int%27%3E%2C%20%27return%27%3A%20%3Cclass%20%27int%27%3E%7D'), 'copy-btn-94')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; def double(x: int) -&gt; int:
+...     return x + x
+...
+&gt;&gt;&gt; double("ab")       # 標注是 int，但傳 str 也照跑不誤
+'abab'
+&gt;&gt;&gt; double.__annotations__
+{'x': &lt;class 'int'&gt;, 'return': &lt;class 'int'&gt;}</code></pre>
+      </div>
+    <p>對照 Java：Java 的型別是<strong>編譯期強制</strong>的，<code>double(&quot;ab&quot;)</code> 連編譯都過不了。Python 把這個檢查工作<strong>外包</strong>給靜態分析工具：</p>
+<ul>
+<li><strong>mypy</strong> 或 <strong>pyright</strong>：在 CI 或編輯器裡做靜態型別檢查（相當於 Java 編譯器的型別檢查階段）。</li>
+<li>編輯器（VS Code + Pylance、PyCharm）即時標紅、提供自動完成。</li>
+</ul>
+<p>換句話說，型別提示 + mypy = 把 Java 編譯器的型別檢查，以**可選（opt-in）**的方式裝回 Python。你可以漸進式導入（gradual typing）：先標關鍵介面，再逐步覆蓋全專案。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：型別提示是寫給工具與人看的契約，不是執行期防護。在團隊專案、公開 API、複雜邏輯裡務必標注並接上 mypy/pyright；快速腳本可以省略。把它當成「免費的文件 + 編輯器自動完成 + CI 防呆」，而不是「執行期驗證」——後者要靠 pydantic 之類的工具（詳見第 9 章）。</p>
+</div><p>關於泛型（<code>TypeVar</code>、<code>Generic</code>）、<code>Protocol</code>（結構型別）、pydantic 執行期驗證等進階主題，第 9 章會專門深入。本章你只要建立一個觀念：<strong>型別提示讓你在動態語言裡找回一大部分靜態安全感，但它的執法者是工具，不是直譯器。</strong></p>
+<hr>
+<h2 id="docstring給人看的文件字串">Docstring：給人看的文件字串</h2><p>型別提示是寫給工具的契約；docstring（文件字串）則是寫給<strong>人</strong>的文件。兩者一搭一唱：型別提示說「這個參數是 <code>str</code>」，docstring 說「這個 <code>str</code> 代表什麼、為什麼、什麼情況會出錯」。</p>
+<p>身為 Java 工程師，你寫過無數 JavaDoc。但這裡有一個本質差異要先扭轉：<strong>JavaDoc 是註解，docstring 是物件。</strong></p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">java</span>
+          <button id="copy-btn-95" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%2F**%20Return%20a%20greeting%20for%20the%20given%20name.%20*%2F%20%20%20%2F%2F%20%E8%A8%BB%E8%A7%A3%EF%BC%9A%E7%B7%A8%E8%AD%AF%E5%BE%8C%EF%BC%88%E9%A0%90%E8%A8%AD%EF%BC%89%E5%B0%B1%E6%B6%88%E5%A4%B1%E4%BA%86%0AString%20greet(String%20name)%20%7B%20return%20%22Hi%20%22%20%2B%20name%3B%20%7D'), 'copy-btn-95')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-java"><code class="language-java">/** Return a greeting for the given name. */   // 註解：編譯後（預設）就消失了
+String greet(String name) { return "Hi " + name; }</code></pre>
+      </div>
+    <p>JavaDoc 的 <code>/** ... */</code> 是一段註解，編譯成 bytecode 後預設不保留，只能靠 <code>javadoc</code> 工具在<strong>原始碼</strong>階段抽出來產生 HTML。Python 的 docstring 不是註解，而是函式（或模組、類別）的<strong>第一個陳述式</strong>——一個字串字面值，直譯器會把它存進 <code>__doc__</code> 屬性，在<strong>執行期</strong>就能讀到。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-96" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20def%20greet(name%3A%20str)%20-%3E%20str%3A%0A...%20%20%20%20%20%22%22%22Return%20a%20greeting%20for%20the%20given%20name.%22%22%22%0A...%20%20%20%20%20return%20f%22Hi%20%7Bname%7D%22%0A...%0A%3E%3E%3E%20greet.__doc__%0A%27Return%20a%20greeting%20for%20the%20given%20name.%27%0A%3E%3E%3E%20help(greet)%20%20%20%20%20%20%20%20%23%20docstring%20%E5%B0%B1%E6%98%AF%20help()%20%E7%9A%84%E5%8E%9F%E6%96%99%0AHelp%20on%20function%20greet%20in%20module%20__main__%3A%0A%0Agreet(name%3A%20str)%20-%3E%20str%0A%20%20%20%20Return%20a%20greeting%20for%20the%20given%20name.'), 'copy-btn-96')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; def greet(name: str) -&gt; str:
+...     """Return a greeting for the given name."""
+...     return f"Hi {name}"
+...
+&gt;&gt;&gt; greet.__doc__
+'Return a greeting for the given name.'
+&gt;&gt;&gt; help(greet)        # docstring 就是 help() 的原料
+Help on function greet in module __main__:
+
+greet(name: str) -&gt; str
+    Return a greeting for the given name.</code></pre>
+      </div>
+    <p><code>help()</code>、IDE 的滑鼠懸停提示、Sphinx 自動產文件、甚至 <code>doctest</code>（第 13 章）能把 docstring 當測試跑——全都靠這個執行期就在的字串。這是 JavaDoc 給不了的：它在執行期早已不存在。</p>
+<div class="callout callout-compare"><p>🔁 <strong>Java 對照</strong>：JavaDoc 是原始碼註解，編譯後消失，靠工具離線抽取；Python 的 docstring 是活在執行期的 <code>str</code> 物件（<code>func.__doc__</code>），<code>help()</code> 與工具直接讀它。對應慣例文件是 <strong>PEP 257</strong>。</p>
+</div><h3 id="它必須是第一個陳述式">它必須是「第一個陳述式」</h3><p>docstring 之所以是 docstring，純粹因為它的<strong>位置</strong>：函式體（或模組、類別）的第一個陳述式且是字串字面值。位置一錯，它就只是一個被丟棄的字串，<code>__doc__</code> 會是 <code>None</code>。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-97" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%3E%3E%3E%20def%20f()%3A%0A...%20%20%20%20%20x%20%3D%201%0A...%20%20%20%20%20%22%E6%88%91%E4%BB%A5%E7%82%BA%E9%80%99%E6%98%AF%20docstring%22%20%20%20%23%20%E4%B8%8D%E6%98%AF%EF%BC%81%E5%89%8D%E9%9D%A2%E5%B7%B2%E7%B6%93%E6%9C%89%20x%20%3D%201%20%E4%BA%86%0A...%20%20%20%20%20return%20x%0A...%0A%3E%3E%3E%20f.__doc__%0A%3E%3E%3E%20%23%20None'), 'copy-btn-97')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">&gt;&gt;&gt; def f():
+...     x = 1
+...     "我以為這是 docstring"   # 不是！前面已經有 x = 1 了
+...     return x
+...
+&gt;&gt;&gt; f.__doc__
+&gt;&gt;&gt; # None</code></pre>
+      </div>
+    <div class="callout callout-warning"><p>⚠️ <strong>陷阱</strong>：docstring 必須是函式/類別/模組的<strong>第一個陳述式</strong>，且是<strong>字串字面值</strong>。放在其他陳述式之後不算；用 f-string（<code>f&quot;&quot;&quot;...&quot;&quot;&quot;</code>）也不算（那是運算式，不是字串字面值），<code>__doc__</code> 都會是 <code>None</code>。</p>
+</div><h3 id="pep-257-的格式慣例">PEP 257 的格式慣例</h3><p>PEP 257 訂下幾條約定，工具與同事都預期你遵守：</p>
+<ol>
+<li><strong>一律用三引號 <code>&quot;&quot;&quot;</code></strong>，就算只有一行也是——這樣日後要擴成多行不必改引號，也能塞進 <code>&quot;</code> 而不必跳脫。</li>
+<li><strong>動詞用祈使句（imperative mood）</strong>：寫 <code>Return the sum</code>（回傳……），而不是 <code>Returns the sum</code> 或 <code>This function returns...</code>。這是 Python 社群慣例，讀起來像在對函式下指令。</li>
+<li><strong>單行 docstring</strong>：摘要 + 句號，全部擠在一行的三引號內。</li>
+<li><strong>多行 docstring</strong>：第一行是<strong>摘要句</strong>，接一個<strong>空行</strong>，再寫詳細說明，最後<strong>結尾的 <code>&quot;&quot;&quot;</code> 自成一行</strong>。</li>
+</ol>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-98" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20add(a%3A%20float%2C%20b%3A%20float)%20-%3E%20float%3A%0A%20%20%20%20%22%22%22Return%20the%20sum%20of%20a%20and%20b.%22%22%22%20%20%20%20%20%20%20%20%23%20%E5%96%AE%E8%A1%8C%EF%BC%9A%E7%A5%88%E4%BD%BF%E5%8F%A5%20%2B%20%E5%8F%A5%E8%99%9F%0A%20%20%20%20return%20a%20%2B%20b%0A%0A%0Adef%20fetch(url%3A%20str%2C%20*%2C%20timeout%3A%20float%20%3D%2030.0%2C%20retries%3A%20int%20%3D%203)%20-%3E%20str%3A%0A%20%20%20%20%22%22%22Fetch%20a%20URL%20and%20return%20its%20body%20as%20text.%0A%0A%20%20%20%20Issues%20a%20GET%20request%20and%20retries%20on%20transient%20failures.%20The%0A%20%20%20%20response%20body%20is%20decoded%20with%20the%20charset%20from%20the%20headers.%0A%0A%20%20%20%20Args%3A%0A%20%20%20%20%20%20%20%20url%3A%20The%20absolute%20URL%20to%20fetch.%0A%20%20%20%20%20%20%20%20timeout%3A%20Per-attempt%20timeout%20in%20seconds.%0A%20%20%20%20%20%20%20%20retries%3A%20How%20many%20times%20to%20retry%20on%20a%205xx%20response.%0A%0A%20%20%20%20Returns%3A%0A%20%20%20%20%20%20%20%20The%20decoded%20response%20body.%0A%0A%20%20%20%20Raises%3A%0A%20%20%20%20%20%20%20%20ValueError%3A%20If%20url%20is%20not%20an%20absolute%20URL.%0A%20%20%20%20%20%20%20%20TimeoutError%3A%20If%20every%20attempt%20exceeds%20timeout.%0A%20%20%20%20%22%22%22%0A%20%20%20%20...'), 'copy-btn-98')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def add(a: float, b: float) -&gt; float:
+    """Return the sum of a and b."""        # 單行：祈使句 + 句號
+    return a + b
+
+
+def fetch(url: str, *, timeout: float = 30.0, retries: int = 3) -&gt; str:
+    """Fetch a URL and return its body as text.
+
+    Issues a GET request and retries on transient failures. The
+    response body is decoded with the charset from the headers.
+
+    Args:
+        url: The absolute URL to fetch.
+        timeout: Per-attempt timeout in seconds.
+        retries: How many times to retry on a 5xx response.
+
+    Returns:
+        The decoded response body.
+
+    Raises:
+        ValueError: If url is not an absolute URL.
+        TimeoutError: If every attempt exceeds timeout.
+    """
+    ...</code></pre>
+      </div>
+    <p>縮排不必擔心：<code>help()</code> 與 <code>inspect.getdoc()</code> 會自動把整段 docstring 的共同縮排去掉，所以你照函式縮排層級寫即可。</p>
+<h3 id="三種結構化風格googlenumpyrest">三種結構化風格：Google／NumPy／reST</h3><p>上面 <code>fetch</code> 用的是 <strong>Google style</strong>（<code>Args:</code>／<code>Returns:</code>／<code>Raises:</code> 區塊），是目前最常見、最好讀的一種。另外兩種你會在野外遇到：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-99" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20NumPy%20style%EF%BC%9A%E6%AC%84%E4%BD%8D%E7%94%A8%E5%BA%95%E7%B7%9A%E5%88%86%E9%9A%94%EF%BC%8C%E7%A7%91%E5%AD%B8%E9%81%8B%E7%AE%97%E7%94%9F%E6%85%8B%EF%BC%88numpy%2Fpandas%2Fscipy%EF%BC%89%E7%9A%84%E4%B8%BB%E6%B5%81%0Adef%20fetch_numpy(url%2C%20timeout%3D30.0)%3A%0A%20%20%20%20%22%22%22Fetch%20a%20URL%20and%20return%20its%20body.%0A%0A%20%20%20%20Parameters%0A%20%20%20%20----------%0A%20%20%20%20url%20%3A%20str%0A%20%20%20%20%20%20%20%20The%20absolute%20URL%20to%20fetch.%0A%20%20%20%20timeout%20%3A%20float%2C%20optional%0A%20%20%20%20%20%20%20%20Per-attempt%20timeout%20in%20seconds.%0A%0A%20%20%20%20Returns%0A%20%20%20%20-------%0A%20%20%20%20str%0A%20%20%20%20%20%20%20%20The%20decoded%20response%20body.%0A%20%20%20%20%22%22%22%0A%0A%23%20reStructuredText%20%2F%20Sphinx%20style%EF%BC%9A%E5%8E%9F%E7%94%9F%E7%9A%84%20%3Aparam%3A%EF%BC%8F%3Areturns%3A%20%E6%AC%84%E4%BD%8D%0Adef%20fetch_rest(url%2C%20timeout%3D30.0)%3A%0A%20%20%20%20%22%22%22Fetch%20a%20URL%20and%20return%20its%20body.%0A%0A%20%20%20%20%3Aparam%20url%3A%20The%20absolute%20URL%20to%20fetch.%0A%20%20%20%20%3Aparam%20timeout%3A%20Per-attempt%20timeout%20in%20seconds.%0A%20%20%20%20%3Areturns%3A%20The%20decoded%20response%20body.%0A%20%20%20%20%22%22%22'), 'copy-btn-99')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># NumPy style：欄位用底線分隔，科學運算生態（numpy/pandas/scipy）的主流
+def fetch_numpy(url, timeout=30.0):
+    """Fetch a URL and return its body.
+
+    Parameters
+    ----------
+    url : str
+        The absolute URL to fetch.
+    timeout : float, optional
+        Per-attempt timeout in seconds.
+
+    Returns
+    -------
+    str
+        The decoded response body.
+    """
+
+# reStructuredText / Sphinx style：原生的 :param:／:returns: 欄位
+def fetch_rest(url, timeout=30.0):
+    """Fetch a URL and return its body.
+
+    :param url: The absolute URL to fetch.
+    :param timeout: Per-attempt timeout in seconds.
+    :returns: The decoded response body.
+    """</code></pre>
+      </div>
+    <p>三種都能被 Sphinx 解析（Google／NumPy 需 <code>napoleon</code> 擴充）。<strong>重點不是選哪一種，而是整個專案統一一種。</strong> 給 Java 工程師的建議：從 Google style 起手，它最接近你習慣的 JavaDoc <code>@param</code>／<code>@return</code>／<code>@throws</code> 心智模型，又最少符號雜訊。</p>
+<h3 id="別在-docstring-裡重抄型別">別在 docstring 裡重抄型別</h3><p>JavaDoc 時代你可能習慣在 <code>@param</code> 寫上型別。在 Python，<strong>型別交給型別提示，docstring 只講語意</strong>。下面是反例與正解：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-100" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%23%20%E5%8F%8D%E4%BE%8B%EF%BC%9A%E5%9E%8B%E5%88%A5%E5%B7%B2%E7%B6%93%E5%9C%A8%E7%B0%BD%E7%AB%A0%E8%A3%A1%E4%BA%86%EF%BC%8Cdocstring%20%E9%87%8D%E6%8A%84%E4%B8%80%E9%81%8D%E5%8F%AA%E6%9C%83%E9%9B%99%E9%87%8D%E7%B6%AD%E8%AD%B7%E3%80%81%E5%AE%B9%E6%98%93%E4%B8%8D%E5%90%8C%E6%AD%A5%0Adef%20charge(amount%3A%20float)%20-%3E%20bool%3A%0A%20%20%20%20%22%22%22Charge%20the%20card.%0A%0A%20%20%20%20Args%3A%0A%20%20%20%20%20%20%20%20amount%20(float)%3A%20the%20amount.%20%20%20%20%23%20%E2%86%90%20(float)%20%E8%88%87%E5%9E%8B%E5%88%A5%E6%8F%90%E7%A4%BA%E9%87%8D%E8%A4%87%EF%BC%9B%22the%20amount%22%20%E7%AD%89%E6%96%BC%E6%B2%92%E8%AA%AA%E6%98%8E%0A%20%20%20%20Returns%3A%0A%20%20%20%20%20%20%20%20bool%3A%20True%20or%20False.%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E2%86%90%20%E6%B2%92%E8%AC%9B%20True%2FFalse%20%E5%90%84%E4%BB%A3%E8%A1%A8%E4%BB%80%E9%BA%BC%0A%20%20%20%20%22%22%22%0A%0A%23%20%E6%AD%A3%E8%A7%A3%EF%BC%9A%E5%9E%8B%E5%88%A5%E8%AE%93%E6%8F%90%E7%A4%BA%E8%AC%9B%EF%BC%8Cdocstring%20%E8%AC%9B%E3%80%8C%E7%82%BA%E4%BB%80%E9%BA%BC%E3%80%81%E5%96%AE%E4%BD%8D%E3%80%81%E9%82%8A%E7%95%8C%E3%80%81%E5%9B%9E%E5%82%B3%E7%9A%84%E6%84%8F%E7%BE%A9%E3%80%8D%0Adef%20charge(amount%3A%20float)%20-%3E%20bool%3A%0A%20%20%20%20%22%22%22Charge%20the%20card%20for%20%60amount%60%20and%20return%20whether%20it%20succeeded.%0A%0A%20%20%20%20Args%3A%0A%20%20%20%20%20%20%20%20amount%3A%20Charge%20value%20in%20the%20account%27s%20currency%3B%20must%20be%20%3E%200.%0A%0A%20%20%20%20Returns%3A%0A%20%20%20%20%20%20%20%20True%20if%20the%20gateway%20accepted%20the%20charge%2C%20False%20if%20it%20was%0A%20%20%20%20%20%20%20%20declined.%20Network%20errors%20raise%20instead%20of%20returning%20False.%0A%20%20%20%20%22%22%22'), 'copy-btn-100')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python"># 反例：型別已經在簽章裡了，docstring 重抄一遍只會雙重維護、容易不同步
+def charge(amount: float) -&gt; bool:
+    """Charge the card.
+
+    Args:
+        amount (float): the amount.    # ← (float) 與型別提示重複；"the amount" 等於沒說明
+    Returns:
+        bool: True or False.            # ← 沒講 True/False 各代表什麼
+    """
+
+# 正解：型別讓提示講，docstring 講「為什麼、單位、邊界、回傳的意義」
+def charge(amount: float) -&gt; bool:
+    """Charge the card for `amount` and return whether it succeeded.
+
+    Args:
+        amount: Charge value in the account's currency; must be &gt; 0.
+
+    Returns:
+        True if the gateway accepted the charge, False if it was
+        declined. Network errors raise instead of returning False.
+    """</code></pre>
+      </div>
+    <div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：公開的模組、類別、函式都該有 docstring（私有 helper 可省）。摘要句用祈使句、單行就講完核心用途；多行才補 <code>Args</code>/<code>Returns</code>/<code>Raises</code>。<strong>不要重抄型別提示已表達的資訊</strong>——docstring 的價值在「型別說不出口的語意」：單位、邊界條件、副作用、回傳值的意義、會丟哪些例外。</p>
+</div><h3 id="docstring-放在哪裡">docstring 放在哪裡</h3><p>不只函式，<strong>模組</strong>（檔案第一行）與<strong>類別</strong>也吃同一套規則：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-101" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('%22%22%22Payment%20processing%20utilities.%0A%0AThis%20module%20wraps%20the%20billing%20gateway%20and%20exposes%20a%20single%0A%60charge()%60%20entry%20point.%0A%22%22%22%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20%E2%86%90%20%E6%A8%A1%E7%B5%84%20docstring%EF%BC%9A%E6%AA%94%E6%A1%88%E7%9A%84%E7%AC%AC%E4%B8%80%E5%80%8B%E9%99%B3%E8%BF%B0%E5%BC%8F%0A%0Aclass%20Stack%3A%0A%20%20%20%20%22%22%22A%20last-in%2C%20first-out%20collection.%22%22%22%20%20%20%23%20%E2%86%90%20%E9%A1%9E%E5%88%A5%20docstring%0A%0A%20%20%20%20def%20push(self%2C%20item%3A%20int)%20-%3E%20None%3A%0A%20%20%20%20%20%20%20%20%22%22%22Add%20%60item%60%20to%20the%20top%20of%20the%20stack.%22%22%22%20%20%20%23%20%E2%86%90%20%E6%96%B9%E6%B3%95%20docstring%0A%20%20%20%20%20%20%20%20...'), 'copy-btn-101')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">"""Payment processing utilities.
+
+This module wraps the billing gateway and exposes a single
+`charge()` entry point.
+"""                                   # ← 模組 docstring：檔案的第一個陳述式
+
+class Stack:
+    """A last-in, first-out collection."""   # ← 類別 docstring
+
+    def push(self, item: int) -&gt; None:
+        """Add `item` to the top of the stack."""   # ← 方法 docstring
+        ...</code></pre>
+      </div>
+    <p><code>Stack.__doc__</code>、<code>Stack.push.__doc__</code> 都能在執行期讀到。模組 docstring 則存在 <code>模組名.__doc__</code>，也是 <code>python -m pydoc 模組名</code> 與 Sphinx 產文件的入口。</p>
+<div class="callout callout-tip"><p>💡 <strong>Pythonic 重點</strong>：docstring 不是「有空再補」的裝飾，而是 Python 把文件做成<strong>執行期一等公民</strong>的設計——<code>help()</code>、IDE、Sphinx、doctest 全靠它。養成「寫完簽章先補一句祈使句摘要」的肌肉記憶，就像你寫 Java 方法會反射性補 JavaDoc 一樣。</p>
+</div><hr>
+<h2 id="本章小結">本章小結</h2><ol>
+<li><strong>函式是一等物件</strong>：可賦值、可放進容器、可當參數與回傳值。<code>def</code> 是執行期建立函式物件並綁名字的陳述式，不是宣告。</li>
+<li><strong>dispatch table 取代 strategy pattern</strong>：當策略只是純函式時，把函式塞進 dict 就好，不需要介面與類別階層。</li>
+<li><strong>Python 沒有多載</strong>：用預設值、<code>*args</code>/<code>**kwargs</code>、keyword-only（<code>*</code> 後）、positional-only（<code>/</code> 前）把所有彈性塞進一個函式定義。</li>
+<li><strong>可變預設參數是大坑</strong>：預設值在「定義時」只算一次並被所有呼叫共用。永遠用 <code>None</code> 當哨兵，函式內判斷後再建可變物件。</li>
+<li><strong>lambda 只能是單一運算式</strong>：不能有陳述式。它只適合「一行、即用即丟」的 key 函式；複雜邏輯給它一個名字，或用 comprehension。</li>
+<li><strong>closure 預設只讀外層變數</strong>：要修改得用 <code>nonlocal</code>（改外層函式變數）或 <code>global</code>（改模組變數），不必像 Java 那樣用陣列 hack。</li>
+<li><strong>late binding 陷阱</strong>：迴圈中建立的 closure 捕捉的是「變數」而非當下的值，呼叫時才查找。用 <code>lambda x=x: ...</code> 在定義時鎖定值。</li>
+<li><strong>型別提示給工具看，不在執行期強制</strong>：搭配 mypy/pyright 把 Java 編譯器的型別檢查以可選方式裝回來，享受漸進式型別的彈性。</li>
+<li><strong>docstring 是給人看的執行期文件</strong>：函式/類別/模組的第一個字串字面值，存進 <code>__doc__</code>，是 <code>help()</code>、IDE、Sphinx、doctest 的原料（不像 JavaDoc 編譯後消失）。遵 PEP 257：三引號、祈使句摘要；用 Google/NumPy/reST 任一風格但全專案統一；別重抄型別提示已表達的型別，只講語意。</li>
+</ol>
+<hr>
+<h2 id="練習">練習</h2><p><strong>練習 1（dispatch table）</strong>
+你有一段 Java 風格的 <code>switch</code>／if-else，依 <code>command</code> 字串（<code>&quot;start&quot;</code>、<code>&quot;stop&quot;</code>、<code>&quot;restart&quot;</code>）呼叫不同方法。把它改寫成 Python 的 dispatch table，要求：用 dict 把字串對應到函式，並提供一個 <code>dispatch(command)</code> 函式；當 command 不存在時回傳預設行為（提示：<code>dict.get(command, default_fn)</code>）。</p>
+<p><strong>練習 2（修掉可變預設參數）</strong>
+下面的函式有兩個獨立的 bug，請各用一句話說明成因並修正：</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-102" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('def%20append_log(msg%2C%20log%3D%5B%5D)%3A%0A%20%20%20%20log.append(msg)%0A%20%20%20%20return%20log'), 'copy-btn-102')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">def append_log(msg, log=[]):
+    log.append(msg)
+    return log</code></pre>
+      </div>
+    <p>（提示：成因在「預設值何時求值」；解法用 <code>None</code> 哨兵。額外挑戰：解釋為什麼把預設值改成 tuple <code>()</code> 雖然不會累積，但 <code>log.append</code> 會直接報錯。）</p>
+<p><strong>練習 3（late binding）</strong>
+以下程式碼想建立三個「分別印出 0、1、2」的函式，但實際全印 2。請說明原因，並提供兩種以上的修法（提示：一種用預設參數綁定；想想還能不能用 <code>functools.partial</code>）。</p>
+
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="lang-tag">python</span>
+          <button id="copy-btn-103" class="copy-btn" onclick="window.copyToClipboard(decodeURIComponent('printers%20%3D%20%5Blambda%3A%20print(i)%20for%20i%20in%20range(3)%5D%0Afor%20p%20in%20printers%3A%0A%20%20%20%20p()'), 'copy-btn-103')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+        </div>
+        <pre class="language-python"><code class="language-python">printers = [lambda: print(i) for i in range(3)]
+for p in printers:
+    p()</code></pre>
+      </div>
+    <p><strong>練習 4（keyword-only API 設計）</strong>
+設計一個 <code>create_account(name, *, is_admin=False, send_email=True)</code>。說明為什麼把 <code>is_admin</code>、<code>send_email</code> 設計成 keyword-only 比讓它們能用位置傳更安全，並寫出一個會被 Python 擋下來的錯誤呼叫範例。</p>
+<p><strong>練習 5（型別提示 + Callable）</strong>
+把練習 1 的 dispatch table 加上完整型別提示，包含 dict 的型別（用 <code>Callable[...]</code>）與 <code>dispatch</code> 函式的簽章。接著故意傳一個型別不符的參數，觀察「程式照常執行」這件事，再（若已裝）用 mypy 跑一次，比較執行期與靜態檢查的差別。</p>
+<p><strong>練習 6（docstring 與 PEP 257）</strong>
+為練習 4 的 <code>create_account</code> 補一段 Google style 的多行 docstring：祈使句摘要、<code>Args</code>/<code>Returns</code>/<code>Raises</code> 區塊。要求（a）不要在 <code>Args</code> 重抄型別（型別交給型別提示），只寫語意與邊界；（b）寫完後在 REPL 用 <code>help(create_account)</code> 與 <code>create_account.__doc__</code> 各看一次，說明兩者差在哪（提示：<code>inspect.getdoc</code> 與縮排）；（c）把摘要句故意改成第二個陳述式（前面加一行 <code>x = 1</code>），再看 <code>__doc__</code>，解釋為什麼變成 <code>None</code>。</p>
